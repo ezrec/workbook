@@ -211,6 +211,21 @@ static void wbCloseWindow(Class *cl, Object *obj, struct Window *win)
     }
 }
 
+// Function to display the "About" pop-up
+static void wbAbout(Class *cl, Object *obj, struct Window *win)
+{
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct EasyStruct es = {
+       .es_StructSize = sizeof(es),
+       .es_Flags = 0,
+       .es_Title = "About",
+       .es_TextFormat = "Workbook v%ld.%ld",
+       .es_GadgetFormat = "Ok",
+    };
+
+    EasyRequest(0, &es, 0, WB_VERSION, WB_REVISION);
+}
+
 static BOOL wbMenuPick(Class *cl, Object *obj, struct Window *win, UWORD menuNumber)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
@@ -241,6 +256,9 @@ static BOOL wbMenuPick(Class *cl, Object *obj, struct Window *win, UWORD menuNum
             case WBMENU_ID(WBMENU_WB_QUIT):
                 quit = TRUE;
                 break;
+	    case WBMENU_ID(WBMENU_WB_ABOUT):
+		wbAbout(cl, obj, win);
+		break;
             case WBMENU_ID(WBMENU_WB_SHUTDOWN):
                 /* TODO: Ask if the user wants a shutdown or reboot */
                 ShutdownA(SD_ACTION_POWEROFF);
