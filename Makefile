@@ -4,6 +4,9 @@ WB_REVISION=1
 WB_ABOUT="(C) Copyright 2023 AmigaKit Ltd.\\n\\nAmibench uses code from the AROS project.\nWritten by Jason S. McMullan"
 
 RM=rm -f
+CP=cp
+MKDIR=mkdir -p
+ZIP=zip
 
 VBCC=/opt/vbcc
 VBCC_CONFIG=aos68k

@@ -4,4 +4,6 @@ LoadWB
 *.o
 *.i
 tags
+*.o
+*.i
 release.zip
