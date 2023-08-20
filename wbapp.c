@@ -216,7 +216,7 @@ static void wbAbout(Class *cl, Object *obj, struct Window *win)
        .es_StructSize = sizeof(es),
        .es_Flags = 0,
        .es_Title = AS_STRING(WB_NAME),
-       .es_TextFormat = "Release V%ld.%ld %s",
+       .es_TextFormat = "Release V%ld.%ld\n%s",
        .es_GadgetFormat = "Ok",
     };
     IPTR args[] = { WB_VERSION, WB_REVISION, (IPTR)AS_STRING(WB_ABOUT) };

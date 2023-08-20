@@ -1,7 +1,7 @@
-WB_NAME=AmiBench
+WB_NAME="AmiBench"
 WB_VERSION=46
 WB_REVISION=1
-WB_ABOUT="(C) Copyright 2023 AmigaKit Ltd.\n\nAmibench uses code from the AROS project written by Jason McMullan"
+WB_ABOUT="(C) Copyright 2023 AmigaKit Ltd.\\n\\nAmibench uses code from the AROS project.\nWritten by Jason S. McMullan"
 
 RM=rm -f
 CP=cp
@@ -14,7 +14,7 @@ VBCC_CONFIG=aos68k
 AMIGA_NDK=$(VBCC)/targets/m68k-amigaos/NDK_3.9
 
 INCLUDES=$(VBCC)/targets/m68k-amigaos/include $(AMIGA_NDK)/Include/include_h
-DEFINES=-DWB_NAME='\"$(WB_NAME)\"' -DWB_VERSION=$(WB_VERSION) -DWB_REVISION=$(WB_REVISION) -DWB_ABOUT='\"$(WB_ABOUT)\"'
+DEFINES=-DWB_NAME='$(WB_NAME)' -DWB_VERSION=$(WB_VERSION) -DWB_REVISION=$(WB_REVISION) -DWB_ABOUT='$(WB_ABOUT)'
 
 CFLAGS=+$(VBCC_CONFIG) -O0 $(patsubst %,-I%,$(INCLUDES)) $(DEFINES)
 
