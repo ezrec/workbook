@@ -519,7 +519,7 @@ static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
         my->Path = AllocVec(strlen(path)+1, MEMF_ANY);
         if (my->Path == NULL)
             goto error;
-        
+
         strcpy(my->Path, path);
     }
 
@@ -538,7 +538,7 @@ static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
                         WA_SmartRefresh, TRUE,
                         WA_NewLookMenus, TRUE,
                         WA_PubScreen, NULL,
-                        TAG_MORE, ops->ops_AttrList );
+                        ops->ops_AttrList == NULL ? TAG_END : TAG_MORE, ops->ops_AttrList );
         my->Window->BorderTop = my->Window->WScreen->BarHeight+1;
     } else {
         struct DiskObject *icon;
@@ -548,7 +548,7 @@ static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
             { WA_Top, 64 },
             { WA_Width, 200, },
             { WA_Height, 150, },
-            { TAG_MORE, (IPTR)ops->ops_AttrList },
+            { ops->ops_AttrList == NULL ? TAG_END : TAG_MORE, (IPTR)ops->ops_AttrList },
         };
 
         icon = GetDiskObjectNew(my->Path);
@@ -556,9 +556,10 @@ static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
             goto error;
 
         if (icon->do_DrawerData) {
+            // If we have dd_NewWindow data, don't override the window placement via extra[]
             nwin = &icon->do_DrawerData->dd_NewWindow;
             D(bug("%s: NewWindow %p\n", __func__, nwin));
-            extra[0].ti_Tag = TAG_MORE;
+            extra[0].ti_Tag = ops->ops_AttrList == NULL ? TAG_END : TAG_MORE;
             extra[0].ti_Data = (IPTR)ops->ops_AttrList;
         }
 
@@ -619,7 +620,7 @@ static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
                 PGA_Visible, 1,
                 PGA_Top, 0,
                 TAG_END)), 0);
-    
+
     /* Add the horizontal scrollbar */
     AddGadget(my->Window, (struct Gadget *)(my->ScrollH = NewObject(NULL, "propgclass",
                 ICA_TARGET, (IPTR)obj,

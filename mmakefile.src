@@ -17,7 +17,7 @@ USER_CPPFLAGS += \
                  -DWB_NAME='AmiBench' \
                  -DWB_VERSION=46 \
                  -DWB_REVISION=1 \
-                 -DWB_ABOUT='(C) Copyright 2023 AmigaKit Ltd.\n\nAmibench uses code from the AROS project written by Jason McMullan'
+                 -DWB_ABOUT='(C) Copyright 2023 AmigaKit Ltd.\n\nAmibench uses code from the AROS project.\nWritten by Jason McMullan'
 
 %build_prog mmake=workbench-system-workbook \
     progname=Workbook targetdir=$(AROS_SYSTEM) \
