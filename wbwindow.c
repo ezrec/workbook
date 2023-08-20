@@ -154,10 +154,7 @@ static BOOL wbMenuEnable(Class *cl, Object *obj, int id, BOOL onoff)
     return rc;
 }
 
-AROS_UFH3(ULONG, wbFilterIcons_Hook,
-    AROS_UFHA(struct Hook*, hook, A0),
-    AROS_UFHA(struct ExAllData*, ead, A2),
-    AROS_UFHA(LONG *, type, A1))
+static ULONG wbFilterIcons_Hook(struct Hook *hook, LONG *type, struct ExAllData *ead)
 {
     AROS_USERFUNC_INIT
     int i;
@@ -179,10 +176,7 @@ AROS_UFH3(ULONG, wbFilterIcons_Hook,
     AROS_USERFUNC_EXIT
 }
 
-AROS_UFH3(ULONG, wbFilterAll_Hook,
-    AROS_UFHA(struct Hook*, hook, A0),
-    AROS_UFHA(struct ExAllData*, ead, A2),
-    AROS_UFHA(LONG *, type, A1))
+static ULONG wbFilterAll_Hook(struct Hook *hook, LONG *type, struct ExAllData *ead)
 {
     AROS_USERFUNC_INIT
 
@@ -280,8 +274,8 @@ static void wbAddFiles(Class *cl, Object *obj)
             struct Hook hook;
             BOOL more = TRUE;
 
-            hook.h_Entry = my->FilterHook;
-            hook.h_SubEntry = NULL;
+            hook.h_Entry = HookEntry;
+            hook.h_SubEntry = my->FilterHook;
             hook.h_Data = wb;
 
             eac->eac_MatchFunc = &hook;
