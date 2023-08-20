@@ -4,9 +4,6 @@
     Desc: Workbook Application Class
 */
 
-#define DEBUG 1
-#include <aros/debug.h>
-
 #include <string.h>
 #include <limits.h>
 
@@ -15,12 +12,12 @@
 #include <proto/intuition.h>
 #include <proto/utility.h>
 #include <proto/gadtools.h>
-#include <proto/workbench.h>
 #include <proto/graphics.h>
 
+#include <dos/dostags.h>
 #include <intuition/classusr.h>
+#include <intuition/intuition.h>
 #include <libraries/gadtools.h>
-#include <workbench/handler.h>
 
 #include "workbook_intern.h"
 #include "workbook_menu.h"
@@ -51,7 +48,7 @@ static void wbOpenDrawer(Class *cl, Object *obj, CONST_STRPTR path)
         struct opMember opmmsg;
         opmmsg.MethodID = OM_ADDMEMBER;
         opmmsg.opam_Object = win;
-        DoMethodA(obj, &opmmsg);
+        DoMethodA(obj, (Msg)&opmmsg);
     }
 }
 
@@ -118,7 +115,7 @@ static IPTR WBAppDispose(Class *cl, Object *obj, Msg msg)
     while ((tmp = NextObject(&tstate))) {
         STACKED ULONG omrmethodID;
         omrmethodID = OM_REMOVE;
-        DoMethodA(tmp, &omrmethodID);
+        DoMethodA(tmp, (Msg)&omrmethodID);
         DisposeObject(obj);
     }
 
@@ -140,7 +137,7 @@ static IPTR WBAppAddMember(Class *cl, Object *obj, struct opMember *opm)
     omatmsg.MethodID = OM_ADDTAIL;
     omatmsg.opat_List = (struct List *)&my->Windows;
 
-    return DoMethodA(opm->opam_Object, &omatmsg);
+    return DoMethodA(opm->opam_Object, (Msg)&omatmsg);
 }
 
 // OM_REMMEMBER
@@ -148,7 +145,7 @@ static IPTR WBAppRemMember(Class *cl, Object *obj, struct opMember *opm)
 {
     STACKED ULONG omrmethodID;
     omrmethodID = OM_REMOVE;
-    return DoMethodA(opm->opam_Object, &omrmethodID);
+    return DoMethodA(opm->opam_Object, (Msg)&omrmethodID);
 }
 
 
@@ -182,7 +179,7 @@ static void wbRefreshWindow(Class *cl, Object *obj, struct Window *win)
     if ((owin = wbLookupWindow(cl, obj, win))) {
         STACKED ULONG wbrefmethodID;
         wbrefmethodID = WBWM_REFRESH;
-        DoMethodA(owin, &wbrefmethodID);
+        DoMethodA(owin, (Msg)&wbrefmethodID);
     }
 }
 
@@ -193,7 +190,7 @@ static void wbNewSizeWindow(Class *cl, Object *obj, struct Window *win)
     if ((owin = wbLookupWindow(cl, obj, win))) {
         STACKED ULONG wbnewsmethodID;
         wbnewsmethodID = WBWM_NEWSIZE;
-        DoMethodA(owin, &wbnewsmethodID);
+        DoMethodA(owin, (Msg)&wbnewsmethodID);
     }
 }
 
@@ -206,7 +203,7 @@ static void wbCloseWindow(Class *cl, Object *obj, struct Window *win)
         struct opMember opmmsg;
         opmmsg.MethodID = OM_REMMEMBER;
         opmmsg.opam_Object = owin;
-        DoMethodA(obj, &opmmsg);
+        DoMethodA(obj, (Msg)&opmmsg);
         DisposeObject(owin);
     }
 }
@@ -218,11 +215,11 @@ static void wbAbout(Class *cl, Object *obj, struct Window *win)
     struct EasyStruct es = {
        .es_StructSize = sizeof(es),
        .es_Flags = 0,
-       .es_Title = "About",
-       .es_TextFormat = "Workbook v%ld.%ld",
+       .es_Title = AS_STRING(WB_NAME),
+       .es_TextFormat = "Release V%ld.%ld %s",
        .es_GadgetFormat = "Ok",
     };
-    IPTR args[] = { WB_VERSION, WB_REVISION };
+    IPTR args[] = { WB_VERSION, WB_REVISION, (IPTR)AS_STRING(WB_ABOUT) };
 
     EasyRequestArgs(0, &es, 0, (RAWARG)args);
 }
@@ -443,10 +440,21 @@ static BOOL wbMenuPick(Class *cl, Object *obj, struct Window *win, UWORD menuNum
             wbmpmsg.MethodID = WBWM_MENUPICK;
             wbmpmsg.wbwmp_MenuItem = item;
             wbmpmsg.wbwmp_MenuNumber = menuNumber;
-            handled = DoMethodA(owin, &wbmpmsg);
+            handled = DoMethodA(owin, (Msg)&wbmpmsg);
         }
 
         if (!handled) {
+            LONG rc;
+            struct EasyStruct es = {
+                .es_StructSize = sizeof(es),
+                .es_Title = (STRPTR)"Shutdown",
+                .es_TextFormat = (STRPTR)"System is ready to shut down.",
+#ifdef __AROS__
+                .es_GadgetFormat = "Shutdown|Reboot",
+#else
+                .es_GadgetFormat = "Reboot",
+#endif
+            };
             switch (WBMENU_ITEM_ID(item)) {
             case WBMENU_ID(WBMENU_WB_QUIT):
                 quit = TRUE;
@@ -458,10 +466,17 @@ static BOOL wbMenuPick(Class *cl, Object *obj, struct Window *win, UWORD menuNum
 		wbExecute(cl, obj, win);
 		break;
             case WBMENU_ID(WBMENU_WB_SHUTDOWN):
-                /* TODO: Ask if the user wants a shutdown or reboot */
-                ShutdownA(SD_ACTION_POWEROFF);
-                /* Can't power off. Try to reboot. */
-                ShutdownA(SD_ACTION_COLDREBOOT);
+                rc = EasyRequest(NULL, &es, NULL, TAG_DONE);
+#ifdef __AROS__
+                if (rc == 1) {
+                    /* TODO: Ask if the user wants a shutdown or reboot */
+                    ShutdownA(SD_ACTION_POWEROFF);
+                } else {
+                    /* Can't power off. Try to reboot. */
+                    ShutdownA(SD_ACTION_COLDREBOOT);
+                }
+#endif
+                ColdReboot();
                 break;
             }
         }
@@ -479,7 +494,7 @@ static void wbIntuiTick(Class *cl, Object *obj, struct Window *win)
     if ((owin = wbLookupWindow(cl, obj, win))) {
         STACKED ULONG wbintuitmethodID;
         wbintuitmethodID = WBWM_INTUITICK;
-        DoMethodA(owin, &wbintuitmethodID);
+        DoMethodA(owin, (Msg)&wbintuitmethodID);
     }
 }
 
@@ -493,7 +508,7 @@ static void wbHideAllWindows(Class *cl, Object *obj)
     while ((owin = NextObject(&ostate))) {
         STACKED ULONG wbhidemethodid;
         wbhidemethodid = WBWM_HIDE;
-        DoMethodA(owin, &wbhidemethodid);
+        DoMethodA(owin, (Msg)&wbhidemethodid);
     }
 }
 
@@ -507,7 +522,7 @@ static void wbShowAllWindows(Class *cl, Object *obj)
     while ((owin = NextObject(&ostate))) {
         STACKED ULONG wbshowmethodid;
         wbshowmethodid = WBWM_SHOW;
-        DoMethodA(owin, &wbshowmethodid);
+        DoMethodA(owin, (Msg)&wbshowmethodid);
     }
 }
 
@@ -522,7 +537,7 @@ static void wbCloseAllWindows(Class *cl, Object *obj)
         struct opMember opmmsg;
         opmmsg.MethodID = OM_REMMEMBER;
         opmmsg.opam_Object = owin;
-        DoMethodA(obj, &opmmsg);
+        DoMethodA(obj, (Msg)&opmmsg);
         DisposeObject(owin);
     }
 }

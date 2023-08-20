@@ -25,7 +25,7 @@
 #define WBMENU_ITEM_ID(item) ((IPTR)GTMENUITEM_USERDATA(item))
 
 /* Workbench Menu */
-#define WBMENU_WB               "Workbook"
+#define WBMENU_WB               AS_STRING(WB_NAME)
 #define WBMENU_WB_BACKDROP	0, "Backdrop",  "B", Broken 0, 0
 #define WBMENU_WB_EXECUTE	1, "Execute",   "E", 0, 0
 #define WBMENU_WB_SHELL		2, "Shell",     "W", 0, 0

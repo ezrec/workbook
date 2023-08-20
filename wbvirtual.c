@@ -4,9 +4,6 @@
     Desc: Workbook Virtual Area Class
 */
 
-#define DEBUG 0
-#include <aros/debug.h>
-
 #include <string.h>
 #include <limits.h>
 
@@ -15,7 +12,6 @@
 #include <proto/intuition.h>
 #include <proto/utility.h>
 #include <proto/gadtools.h>
-#include <proto/workbench.h>
 #include <proto/graphics.h>
 #include <proto/layers.h>
 
@@ -134,7 +130,7 @@ static IPTR WBVirtualNew(Class *cl, Object *obj, struct opSet *ops)
     smsg.ops_GInfo = ops->ops_GInfo;
     smsg.ops_AttrList = ops->ops_AttrList;
 
-    DoMethodA(obj, &smsg);
+    DoMethodA(obj, (Msg)&smsg);
 
     return rc;
 }

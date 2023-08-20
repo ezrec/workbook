@@ -9,6 +9,8 @@
 #include <utility/tagitem.h>
 #include <clib/alib_protos.h>
 
+#include "workbook_intern.h"
+
 /* WBApp class
  *
  * Workbench replacement

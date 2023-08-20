@@ -4,9 +4,6 @@
     Desc: Workbook Icon Set Class
 */
 
-#define DEBUG 0
-#include <aros/debug.h>
-
 #include <string.h>
 #include <limits.h>
 
@@ -15,7 +12,6 @@
 #include <proto/intuition.h>
 #include <proto/utility.h>
 #include <proto/gadtools.h>
-#include <proto/workbench.h>
 #include <proto/graphics.h>
 
 #include <intuition/classusr.h>
