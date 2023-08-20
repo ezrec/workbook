@@ -27,7 +27,7 @@ OBJS=$(patsubst %.c,%.o,$(SRCS))
 all: LoadWB
 
 clean:
-	$(RM) LoadWB $(OBJS)
+	$(RM) LoadWB $(OBJS) release.zip
 
 %.o: %.c $(HDRS)
 	vc $(CFLAGS) -c $<
