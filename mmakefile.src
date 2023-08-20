@@ -19,15 +19,4 @@ FILES := workbook workbook_intern \
     files="main $(FILES)" \
     detach=no
 
-## For the 'workbook.resource' embedded commands
-USER_CPPFLAGS += \
-               -DUSE_EXEC_DEBUG \
-	       -DAROS_ROM
-
-OBJDIR := $(OBJDIR).kernel
-
-%build_module mmake=kernel-workbook \
-  modname=workbook modtype=resource \
-  files="workbook_init $(FILES)"
-
 %common
