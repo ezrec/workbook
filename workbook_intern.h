@@ -79,6 +79,16 @@ extern struct ExecBase *SysBase;
 #include <string.h>
 #include <proto/exec.h>
 
+typedef VOID (*wbPopupActionFunc)(struct WorkbookBase *wb, CONST_STRPTR input, APTR arg);
+
+VOID wbPopupAction(struct WorkbookBase *wb,
+                         CONST_STRPTR title,
+                         CONST_STRPTR description,
+                         CONST_STRPTR request,
+                         STRPTR saveBuffer, // Can be NULL,
+                         LONG saveBufferSize, // Can be 0
+                         wbPopupActionFunc action,
+                         APTR arg);
 struct Region *wbClipWindow(struct WorkbookBase *wb, struct Window *win);
 void wbUnclipWindow(struct WorkbookBase *wb, struct Window *win, struct Region *clip);
 ULONG WorkbookMain(void);
