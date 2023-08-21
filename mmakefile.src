@@ -3,7 +3,8 @@
 include $(SRCDIR)/config/aros.cfg
 
 USER_CPPFLAGS := \
-               -D__NOLIBBASE__
+               -D__NOLIBBASE__ \
+	       -DDEBUG=0
 
 FILES := workbook workbook_intern \
          wbapp \
@@ -12,15 +13,15 @@ FILES := workbook workbook_intern \
          wbset \
          wbicon
 
-#MM- workbench-system : workbench-system-workbook
+#MM- workbench-system : workbench-system-loadwb
 USER_CPPFLAGS += \
-                 -DWB_NAME='AmiBench' \
-                 -DWB_VERSION=46 \
-                 -DWB_REVISION=1 \
-                 -DWB_ABOUT='(C) Copyright 2023 AmigaKit Ltd.\n\nAmibench uses code from the AROS project.\nWritten by Jason McMullan'
+                 -DWB_NAME='Workbook' \
+                 -DWB_VERSION=1 \
+                 -DWB_REVISION=2 \
+                 -DWB_ABOUT='(C) Copyright 2023\nThe AROS Development Team'
 
-%build_prog mmake=workbench-system-workbook \
-    progname=Workbook targetdir=$(AROS_SYSTEM) \
+%build_prog mmake=workbench-system-loadwb \
+    progname=LoadWB targetdir=$(AROS_SYSTEM) \
     files="main $(FILES)" \
     detach=no
 
