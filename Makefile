@@ -17,6 +17,10 @@ INCLUDES=$(VBCC)/targets/m68k-amigaos/include $(AMIGA_NDK)/Include/include_h
 DEFINES=-DWB_NAME='$(WB_NAME)' -DWB_VERSION=$(WB_VERSION) -DWB_REVISION=$(WB_REVISION) -DWB_ABOUT='$(WB_ABOUT)'
 
 CFLAGS=+$(VBCC_CONFIG) -g -O0 -DDEBUG=0 \
+	   -warn=-1 \
+	   -dontwarn=81 \
+	   -dontwarn=65 -dontwarn=163 -dontwarn=167 \
+	   -dontwarn=307 -dontwarn=306 -warnings-as-errors \
 	   $(patsubst %,-I%,$(INCLUDES)) $(DEFINES)
 LINKOPTS=-L$(AMIGA_NDK)/Include/linker_libs -ldebug -lamigas
 
