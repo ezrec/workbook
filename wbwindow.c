@@ -947,16 +947,17 @@ static IPTR WBWindowIntuiTick(Class *cl, Object *obj, Msg msg)
     IPTR rc = FALSE;
 
     if (my->Tick == 0) {
-        ULONG val[5];
+        IPTR val[6];
 
-        val[0] = WB_VERSION;
-        val[1] = WB_REVISION;
-        val[2] = AvailMem(MEMF_CHIP) / 1024;
-        val[3] = AvailMem(MEMF_FAST) / 1024;
-        val[4] = AvailMem(MEMF_ANY) / 1024;
+        val[0] = (IPTR)AS_STRING(WB_NAME);
+        val[1] = WB_VERSION;
+        val[2] = WB_REVISION;
+        val[3] = AvailMem(MEMF_CHIP) / 1024;
+        val[4] = AvailMem(MEMF_FAST) / 1024;
+        val[5] = AvailMem(MEMF_ANY) / 1024;
 
         /* Update the window's title */
-        RawDoFmt("Workbook %ld.%ld  Chip: %ldk, Fast: %ldk, Any: %ldk", (RAWARG)val,
+        RawDoFmt("%s %ld.%ld  Chip: %ldk, Fast: %ldk, Any: %ldk", (RAWARG)val,
                  RAWFMTFUNC_STRING, my->ScreenTitle);
 
         SetWindowTitles(my->Window, (CONST_STRPTR)-1, my->ScreenTitle);

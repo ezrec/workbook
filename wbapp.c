@@ -215,12 +215,12 @@ static void wbAbout(Class *cl, Object *obj, struct Window *win)
     struct EasyStruct es = {
        .es_StructSize = sizeof(es),
        .es_Flags = 0,
-       .es_Title = "About",
-       .es_TextFormat = "Workbook v%ld.%ld",
+       .es_Title = AS_STRING(WB_NAME),
+       .es_TextFormat = "Release V%ld.%ld %s",
        .es_GadgetFormat = "Ok",
     };
 
-    EasyRequest(0, &es, 0, WB_VERSION, WB_REVISION);
+    EasyRequest(0, &es, 0, WB_VERSION, WB_REVISION, (IPTR)AS_STRING(WB_ABOUT));
 }
 
 static void execute_command(struct WorkbookBase *wb, const char *command) {

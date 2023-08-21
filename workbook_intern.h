@@ -7,9 +7,12 @@
 #ifndef WORKBOOK_H
 #define WORKBOOK_H
 
+#ifndef WB_NAME
+#define WB_NAME     "Workbook"
+#endif
 #ifndef WB_VERSION
-#define WB_VERSION	1
-#define WB_REVISION	0
+#define WB_VERSION 1
+#define WB_REVISION	2
 #endif
 
 #define _D(x)
@@ -17,7 +20,6 @@
 #define AS_STRING(x) _AS_STRING(x)
 
 #ifdef __AROS__
-#include <clib/boopsistubs.h>
 #include <dos/bptr.h>
 #include <exec/rawfmt.h>
 #include <proto/workbench.h>
