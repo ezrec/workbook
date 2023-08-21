@@ -4,13 +4,13 @@
     Desc: Workbook Resource
 */
 
-#define DEBUG 0
-#include <aros/debug.h>
 #include <aros/symbolsets.h>
 
 #include <exec/resident.h>
 #include <proto/exec.h>
 #include <proto/dos.h>
+
+#include "workbook_intern.h"
 
 #include LC_LIBDEFS_FILE
 

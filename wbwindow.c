@@ -4,9 +4,7 @@
     Desc: Workbook Window Class
 */
 
-#define DEBUG 0
-#include <aros/debug.h>
-
+#include <stdio.h>
 #include <string.h>
 #include <limits.h>
 #include <intuition/icclass.h>
@@ -16,20 +14,21 @@
 #include <proto/intuition.h>
 #include <proto/utility.h>
 #include <proto/gadtools.h>
+#ifdef __AROS__
 #include <proto/workbench.h>
+#else
+#include <proto/wb.h>
+#endif
 #include <proto/graphics.h>
 #include <proto/layers.h>
 #include <proto/icon.h>
 
 #include <intuition/classusr.h>
 #include <libraries/gadtools.h>
-#include <exec/rawfmt.h>
 
 #include "workbook_intern.h"
 #include "workbook_menu.h"
 #include "classes.h"
-
-#include <clib/boopsistubs.h>
 
 static inline WORD max(WORD a, WORD b)
 {
@@ -156,7 +155,6 @@ static BOOL wbMenuEnable(Class *cl, Object *obj, int id, BOOL onoff)
 
 static ULONG wbFilterIcons_Hook(struct Hook *hook, LONG *type, struct ExAllData *ead)
 {
-    AROS_USERFUNC_INIT
     int i;
 
     if (stricmp(ead->ed_Name, "disk.info") == 0)
@@ -173,13 +171,10 @@ static ULONG wbFilterIcons_Hook(struct Hook *hook, LONG *type, struct ExAllData 
 
     return FALSE;
     
-    AROS_USERFUNC_EXIT
 }
 
 static ULONG wbFilterAll_Hook(struct Hook *hook, LONG *type, struct ExAllData *ead)
 {
-    AROS_USERFUNC_INIT
-
     int i;
 
     if (stricmp(ead->ed_Name, "disk.info") == 0)
@@ -195,8 +190,6 @@ static ULONG wbFilterAll_Hook(struct Hook *hook, LONG *type, struct ExAllData *e
         return FALSE;
 
     return TRUE;
-    
-    AROS_USERFUNC_EXIT
 }
 
 static int wbwiIconCmp(Class *cl, Object *obj, Object *a, Object *b)
@@ -311,7 +304,7 @@ static void wbAddVolumeIcons(Class *cl, Object *obj)
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbWindow *my = INST_DATA(cl, obj);
     struct DosList *dl;
-    char text[NAME_MAX];
+    char text[FILENAME_MAX];
 
     /* Add all the DOS disks */
     dl = LockDosList(LDF_VOLUMES | LDF_READ);
@@ -344,7 +337,7 @@ static void wbAddAppIcons(Class *cl, Object *obj)
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbWindow *my = INST_DATA(cl, obj);
     struct DiskObject *icon;
-    char text[NAME_MAX];
+    char text[FILENAME_MAX];
 
     /* Add all the AppIcons */
     icon = NULL;
@@ -438,9 +431,9 @@ static void wbRescan(Class *cl, Object *obj)
 
     /* Remove and undisplay any existing icons */
     opmmsg.MethodID = OM_REMMEMBER;
-    while ((wbwi = (struct wbWindow_Icon *)REMHEAD(&my->IconList)) != NULL) {
+    while ((wbwi = (struct wbWindow_Icon *)REMHEAD((struct List *)&my->IconList)) != NULL) {
         opmmsg.opam_Object = wbwi->wbwiObject;
-        DoMethodA(my->Set, &opmmsg);
+        DoMethodA(my->Set, (Msg)&opmmsg);
         DisposeObject(wbwi->wbwiObject);
         FreeMem(wbwi, sizeof(*wbwi));
     }
@@ -461,7 +454,7 @@ static void wbRescan(Class *cl, Object *obj)
     ForeachNode(&my->IconList, wbwi)
     {
         opmmsg.opam_Object = wbwi->wbwiObject;
-        DoMethodA(my->Set, &opmmsg);
+        DoMethodA(my->Set, (Msg)&opmmsg);
     }
 
     /* Adjust the scrolling regions */
@@ -512,7 +505,7 @@ static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
     my = INST_DATA(cl, obj);
 
     NEWLIST(&my->IconList);
-    my->FilterHook = wbFilterIcons_Hook;
+    my->FilterHook = (APTR)wbFilterIcons_Hook;
 
     path = (CONST_STRPTR)GetTagData(WBWA_Path, (IPTR)NULL, ops->ops_AttrList);
     if (path == NULL) {
@@ -674,7 +667,7 @@ static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
     return rc;
 
 error:
-    while ((wbwi = (APTR)GetHead(&my->IconList))) {
+    while ((wbwi = (APTR)GetHead((struct List *)&my->IconList))) {
         Remove((struct Node *)wbwi);
         FreeMem(wbwi, sizeof(*wbwi));
     }
@@ -729,7 +722,7 @@ static IPTR WBWindowDispose(Class *cl, Object *obj, Msg msg)
     }
 
     /* We won't need our list of icons anymore */
-    while ((wbwi = (APTR)GetHead(&my->IconList))) {
+    while ((wbwi = (APTR)GetHead((struct List *)&my->IconList))) {
         Remove((struct Node *)wbwi);
         FreeMem(wbwi, sizeof(*wbwi));
     }
@@ -895,11 +888,11 @@ static IPTR WBWindowMenuPick(Class *cl, Object *obj, struct wbwm_MenuPick *wbwmp
         }
         break;
     case WBMENU_ID(WBMENU_WN__SHOW_ICONS):
-        my->FilterHook = wbFilterIcons_Hook;
+        my->FilterHook = (APTR)wbFilterIcons_Hook;
         wbRescan(cl, obj);
         break;
     case WBMENU_ID(WBMENU_WN__SHOW_ALL):
-        my->FilterHook = wbFilterAll_Hook;
+        my->FilterHook = (APTR)wbFilterAll_Hook;
         wbRescan(cl, obj);
         break;
     case WBMENU_ID(WBMENU_WB_SHELL):

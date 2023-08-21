@@ -4,10 +4,7 @@
     Desc: Workbook Icon Class
 */
 
-#define DEBUG 0
 #include <string.h>
-
-#include <aros/debug.h>
 
 #include <proto/icon.h>
 #include <proto/intuition.h>
@@ -17,9 +14,14 @@
 #include <proto/dos.h>
 #include <proto/icon.h>
 #include <proto/graphics.h>
+#ifdef __AROS__
 #include <proto/workbench.h>
+#else
+#include <proto/wb.h>
+#endif
 
 #include <intuition/cghooks.h>
+#include <dos/dostags.h>
 
 #include "workbook_intern.h"
 #include "classes.h"
@@ -230,7 +232,7 @@ static IPTR wbIconGoActive(Class *cl, Object *obj, struct gpInput *gpi)
         gadget->Flags ^= GFLG_SELECTED;
         /* Clip to the window for drawing */
         clip = wbClipWindow(wb, gpi->gpi_GInfo->gi_Window);
-        DoMethodA(obj, &rmsg);
+        DoMethodA(obj, (Msg)&rmsg);
         wbUnclipWindow(wb, gpi->gpi_GInfo->gi_Window, clip);
         ReleaseGIRPort(rp);
     }
@@ -308,7 +310,9 @@ static IPTR wbIconInfo(Class *cl, Object *obj, Msg msg)
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
 
-    return WBInfo(BNULL, my->File, NULL);
+    WBInfo(BNULL, my->File, NULL);
+
+    return TRUE;
 }
 
 // WBIM_Snapshot

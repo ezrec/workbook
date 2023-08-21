@@ -10,8 +10,6 @@
 #include <proto/intuition.h>
 #include <proto/exec.h>
 #include <proto/icon.h>
-#include <proto/workbench.h>
-#include <proto/arossupport.h>
 
 #include "workbook_intern.h"
 #include "classes.h"
@@ -45,7 +43,7 @@ static int WB_Main(struct WorkbookBase *wb)
     if (wb->wb_App) {
         STACKED ULONG wbmethodID;
         wbmethodID = WBAM_WORKBENCH;
-        DoMethodA(wb->wb_App, &wbmethodID);
+        DoMethodA(wb->wb_App, (Msg)&wbmethodID);
         DisposeObject(wb->wb_App);
         rc = 0;
     }
@@ -71,26 +69,23 @@ exit:
 /* This wrapper is needed, so that we can start
  * workbench items from an Input handler
  */
-AROS_PROCH(wbOpener, argstr, argsize, SysBase)
+static AROS_PROCH(wbOpener, argstr, argsize, SysBase)
 {
     AROS_PROCFUNC_INIT
 
     APTR WorkbenchBase = OpenLibrary("workbench.library", 0);
-    APTR DOSBase = OpenLibrary("dos.library", 0);
-
-    if (WorkbenchBase && DOSBase) {
+    if (WorkbenchBase) {
         /* 'argstr' is already an absolute path */
+        D(bug("%s: OpenWorkbenchObject(%s)\n", __func__, argstr));
         OpenWorkbenchObject(argstr, TAG_END);
+        CloseLibrary(WorkbenchBase);
     }
-
-    CloseLibrary(DOSBase);
-    CloseLibrary(WorkbenchBase);
+    D(bug("%s: Close\n", __func__));
 
     return 0;
 
     AROS_PROCFUNC_EXIT
 }
-
 
 ULONG WorkbookMain(void)
 {
@@ -127,8 +122,8 @@ ULONG WorkbookMain(void)
     if (wb->wb_IconBase == NULL)
         goto error;
 
-    /* Version 44 or later for OpenWorkbenchObject */
-    wb->wb_WorkbenchBase = OpenLibrary("workbench.library",44);
+    /* Version 45 or later for RegisterWorkbench */
+    wb->wb_WorkbenchBase = OpenLibrary("workbench.library",45);
     if (wb->wb_WorkbenchBase == NULL)
         goto error;
 
