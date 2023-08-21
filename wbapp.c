@@ -226,6 +226,200 @@ static void wbAbout(Class *cl, Object *obj, struct Window *win)
     EasyRequest(0, &es, 0, WB_VERSION, WB_REVISION);
 }
 
+static void execute_command(struct WorkbookBase *wb, const char *command) {
+    SystemTags(command, SYS_Asynch, TRUE, 
+			SYS_Input, NULL,
+			SYS_Output, SYS_DupStream, TAG_DONE);
+}
+
+static void wbExecute(Class *cl, Object *obj, struct Window *win)
+{
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct Window *executeWindow = NULL;
+    struct Gadget *glist = NULL, *gctx, *inputGadget=NULL;
+    enum {
+	   textField,
+	   inputField,
+	   executeButton,
+	   cancelButton
+    };
+    struct NewGadget newGadget = {0};
+    const char *inputBuffer;
+
+    const int winWidth = 400;
+    const int winHeight = 100;
+
+    struct Screen *screen = NULL;
+    void *vi = NULL;
+    
+    screen = LockPubScreen(NULL);
+    if (screen == NULL) {
+	    goto exit;
+    }
+
+    vi = GetVisualInfo(screen, TAG_END);
+    if (vi == NULL) {
+	    goto exit;
+    }
+
+    gctx = CreateContext(&glist);
+    if (gctx == NULL) {
+	    goto exit;
+    }
+
+    LONG top_border = screen->WBorTop + (screen->Font->ta_YSize + 1);
+
+    // Message
+    newGadget.ng_TopEdge = top_border + 8;
+    newGadget.ng_LeftEdge = 20;
+    newGadget.ng_VisualInfo = vi;
+    newGadget.ng_Width = winWidth - 50;
+    newGadget.ng_Height = 12;
+    newGadget.ng_GadgetText = (UBYTE *)""; // Initialize with empty string
+    newGadget.ng_GadgetID = textField;
+    newGadget.ng_Flags = NG_HIGHLABEL;
+    gctx = CreateGadget(TEXT_KIND, gctx, &newGadget, GTTX_Text, "Enter command and its arguments:", TAG_DONE);
+ 
+    // Create an input field for the command
+    newGadget.ng_TopEdge += 20;
+    newGadget.ng_Height = 18;
+    newGadget.ng_GadgetText = (UBYTE *)""; // Initialize with empty string
+    newGadget.ng_GadgetID = inputField;
+    inputGadget = gctx = CreateGadget(STRING_KIND, gctx, &newGadget, GTST_String, wb->ExecuteBuffer,
+		   GTST_MaxChars, sizeof(wb->ExecuteBuffer)-1,
+		   GACT_RELVERIFY, TRUE,
+		   TAG_DONE);
+
+    if (gctx == NULL) {
+	D(bug("No input field!"));
+	goto exit;
+    }
+    inputBuffer = ((struct StringInfo *)(gctx->SpecialInfo))->Buffer;
+
+    // Create the "Execute" button
+    newGadget.ng_TopEdge += 24;
+    newGadget.ng_Width = 60;
+    newGadget.ng_Height = 20;
+    newGadget.ng_GadgetText = "_Execute";
+    newGadget.ng_GadgetID = executeButton;
+    gctx = CreateGadget(BUTTON_KIND, gctx, &newGadget, GT_Underscore, '_', TAG_DONE);
+
+    if (gctx == NULL) {
+	D(bug("No execute button!"));
+	goto exit;
+    }
+
+    // Create the "Cancel" button
+    newGadget.ng_Width = 60;
+    newGadget.ng_LeftEdge = winWidth - 20 - newGadget.ng_Width;
+    newGadget.ng_GadgetText = "_Cancel";
+    newGadget.ng_GadgetID = cancelButton;
+    gctx = CreateGadget(BUTTON_KIND, gctx, &newGadget, GT_Underscore, '_', TAG_DONE);
+
+    if (gctx == NULL) {
+	D(bug("No cancel button!"));
+	goto exit;
+    }
+
+    // Create a simple window for the dialog
+    executeWindow = OpenWindowTags(NULL,
+        WA_Left, 20,
+        WA_Top, 20,
+        WA_Width, winWidth,
+        WA_Height, winHeight,
+        WA_Title, "Execute Command",
+	WA_Gadgets, glist,
+	WA_PubScreen, screen,
+	WA_AutoAdjust, TRUE,
+	WA_SimpleRefresh, TRUE,
+        WA_DepthGadget, TRUE,
+        WA_DragBar, TRUE,
+        WA_Activate, TRUE,
+        WA_CloseGadget, TRUE,
+        WA_IDCMP, IDCMP_CLOSEWINDOW | IDCMP_REFRESHWINDOW | STRINGIDCMP | BUTTONIDCMP | IDCMP_VANILLAKEY,
+        TAG_DONE);
+
+    if (executeWindow == NULL) {
+	goto exit;
+    }
+
+    GT_RefreshWindow(executeWindow, NULL);
+
+    // Activate text entry.
+    ActivateGadget(inputGadget, executeWindow, NULL);
+
+    // Event loop
+    BOOL done = FALSE;
+    ULONG signals = 1L << executeWindow->UserPort->mp_SigBit;
+
+    while (!done) {
+        ULONG result = Wait(signals);
+
+        if (result & signals) {
+            struct IntuiMessage *msg;
+
+            while ((msg = GT_GetIMsg(executeWindow->UserPort)) != NULL) {
+		struct Gadget *gad = (struct Gadget *)msg->IAddress;
+
+		ULONG msgClass = msg->Class;
+		UWORD msgCode = msg->Code;
+                GT_ReplyIMsg(msg);
+
+		switch (msgClass) {
+		case IDCMP_REFRESHWINDOW:
+		    GT_BeginRefresh(executeWindow);
+		    GT_EndRefresh(executeWindow, TRUE);
+		    break;
+		case IDCMP_CLOSEWINDOW:
+                    done = TRUE;
+		    break;
+		case IDCMP_VANILLAKEY:
+		    D(bug("msgCode: %d\n", msgCode));
+		    switch (msgCode) {
+		    case '\r':
+			// fallthrough
+		    case 'e':
+			execute_command(wb, inputBuffer);
+			done = TRUE;
+			break;
+		    case 'c':
+			done = TRUE;
+			break;
+		    }
+		    break;
+		case IDCMP_GADGETUP:
+                    switch (gad->GadgetID) {
+		    case inputField:
+			// fallthrough
+		    case executeButton:
+                        // "Execute" button was pressed
+                        // Get the text from the input field
+			execute_command(wb, inputBuffer);
+                        done = TRUE;
+			break;
+		    case cancelButton:
+                        // "Cancel" button was pressed
+                        done = TRUE;
+			break;
+                    }
+		    break;
+                }
+            }
+        }
+    }
+
+    // Save the input for next time.
+    CopyMem(inputBuffer, wb->ExecuteBuffer, sizeof(wb->ExecuteBuffer));
+    wb->ExecuteBuffer[sizeof(wb->ExecuteBuffer)-1] = 0;
+
+exit:
+    // Cleanup and close
+    FreeGadgets(glist);
+    CloseWindow(executeWindow);
+    FreeVisualInfo(vi);
+    UnlockPubScreen(NULL, screen);
+}
+
 static BOOL wbMenuPick(Class *cl, Object *obj, struct Window *win, UWORD menuNumber)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
@@ -258,6 +452,9 @@ static BOOL wbMenuPick(Class *cl, Object *obj, struct Window *win, UWORD menuNum
                 break;
 	    case WBMENU_ID(WBMENU_WB_ABOUT):
 		wbAbout(cl, obj, win);
+		break;
+	    case WBMENU_ID(WBMENU_WB_EXECUTE):
+		wbExecute(cl, obj, win);
 		break;
             case WBMENU_ID(WBMENU_WB_SHUTDOWN):
                 /* TODO: Ask if the user wants a shutdown or reboot */
