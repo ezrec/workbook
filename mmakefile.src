@@ -3,14 +3,14 @@
 include $(SRCDIR)/config/aros.cfg
 
 USER_CPPFLAGS := \
-	       -D__NOLIBBASE__
+               -D__NOLIBBASE__
 
 FILES := workbook workbook_intern \
-	 wbapp \
-	 wbwindow \
-	 wbvirtual \
-	 wbset \
-	 wbicon
+         wbapp \
+         wbwindow \
+         wbvirtual \
+         wbset \
+         wbicon
 
 #MM- workbench-system : workbench-system-workbook
 USER_CPPFLAGS += \

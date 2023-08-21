@@ -25,7 +25,7 @@
 
 Class *WBApp_MakeClass(struct WorkbookBase *wb);
 
-#define WBApp	wb->wb_WBApp
+#define WBApp        wb->wb_WBApp
 
 
 /* WBWindow class 
@@ -66,7 +66,7 @@ struct wbwm_MenuPick {
 
 Class *WBWindow_MakeClass(struct WorkbookBase *wb);
 
-#define WBWindow	wb->wb_WBWindow
+#define WBWindow        wb->wb_WBWindow
 
 /* WBVirtual class
  *
@@ -87,7 +87,7 @@ Class *WBWindow_MakeClass(struct WorkbookBase *wb);
 
 Class *WBVirtual_MakeClass(struct WorkbookBase *wb);
 
-#define WBVirtual	wb->wb_WBVirtual
+#define WBVirtual        wb->wb_WBVirtual
 
 /* WBSet class
  *
@@ -118,27 +118,27 @@ Class *WBSet_MakeClass(struct WorkbookBase *wb);
 
 /* Attributes */
 #define WBIA_Dummy               (TAG_USER | 0x40440000)
-#define WBIA_File                (WBIA_Dummy+1)	/* CONST_STRPTR */
-#define WBIA_Icon                (WBIA_Dummy+2)	/* struct DiskObject * */
-#define WBIA_Label               (WBIA_Dummy+3)	/* CONST_STRPTR */
-#define WBIA_Screen              (WBIA_Dummy+4)	/* struct Screen * */
+#define WBIA_File                (WBIA_Dummy+1)        /* CONST_STRPTR */
+#define WBIA_Icon                (WBIA_Dummy+2)        /* struct DiskObject * */
+#define WBIA_Label               (WBIA_Dummy+3)        /* CONST_STRPTR */
+#define WBIA_Screen              (WBIA_Dummy+4)        /* struct Screen * */
 
 /* Methods */
 #define WBIM_Dummy               (TAG_USER | 0x40440100)
-#define WBIM_Open                (WBIM_Dummy + 1)	/* N/A */
-#define WBIM_Copy                (WBIM_Dummy + 2)	/* N/A */
-#define WBIM_Rename              (WBIM_Dummy + 3)	/* N/A */
-#define WBIM_Info                (WBIM_Dummy + 4)	/* N/A */
-#define WBIM_Snapshot            (WBIM_Dummy + 5)	/* N/A */
-#define WBIM_Unsnapshot          (WBIM_Dummy + 6)	/* N/A */
-#define WBIM_Leave_Out           (WBIM_Dummy + 7)	/* N/A */
-#define WBIM_Put_Away            (WBIM_Dummy + 8)	/* N/A */
-#define WBIM_Delete              (WBIM_Dummy + 9)	/* N/A */
-#define WBIM_Format              (WBIM_Dummy + 10)	/* N/A */
-#define WBIM_Empty_Trash         (WBIM_Dummy + 11)	/* N/A */
+#define WBIM_Open                (WBIM_Dummy + 1)        /* N/A */
+#define WBIM_Copy                (WBIM_Dummy + 2)        /* N/A */
+#define WBIM_Rename              (WBIM_Dummy + 3)        /* N/A */
+#define WBIM_Info                (WBIM_Dummy + 4)        /* N/A */
+#define WBIM_Snapshot            (WBIM_Dummy + 5)        /* N/A */
+#define WBIM_Unsnapshot          (WBIM_Dummy + 6)        /* N/A */
+#define WBIM_Leave_Out           (WBIM_Dummy + 7)        /* N/A */
+#define WBIM_Put_Away            (WBIM_Dummy + 8)        /* N/A */
+#define WBIM_Delete              (WBIM_Dummy + 9)        /* N/A */
+#define WBIM_Format              (WBIM_Dummy + 10)        /* N/A */
+#define WBIM_Empty_Trash         (WBIM_Dummy + 11)        /* N/A */
 
 Class *WBIcon_MakeClass(struct WorkbookBase *wb);
 
-#define WBIcon	wb->wb_WBIcon
+#define WBIcon        wb->wb_WBIcon
 
 #endif /* WORKBOOK_CLASSES_H */

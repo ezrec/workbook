@@ -11,8 +11,8 @@
 #define WB_NAME     "Workbook"
 #endif
 #ifndef WB_VERSION
-#define WB_VERSION 1
-#define WB_REVISION	2
+#define WB_VERSION      1
+#define WB_REVISION     2
 #endif
 
 #define _D(x)

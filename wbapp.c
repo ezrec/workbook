@@ -224,9 +224,11 @@ static void wbAbout(Class *cl, Object *obj, struct Window *win)
 }
 
 static void execute_command(struct WorkbookBase *wb, const char *command) {
-    SystemTags(command, SYS_Asynch, TRUE, 
-			SYS_Input, NULL,
-			SYS_Output, SYS_DupStream, TAG_DONE);
+    SystemTags(command,
+            SYS_Asynch, TRUE,
+                        SYS_Input, NULL,
+                        SYS_Output, SYS_DupStream,
+                        TAG_DONE);
 }
 
 static void wbExecute(Class *cl, Object *obj, struct Window *win)
@@ -235,10 +237,10 @@ static void wbExecute(Class *cl, Object *obj, struct Window *win)
     struct Window *executeWindow = NULL;
     struct Gadget *glist = NULL, *gctx, *inputGadget=NULL;
     enum {
-	   textField,
-	   inputField,
-	   executeButton,
-	   cancelButton
+           textField,
+           inputField,
+           executeButton,
+           cancelButton
     };
     struct NewGadget newGadget = {0};
     const char *inputBuffer;
@@ -248,20 +250,20 @@ static void wbExecute(Class *cl, Object *obj, struct Window *win)
 
     struct Screen *screen = NULL;
     void *vi = NULL;
-    
+
     screen = LockPubScreen(NULL);
     if (screen == NULL) {
-	    goto exit;
+            goto exit;
     }
 
     vi = GetVisualInfo(screen, TAG_END);
     if (vi == NULL) {
-	    goto exit;
+            goto exit;
     }
 
     gctx = CreateContext(&glist);
     if (gctx == NULL) {
-	    goto exit;
+            goto exit;
     }
 
     LONG top_border = screen->WBorTop + (screen->Font->ta_YSize + 1);
@@ -276,20 +278,20 @@ static void wbExecute(Class *cl, Object *obj, struct Window *win)
     newGadget.ng_GadgetID = textField;
     newGadget.ng_Flags = NG_HIGHLABEL;
     gctx = CreateGadget(TEXT_KIND, gctx, &newGadget, GTTX_Text, "Enter command and its arguments:", TAG_DONE);
- 
+
     // Create an input field for the command
     newGadget.ng_TopEdge += 20;
     newGadget.ng_Height = 18;
     newGadget.ng_GadgetText = (UBYTE *)""; // Initialize with empty string
     newGadget.ng_GadgetID = inputField;
     inputGadget = gctx = CreateGadget(STRING_KIND, gctx, &newGadget, GTST_String, wb->ExecuteBuffer,
-		   GTST_MaxChars, sizeof(wb->ExecuteBuffer)-1,
-		   GACT_RELVERIFY, TRUE,
-		   TAG_DONE);
+                   GTST_MaxChars, sizeof(wb->ExecuteBuffer)-1,
+                   GACT_RELVERIFY, TRUE,
+                   TAG_DONE);
 
     if (gctx == NULL) {
-	D(bug("No input field!"));
-	goto exit;
+        D(bug("No input field!"));
+        goto exit;
     }
     inputBuffer = ((struct StringInfo *)(gctx->SpecialInfo))->Buffer;
 
@@ -302,8 +304,8 @@ static void wbExecute(Class *cl, Object *obj, struct Window *win)
     gctx = CreateGadget(BUTTON_KIND, gctx, &newGadget, GT_Underscore, '_', TAG_DONE);
 
     if (gctx == NULL) {
-	D(bug("No execute button!"));
-	goto exit;
+        D(bug("No execute button!"));
+        goto exit;
     }
 
     // Create the "Cancel" button
@@ -314,8 +316,8 @@ static void wbExecute(Class *cl, Object *obj, struct Window *win)
     gctx = CreateGadget(BUTTON_KIND, gctx, &newGadget, GT_Underscore, '_', TAG_DONE);
 
     if (gctx == NULL) {
-	D(bug("No cancel button!"));
-	goto exit;
+        D(bug("No cancel button!"));
+        goto exit;
     }
 
     // Create a simple window for the dialog
@@ -325,10 +327,10 @@ static void wbExecute(Class *cl, Object *obj, struct Window *win)
         WA_Width, winWidth,
         WA_Height, winHeight,
         WA_Title, "Execute Command",
-	WA_Gadgets, glist,
-	WA_PubScreen, screen,
-	WA_AutoAdjust, TRUE,
-	WA_SimpleRefresh, TRUE,
+        WA_Gadgets, glist,
+        WA_PubScreen, screen,
+        WA_AutoAdjust, TRUE,
+        WA_SimpleRefresh, TRUE,
         WA_DepthGadget, TRUE,
         WA_DragBar, TRUE,
         WA_Activate, TRUE,
@@ -337,7 +339,7 @@ static void wbExecute(Class *cl, Object *obj, struct Window *win)
         TAG_DONE);
 
     if (executeWindow == NULL) {
-	goto exit;
+        goto exit;
     }
 
     GT_RefreshWindow(executeWindow, NULL);
@@ -356,50 +358,50 @@ static void wbExecute(Class *cl, Object *obj, struct Window *win)
             struct IntuiMessage *msg;
 
             while ((msg = GT_GetIMsg(executeWindow->UserPort)) != NULL) {
-		struct Gadget *gad = (struct Gadget *)msg->IAddress;
+                struct Gadget *gad = (struct Gadget *)msg->IAddress;
 
-		ULONG msgClass = msg->Class;
-		UWORD msgCode = msg->Code;
+                ULONG msgClass = msg->Class;
+                UWORD msgCode = msg->Code;
                 GT_ReplyIMsg(msg);
 
-		switch (msgClass) {
-		case IDCMP_REFRESHWINDOW:
-		    GT_BeginRefresh(executeWindow);
-		    GT_EndRefresh(executeWindow, TRUE);
-		    break;
-		case IDCMP_CLOSEWINDOW:
+                switch (msgClass) {
+                case IDCMP_REFRESHWINDOW:
+                    GT_BeginRefresh(executeWindow);
+                    GT_EndRefresh(executeWindow, TRUE);
+                    break;
+                case IDCMP_CLOSEWINDOW:
                     done = TRUE;
-		    break;
-		case IDCMP_VANILLAKEY:
-		    D(bug("msgCode: %d\n", msgCode));
-		    switch (msgCode) {
-		    case '\r':
-			// fallthrough
-		    case 'e':
-			execute_command(wb, inputBuffer);
-			done = TRUE;
-			break;
-		    case 'c':
-			done = TRUE;
-			break;
-		    }
-		    break;
-		case IDCMP_GADGETUP:
+                    break;
+                case IDCMP_VANILLAKEY:
+                    D(bug("msgCode: %d\n", msgCode));
+                    switch (msgCode) {
+                    case '\r':
+                        // fallthrough
+                    case 'e':
+                        execute_command(wb, inputBuffer);
+                        done = TRUE;
+                        break;
+                    case 'c':
+                        done = TRUE;
+                        break;
+                    }
+                    break;
+                case IDCMP_GADGETUP:
                     switch (gad->GadgetID) {
-		    case inputField:
-			// fallthrough
-		    case executeButton:
+                    case inputField:
+                        // fallthrough
+                    case executeButton:
                         // "Execute" button was pressed
                         // Get the text from the input field
-			execute_command(wb, inputBuffer);
+                        execute_command(wb, inputBuffer);
                         done = TRUE;
-			break;
-		    case cancelButton:
+                        break;
+                    case cancelButton:
                         // "Cancel" button was pressed
                         done = TRUE;
-			break;
+                        break;
                     }
-		    break;
+                    break;
                 }
             }
         }
@@ -458,23 +460,24 @@ static BOOL wbMenuPick(Class *cl, Object *obj, struct Window *win, UWORD menuNum
             case WBMENU_ID(WBMENU_WB_QUIT):
                 quit = TRUE;
                 break;
-	    case WBMENU_ID(WBMENU_WB_ABOUT):
-		wbAbout(cl, obj, win);
-		break;
-	    case WBMENU_ID(WBMENU_WB_EXECUTE):
-		wbExecute(cl, obj, win);
-		break;
+            case WBMENU_ID(WBMENU_WB_ABOUT):
+                wbAbout(cl, obj, win);
+                break;
+            case WBMENU_ID(WBMENU_WB_EXECUTE):
+                wbExecute(cl, obj, win);
+                break;
             case WBMENU_ID(WBMENU_WB_SHUTDOWN):
                 rc = EasyRequest(NULL, &es, NULL, TAG_DONE);
 #ifdef __AROS__
+                /* Does the user wants a shutdown or reboot? */
                 if (rc == 1) {
-                    /* TODO: Ask if the user wants a shutdown or reboot */
                     ShutdownA(SD_ACTION_POWEROFF);
                 } else {
-                    /* Can't power off. Try to reboot. */
+                    /* Try to reboot. */
                     ShutdownA(SD_ACTION_COLDREBOOT);
                 }
 #endif
+                // If all else fails, ColdReboot()
                 ColdReboot();
                 break;
             }
