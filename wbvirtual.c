@@ -23,17 +23,14 @@
 #include "workbook_intern.h"
 #include "classes.h"
 
-static inline WORD max(WORD a, WORD b)
-{
-    return (a > b) ? a : b;
-}
+#define CLAMP_POS(x) ((x) > 0 ? (x) : 0)
 
 struct wbVirtual {
     Object        *Gadget;
     struct IBox    Virt;     /* Virtual pos in, and total size of the scroll area */
 };
 
-static BOOL wbRedimension(Class *cl, Object *obj, WORD vwidth, WORD vheight)
+static BOOL wbvRedimension(Class *cl, Object *obj, WORD vwidth, WORD vheight)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbVirtual *my = INST_DATA(cl, obj);
@@ -47,17 +44,19 @@ static BOOL wbRedimension(Class *cl, Object *obj, WORD vwidth, WORD vheight)
     my->Virt.Width = vwidth;
     my->Virt.Height = vheight;
 
+#pragma dontwarn 166
     if (my->Virt.Left > (my->Virt.Width - gadget->Width)) {
-        my->Virt.Left = max(0, my->Virt.Width - gadget->Width);
+        my->Virt.Left = CLAMP_POS( my->Virt.Width - gadget->Width);
         rc = TRUE;
     }
 
     if (my->Virt.Top > (my->Virt.Height - gadget->Height)) {
-        my->Virt.Top  = max(0, my->Virt.Height - gadget->Height);
+        my->Virt.Top  = CLAMP_POS( my->Virt.Height - gadget->Height);
         rc = TRUE;
     }
+#pragma popwarn
 
-    D(bug("WBVirtual: wbRedimension(%d,%d) = (%d,%d) %dx%d\n",
+    D(bug("WBVirtual: wbvRedimension(%d,%d) = (%d,%d) %dx%d\n",
                 vwidth,vheight,my->Virt.Left,my->Virt.Top,
                 my->Virt.Width, my->Virt.Height));
     D(bug("WBVirtual: Frame at: (%d,%d) %dx%d\n",
@@ -73,7 +72,7 @@ static BOOL wbRedimension(Class *cl, Object *obj, WORD vwidth, WORD vheight)
     return rc;
 }
 
-static BOOL wbMoveTo(Class *cl, Object *obj, WORD left, WORD top)
+static BOOL wbvMoveTo(Class *cl, Object *obj, WORD left, WORD top)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbVirtual *my = INST_DATA(cl, obj);
@@ -82,12 +81,14 @@ static BOOL wbMoveTo(Class *cl, Object *obj, WORD left, WORD top)
 
     D(bug("GadgetSize %dx%d\n", gadget->Width, gadget->Width));
     D(bug("  VirtSize %dx%d\n", my->Virt.Width, my->Virt.Height));
-    D(bug("  wbMoveTo(%d,%d) =", left,top));
+    D(bug("  wbvMoveTo(%d,%d) =", left,top));
 
+#pragma dontwarn 166
     if (left > (my->Virt.Width - gadget->Width))
-        left = max(0, my->Virt.Width - gadget->Width);
+        left = CLAMP_POS( my->Virt.Width - gadget->Width);
     if (top > (my->Virt.Height - gadget->Height))
-        top = max(0, my->Virt.Height - gadget->Height);
+        top = CLAMP_POS( my->Virt.Height - gadget->Height);
+#pragma popwarn
 
     dLeft = left - my->Virt.Left;
     dTop  = top  - my->Virt.Top;
@@ -182,7 +183,9 @@ static IPTR WBVirtualSetUpdate(Class *cl, Object *obj, struct opUpdate *opu)
 
     tstate = opu->opu_AttrList;
     while ((tag = NextTagItem(&tstate))) {
+#pragma dontwarn 166
         val = (WORD)tag->ti_Data;
+#pragma popwarn
 D(bug("%s: Tag=0x%x, val=%d\n", __func__, tag->ti_Tag, val));
         switch (tag->ti_Tag) {
         case WBVA_Gadget:
@@ -191,24 +194,26 @@ D(bug("%s: Tag=0x%x, val=%d\n", __func__, tag->ti_Tag, val));
                 IPTR vwidth = 0, vheight = 0;
                 GetAttr(GA_Width, my->Gadget, &vwidth);
                 GetAttr(GA_Height, my->Gadget, &vheight);
-                rc |= wbRedimension(cl, obj, vwidth, vheight);
+#pragma dontwarn 166
+                rc |= wbvRedimension(cl, obj, (WORD)vwidth, (WORD)vheight);
+#pragma popwarn
             }
             break;
         case WBVA_VirtTop:
-            rc |= wbMoveTo(cl, obj, my->Virt.Left, val);
+            rc |= wbvMoveTo(cl, obj, my->Virt.Left, val);
             break;
         case WBVA_VirtLeft:
-            rc |= wbMoveTo(cl, obj, val, my->Virt.Top);
+            rc |= wbvMoveTo(cl, obj, val, my->Virt.Top);
             break;
         case WBVA_VirtHeight:
-            rc |= wbRedimension(cl, obj, my->Virt.Width, val);
+            rc |= wbvRedimension(cl, obj, my->Virt.Width, val);
             break;
         case WBVA_VirtWidth:
-            rc |= wbRedimension(cl, obj, val, my->Virt.Height);
+            rc |= wbvRedimension(cl, obj, val, my->Virt.Height);
             break;
         case GA_Width:
         case GA_Height:
-            rc |= wbRedimension(cl, obj, my->Virt.Width, my->Virt.Height);
+            rc |= wbvRedimension(cl, obj, my->Virt.Width, my->Virt.Height);
             break;
         default:
             break;

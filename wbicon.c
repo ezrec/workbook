@@ -35,14 +35,14 @@ struct wbIcon {
     struct timeval LastActive;
 };
 
-const struct TagItem wbIcon_DrawTags[] = {
+static const struct TagItem wbIcon_DrawTags[] = {
     { ICONDRAWA_Frameless, TRUE, },
     { ICONDRAWA_Borderless, TRUE, },
     { ICONDRAWA_EraseBackground, FALSE, },
     { TAG_DONE },
 };
 
-void wbIcon_Update(Class *cl, Object *obj)
+static void wbIcon_Update(Class *cl, Object *obj)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
@@ -59,23 +59,23 @@ void wbIcon_Update(Class *cl, Object *obj)
     /* If the icon is outside of the bounds for this
      * screen, ignore the position information
      */
-    if ((my->Icon->do_CurrentX != NO_ICON_POSITION ||
-         my->Icon->do_CurrentY != NO_ICON_POSITION) && my->Screen) {
-        if ((my->Icon->do_CurrentX != NO_ICON_POSITION &&
+    if ((my->Icon->do_CurrentX != (LONG)NO_ICON_POSITION ||
+         my->Icon->do_CurrentY != (LONG)NO_ICON_POSITION) && my->Screen) {
+        if ((my->Icon->do_CurrentX != (LONG)NO_ICON_POSITION &&
             (my->Icon->do_CurrentX < my->Screen->LeftEdge ||
             (my->Icon->do_CurrentX > (my->Screen->LeftEdge + my->Screen->Width - w)))) ||
-            (my->Icon->do_CurrentY != NO_ICON_POSITION &&
+            (my->Icon->do_CurrentY != (LONG)NO_ICON_POSITION &&
             (my->Icon->do_CurrentY < my->Screen->TopEdge ||
             (my->Icon->do_CurrentY > (my->Screen->TopEdge + my->Screen->Height - h))))) {
-            my->Icon->do_CurrentY = NO_ICON_POSITION;
-            my->Icon->do_CurrentX = NO_ICON_POSITION;
+            my->Icon->do_CurrentY = (LONG)NO_ICON_POSITION;
+            my->Icon->do_CurrentX = (LONG)NO_ICON_POSITION;
         }
     }
 
-    D(bug("%s: %dx%d @%d,%d (%s)\n", my->File, (int)w, (int)h, (WORD)my->Icon->do_CurrentX, (WORD)my->Icon->do_CurrentY, my->Label));
+    D(bug("%s: %ldx%ld @%ld,%ld (%s)\n", my->File, w, h, my->Icon->do_CurrentX, my->Icon->do_CurrentY, my->Label));
     SetAttrs(obj,
-        GA_Left, (my->Icon->do_CurrentX == NO_ICON_POSITION) ? ~0 : my->Icon->do_CurrentX,
-        GA_Top, (my->Icon->do_CurrentY == NO_ICON_POSITION) ? ~0 : my->Icon->do_CurrentY,
+        GA_Left, (my->Icon->do_CurrentX == (LONG)NO_ICON_POSITION) ? ~0 : my->Icon->do_CurrentX,
+        GA_Top, (my->Icon->do_CurrentY == (LONG)NO_ICON_POSITION) ? ~0 : my->Icon->do_CurrentY,
         GA_Width, w,
         GA_Height, h,
         TAG_END);
@@ -281,15 +281,16 @@ static IPTR wbIconOpen(Class *cl, Object *obj, Msg msg)
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
 
-    struct TagItem tags[] = {
-        { NP_Seglist,     (IPTR)wb->wb_OpenerSegList },
-        { NP_Arguments,   (IPTR)my->File },
-        { NP_FreeSeglist, FALSE },
-        { TAG_END, 0 },
-    };
-    CreateNewProc(tags);
+    struct Process *proc;
+    proc = CreateNewProcTags(
+            NP_Name, (IPTR)my->File,
+            NP_Seglist, (IPTR)wb->wb_OpenerSegList,
+            NP_Arguments,   (IPTR)my->File,
+            NP_FreeSeglist, (IPTR)FALSE,
+            TAG_END);
+    D(bug("WBIcon.Open: %s (0x%lx)\n", my->File, (IPTR)proc));
 
-    return TRUE;
+    return (proc != NULL);
 }
 
 // WBIM_Copy
@@ -361,6 +362,7 @@ static IPTR dispatcher(Class *cl, Object *obj, Msg msg)
 {
     IPTR rc = 0;
 
+    _D(bug("WBIcon: dispatch 0x%lx\n", msg->MethodID));
     switch (msg->MethodID) {
     case OM_NEW:           rc = wbIconNew(cl, obj, (APTR)msg); break;
     case OM_DISPOSE:       rc = wbIconDispose(cl, obj, (APTR)msg); break;

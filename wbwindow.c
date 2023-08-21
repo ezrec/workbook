@@ -30,11 +30,6 @@
 #include "workbook_menu.h"
 #include "classes.h"
 
-static inline WORD max(WORD a, WORD b)
-{
-    return (a > b) ? a : b;
-}
-
 struct wbWindow_Icon {
     struct MinNode wbwiNode;
     Object *wbwiObject;
@@ -111,13 +106,11 @@ static BOOL wbMenuEnable(Class *cl, Object *obj, int id, BOOL onoff)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbWindow *my = INST_DATA(cl, obj);
-    int i, menu = -1, item = -1, sub = -1;
+    int menu = -1, item = -1, sub = -1;
     UWORD MenuNumber = MENUNULL;
     BOOL rc = FALSE;
 
-    for (i = 0; WBWindow_menu[i].nm_Type != NM_END; i++) {
-        const struct NewMenu *nm = &WBWindow_menu[i];
-
+    for (const struct NewMenu *nm = WBWindow_menu; nm->nm_Type != NM_END; nm++) {
         switch (nm->nm_Type) {
         case NM_TITLE:
             menu++;
@@ -157,8 +150,9 @@ static ULONG wbFilterIcons_Hook(struct Hook *hook, LONG *type, struct ExAllData 
 {
     int i;
 
-    if (stricmp(ead->ed_Name, "disk.info") == 0)
+    if (stricmp(ead->ed_Name, "disk.info") == 0) {
         return FALSE;
+    }
 
     i = strlen(ead->ed_Name);
     if (i >= 5 && stricmp(&ead->ed_Name[i-5], ".info") == 0) {
@@ -166,11 +160,11 @@ static ULONG wbFilterIcons_Hook(struct Hook *hook, LONG *type, struct ExAllData 
         return TRUE;
     }
 
-    if (stricmp(ead->ed_Name, ".backdrop") == 0)
+    if (stricmp(ead->ed_Name, ".backdrop") == 0) {
         return FALSE;
+    }
 
     return FALSE;
-    
 }
 
 static ULONG wbFilterAll_Hook(struct Hook *hook, LONG *type, struct ExAllData *ead)
@@ -265,7 +259,7 @@ static void wbAddFiles(Class *cl, Object *obj)
         eac = AllocDosObject(DOS_EXALLCONTROL, NULL);
         if (eac != NULL) {
             struct Hook hook;
-            BOOL more = TRUE;
+            LONG more = TRUE;
 
             hook.h_Entry = HookEntry;
             hook.h_SubEntry = my->FilterHook;
@@ -466,11 +460,12 @@ static void wbRescan(Class *cl, Object *obj)
 }
 
 
-const struct TagItem scrollv2window[] = {
+static const struct TagItem scrollv2window[] = {
         { PGA_Top, WBVA_VirtTop },
         { TAG_END, 0 },
 };
-const struct TagItem scrollh2window[] = {
+
+static const struct TagItem scrollh2window[] = {
         { PGA_Top, WBVA_VirtLeft },
         { TAG_END, 0 },
 };
@@ -668,7 +663,7 @@ static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
     return rc;
 
 error:
-    while ((wbwi = (APTR)GetHead((struct List *)&my->IconList))) {
+    while ((wbwi = (APTR)GetHead((struct List *)&my->IconList)) != NULL) {
         Remove((struct Node *)wbwi);
         FreeMem(wbwi, sizeof(*wbwi));
     }
@@ -707,7 +702,7 @@ static IPTR WBWindowDispose(Class *cl, Object *obj, Msg msg)
 
         Forbid();
         msg = (APTR)my->Window->UserPort->mp_MsgList.lh_Head;
-        while ((succ = msg->ExecMessage.mn_Node.ln_Succ )) {
+        while ((succ = msg->ExecMessage.mn_Node.ln_Succ ) != NULL) {
             if (msg->IDCMPWindow == my->Window) {
                 Remove((APTR)msg);
                 ReplyMsg((struct Message *)msg);
@@ -723,7 +718,7 @@ static IPTR WBWindowDispose(Class *cl, Object *obj, Msg msg)
     }
 
     /* We won't need our list of icons anymore */
-    while ((wbwi = (APTR)GetHead((struct List *)&my->IconList))) {
+    while ((wbwi = (APTR)GetHead((struct List *)&my->IconList)) != NULL) {
         Remove((struct Node *)wbwi);
         FreeMem(wbwi, sizeof(*wbwi));
     }
@@ -876,7 +871,7 @@ static IPTR WBWindowMenuPick(Class *cl, Object *obj, struct wbwm_MenuPick *wbwmp
     struct wbWindow *my = INST_DATA(cl, obj);
     struct MenuItem *item = wbwmp->wbwmp_MenuItem;
     BPTR lock;
-    BOOL rc = TRUE;
+    IPTR rc = TRUE;
 
     switch (WBMENU_ITEM_ID(item)) {
     case WBMENU_ID(WBMENU_WN_OPEN_PARENT):

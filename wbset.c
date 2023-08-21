@@ -26,15 +26,14 @@ struct wbSetNode {
 };
 
 struct wbSet {
-    WORD MaxWidth;
+    LONG MaxWidth;
     struct List FixedObjects;
     struct List AutoObjects;
 };
 
-static void wbGABox(struct WorkbookBase *wb, Object *obj, struct IBox *box)
+static void wbGABox(Object *obj, struct IBox *box)
 {
     struct Gadget *gadget = (struct Gadget *)obj;
-
     box->Top = gadget->TopEdge;
     box->Left = gadget->LeftEdge;
     box->Width = gadget->Width;
@@ -55,7 +54,7 @@ static void rearrange(Class *cl, Object *obj)
     }
 
     /* Find the set size with just the fixed objects */
-    wbGABox(wb, obj, &sbox);
+    wbGABox(obj, &sbox);
 
     /* Set the start of the auto area to be
      * immediately below the fixed objects.
@@ -68,12 +67,12 @@ static void rearrange(Class *cl, Object *obj)
         Object *iobj = node->sn_Object;
         struct IBox ibox;
 
-        wbGABox(wb, iobj, &ibox);
+        wbGABox(iobj, &ibox);
 
         if ((CurrRight + ibox.Width) < my->MaxWidth) {
             ibox.Left = CurrRight;
         } else {
-            wbGABox(wb, obj, &sbox);
+            wbGABox(obj, &sbox);
             ibox.Left = sbox.Left;
             CurrRight = sbox.Left;
             CurrBottom = sbox.Top + sbox.Height;
@@ -92,7 +91,6 @@ static void rearrange(Class *cl, Object *obj)
 // OM_ADDMEMBER
 static IPTR WBSetAddMember(Class *cl, Object *obj, struct opMember *opm)
 {
-    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     Object *iobj = opm->opam_Object;
     struct IBox ibox;
     struct wbSet *my = INST_DATA(cl, obj);
@@ -103,7 +101,7 @@ static IPTR WBSetAddMember(Class *cl, Object *obj, struct opMember *opm)
     node->sn_Object = iobj;
 
     /* Get bounding box of item to add */
-    wbGABox(wb, iobj, &ibox);
+    wbGABox(iobj, &ibox);
 
     if (ibox.Left == ~0 ||
         ibox.Top == ~0) {
@@ -162,7 +160,7 @@ static IPTR WBSetNew(Class *cl, Object *obj, struct opSet *ops)
 
     my = INST_DATA(cl, rc);
 
-    my->MaxWidth = (WORD)GetTagData(WBSA_MaxWidth, 0, ops->ops_AttrList);
+    my->MaxWidth = GetTagData(WBSA_MaxWidth, 0, ops->ops_AttrList);
 
     NEWLIST(&my->FixedObjects);
     NEWLIST(&my->AutoObjects);
@@ -205,7 +203,7 @@ static IPTR WBSetUpdate(Class *cl, Object *obj, struct opUpdate *opu)
     while ((tag = NextTagItem(&tstate))) {
         switch (tag->ti_Tag) {
         case WBSA_MaxWidth:
-            my->MaxWidth = (WORD)tag->ti_Data;
+            my->MaxWidth = tag->ti_Data;
             rearrange(cl, obj);
             rc |= TRUE;
         default:
@@ -244,7 +242,7 @@ static IPTR WBSetRender(Class *cl, Object *obj, struct gpRender *gpr)
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct IBox box;
 
-    wbGABox(wb, obj, &box);
+    wbGABox(obj, &box);
 
     /* Clear the area first */
     EraseRect(gpr->gpr_RPort, box.Left, box.Top,
@@ -259,6 +257,7 @@ static IPTR dispatcher(Class *cl, Object *obj, Msg msg)
 {
     IPTR rc = 0;
 
+    D(bug("WBSet: dispatch 0x%lx\n", msg->MethodID));
     switch (msg->MethodID) {
     case OM_NEW:        rc = WBSetNew(cl, obj, (APTR)msg); break;
     case OM_DISPOSE:    rc = WBSetDispose(cl, obj, (APTR)msg); break;

@@ -93,6 +93,8 @@ ULONG WorkbookMain(void)
     APTR DOSBase;
     int rc = RETURN_ERROR;
 
+    D(bug("%s: Starting up...\n", AS_STRING(WB_NAME)));
+
     wb = NULL;
 
     wb = AllocVec(sizeof(*wb), MEMF_ANY | MEMF_CLEAR);
@@ -135,7 +137,7 @@ ULONG WorkbookMain(void)
     if (wb->wb_LayersBase == NULL)
         goto error;
 
-    wb->wb_OpenerSegList = CreateSegList(wbOpener);
+    wb->wb_OpenerSegList = CreateSegList((APTR)wbOpener);
     if (wb->wb_OpenerSegList == BNULL)
         goto error;
 

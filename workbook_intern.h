@@ -81,5 +81,6 @@ extern struct ExecBase *SysBase;
 
 struct Region *wbClipWindow(struct WorkbookBase *wb, struct Window *win);
 void wbUnclipWindow(struct WorkbookBase *wb, struct Window *win, struct Region *clip);
+ULONG WorkbookMain(void);
 
 #endif /* WORKBOOK_H */

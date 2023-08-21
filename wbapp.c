@@ -245,8 +245,8 @@ static void wbExecute(Class *cl, Object *obj, struct Window *win)
     struct NewGadget newGadget = {0};
     const char *inputBuffer;
 
-    const int winWidth = 400;
-    const int winHeight = 100;
+    const WORD winWidth = 400;
+    const WORD winHeight = 100;
 
     struct Screen *screen = NULL;
     void *vi = NULL;
@@ -266,7 +266,7 @@ static void wbExecute(Class *cl, Object *obj, struct Window *win)
             goto exit;
     }
 
-    LONG top_border = screen->WBorTop + (screen->Font->ta_YSize + 1);
+    WORD top_border = screen->WBorTop + (screen->Font->ta_YSize + 1);
 
     // Message
     newGadget.ng_TopEdge = top_border + 8;
@@ -373,7 +373,7 @@ static void wbExecute(Class *cl, Object *obj, struct Window *win)
                     done = TRUE;
                     break;
                 case IDCMP_VANILLAKEY:
-                    D(bug("msgCode: %d\n", msgCode));
+                    D(bug("msgCode: %ld\n", msgCode));
                     switch (msgCode) {
                     case '\r':
                         // fallthrough
@@ -428,9 +428,9 @@ static BOOL wbMenuPick(Class *cl, Object *obj, struct Window *win, UWORD menuNum
 
     owin = wbLookupWindow(cl, obj, win);
 
-    D(bug("Menu: %x\n", menuNumber));
+    D(bug("Menu: %lx\n", menuNumber));
     while (menuNumber != MENUNULL) {
-        BOOL handled = FALSE;
+        ULONG handled = FALSE;
 
         item = ItemAddress(win->MenuStrip, menuNumber);
 
@@ -478,7 +478,9 @@ static BOOL wbMenuPick(Class *cl, Object *obj, struct Window *win, UWORD menuNum
                 }
 #endif
                 // If all else fails, ColdReboot()
-                ColdReboot();
+                if (rc || !rc) {
+                    ColdReboot();
+                }
                 break;
             }
         }
@@ -549,7 +551,7 @@ static IPTR WBAppWorkbench(Class *cl, Object *obj, Msg msg)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbApp *my = INST_DATA(cl, obj);
-    BOOL done = FALSE;
+    ULONG done = FALSE;
 
     CurrentDir(BNULL);
 
@@ -580,6 +582,7 @@ static IPTR WBAppWorkbench(Class *cl, Object *obj, Msg msg)
                     /* Refresh an open window/object */
                     break;
                 }
+
                 ReplyMsg((APTR)wbhm);
             }
 
@@ -587,8 +590,6 @@ static IPTR WBAppWorkbench(Class *cl, Object *obj, Msg msg)
                 struct IntuiMessage *im;
 
                 im = GT_GetIMsg(my->WinPort);
-
-                D(bug("im=%p, Class=%d, Code=%d\n", im, im->Class, im->Code));
                 switch (im->Class) {
                 case IDCMP_CLOSEWINDOW:
                     /* Dispose the window */
@@ -607,6 +608,9 @@ static IPTR WBAppWorkbench(Class *cl, Object *obj, Msg msg)
                     break;
                 case IDCMP_INTUITICKS:
                     wbIntuiTick(cl, obj, im->IDCMPWindow);
+                    break;
+                default:
+                    D(bug("im=%p, Class=%ld, Code=%ld\n", im, im->Class, im->Code));
                     break;
                 }
 
