@@ -4,9 +4,7 @@
     Desc: Workbook Window Class
 */
 
-#define DEBUG 0
-#include <aros/debug.h>
-
+#include <stdio.h>
 #include <string.h>
 #include <limits.h>
 #include <intuition/icclass.h>
@@ -16,25 +14,21 @@
 #include <proto/intuition.h>
 #include <proto/utility.h>
 #include <proto/gadtools.h>
+#ifdef __AROS__
 #include <proto/workbench.h>
+#else
+#include <proto/wb.h>
+#endif
 #include <proto/graphics.h>
 #include <proto/layers.h>
 #include <proto/icon.h>
 
 #include <intuition/classusr.h>
 #include <libraries/gadtools.h>
-#include <exec/rawfmt.h>
 
 #include "workbook_intern.h"
 #include "workbook_menu.h"
 #include "classes.h"
-
-#include <clib/boopsistubs.h>
-
-static inline WORD max(WORD a, WORD b)
-{
-    return (a > b) ? a : b;
-}
 
 struct wbWindow_Icon {
     struct MinNode wbwiNode;
@@ -112,13 +106,11 @@ static BOOL wbMenuEnable(Class *cl, Object *obj, int id, BOOL onoff)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbWindow *my = INST_DATA(cl, obj);
-    int i, menu = -1, item = -1, sub = -1;
+    int menu = -1, item = -1, sub = -1;
     UWORD MenuNumber = MENUNULL;
     BOOL rc = FALSE;
 
-    for (i = 0; WBWindow_menu[i].nm_Type != NM_END; i++) {
-        const struct NewMenu *nm = &WBWindow_menu[i];
-
+    for (const struct NewMenu *nm = WBWindow_menu; nm->nm_Type != NM_END; nm++) {
         switch (nm->nm_Type) {
         case NM_TITLE:
             menu++;
@@ -154,16 +146,13 @@ static BOOL wbMenuEnable(Class *cl, Object *obj, int id, BOOL onoff)
     return rc;
 }
 
-AROS_UFH3(ULONG, wbFilterIcons_Hook,
-    AROS_UFHA(struct Hook*, hook, A0),
-    AROS_UFHA(struct ExAllData*, ead, A2),
-    AROS_UFHA(LONG *, type, A1))
+static ULONG wbFilterIcons_Hook(struct Hook *hook, LONG *type, struct ExAllData *ead)
 {
-    AROS_USERFUNC_INIT
     int i;
 
-    if (stricmp(ead->ed_Name, "disk.info") == 0)
+    if (stricmp(ead->ed_Name, "disk.info") == 0) {
         return FALSE;
+    }
 
     i = strlen(ead->ed_Name);
     if (i >= 5 && stricmp(&ead->ed_Name[i-5], ".info") == 0) {
@@ -171,21 +160,15 @@ AROS_UFH3(ULONG, wbFilterIcons_Hook,
         return TRUE;
     }
 
-    if (stricmp(ead->ed_Name, ".backdrop") == 0)
+    if (stricmp(ead->ed_Name, ".backdrop") == 0) {
         return FALSE;
+    }
 
     return FALSE;
-    
-    AROS_USERFUNC_EXIT
 }
 
-AROS_UFH3(ULONG, wbFilterAll_Hook,
-    AROS_UFHA(struct Hook*, hook, A0),
-    AROS_UFHA(struct ExAllData*, ead, A2),
-    AROS_UFHA(LONG *, type, A1))
+static ULONG wbFilterAll_Hook(struct Hook *hook, LONG *type, struct ExAllData *ead)
 {
-    AROS_USERFUNC_INIT
-
     int i;
 
     if (stricmp(ead->ed_Name, "disk.info") == 0)
@@ -201,8 +184,6 @@ AROS_UFH3(ULONG, wbFilterAll_Hook,
         return FALSE;
 
     return TRUE;
-    
-    AROS_USERFUNC_EXIT
 }
 
 static int wbwiIconCmp(Class *cl, Object *obj, Object *a, Object *b)
@@ -278,10 +259,10 @@ static void wbAddFiles(Class *cl, Object *obj)
         eac = AllocDosObject(DOS_EXALLCONTROL, NULL);
         if (eac != NULL) {
             struct Hook hook;
-            BOOL more = TRUE;
+            LONG more = TRUE;
 
-            hook.h_Entry = my->FilterHook;
-            hook.h_SubEntry = NULL;
+            hook.h_Entry = HookEntry;
+            hook.h_SubEntry = my->FilterHook;
             hook.h_Data = wb;
 
             eac->eac_MatchFunc = &hook;
@@ -317,7 +298,7 @@ static void wbAddVolumeIcons(Class *cl, Object *obj)
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbWindow *my = INST_DATA(cl, obj);
     struct DosList *dl;
-    char text[NAME_MAX];
+    char text[FILENAME_MAX];
 
     /* Add all the DOS disks */
     dl = LockDosList(LDF_VOLUMES | LDF_READ);
@@ -350,7 +331,7 @@ static void wbAddAppIcons(Class *cl, Object *obj)
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbWindow *my = INST_DATA(cl, obj);
     struct DiskObject *icon;
-    char text[NAME_MAX];
+    char text[FILENAME_MAX];
 
     /* Add all the AppIcons */
     icon = NULL;
@@ -444,9 +425,9 @@ static void wbRescan(Class *cl, Object *obj)
 
     /* Remove and undisplay any existing icons */
     opmmsg.MethodID = OM_REMMEMBER;
-    while ((wbwi = (struct wbWindow_Icon *)REMHEAD(&my->IconList)) != NULL) {
+    while ((wbwi = (struct wbWindow_Icon *)REMHEAD((struct List *)&my->IconList)) != NULL) {
         opmmsg.opam_Object = wbwi->wbwiObject;
-        DoMethodA(my->Set, &opmmsg);
+        DoMethodA(my->Set, (Msg)&opmmsg);
         DisposeObject(wbwi->wbwiObject);
         FreeMem(wbwi, sizeof(*wbwi));
     }
@@ -467,7 +448,7 @@ static void wbRescan(Class *cl, Object *obj)
     ForeachNode(&my->IconList, wbwi)
     {
         opmmsg.opam_Object = wbwi->wbwiObject;
-        DoMethodA(my->Set, &opmmsg);
+        DoMethodA(my->Set, (Msg)&opmmsg);
     }
 
     /* Adjust the scrolling regions */
@@ -479,11 +460,12 @@ static void wbRescan(Class *cl, Object *obj)
 }
 
 
-const struct TagItem scrollv2window[] = {
+static const struct TagItem scrollv2window[] = {
         { PGA_Top, WBVA_VirtTop },
         { TAG_END, 0 },
 };
-const struct TagItem scrollh2window[] = {
+
+static const struct TagItem scrollh2window[] = {
         { PGA_Top, WBVA_VirtLeft },
         { TAG_END, 0 },
 };
@@ -518,7 +500,7 @@ static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
     my = INST_DATA(cl, obj);
 
     NEWLIST(&my->IconList);
-    my->FilterHook = wbFilterIcons_Hook;
+    my->FilterHook = (APTR)wbFilterIcons_Hook;
 
     path = (CONST_STRPTR)GetTagData(WBWA_Path, (IPTR)NULL, ops->ops_AttrList);
     if (path == NULL) {
@@ -532,7 +514,7 @@ static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
         my->Path = AllocVec(strlen(path)+1, MEMF_ANY);
         if (my->Path == NULL)
             goto error;
-        
+
         strcpy(my->Path, path);
     }
 
@@ -551,7 +533,7 @@ static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
                         WA_SmartRefresh, TRUE,
                         WA_NewLookMenus, TRUE,
                         WA_PubScreen, NULL,
-                        TAG_MORE, ops->ops_AttrList );
+                        ops->ops_AttrList == NULL ? TAG_END : TAG_MORE, ops->ops_AttrList );
         my->Window->BorderTop = my->Window->WScreen->BarHeight+1;
     } else {
         struct DiskObject *icon;
@@ -561,7 +543,7 @@ static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
             { WA_Top, 64 },
             { WA_Width, 200, },
             { WA_Height, 150, },
-            { TAG_MORE, (IPTR)ops->ops_AttrList },
+            { ops->ops_AttrList == NULL ? TAG_END : TAG_MORE, (IPTR)ops->ops_AttrList },
         };
 
         icon = GetDiskObjectNew(my->Path);
@@ -569,9 +551,10 @@ static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
             goto error;
 
         if (icon->do_DrawerData) {
+            // If we have dd_NewWindow data, don't override the window placement via extra[]
             nwin = &icon->do_DrawerData->dd_NewWindow;
             D(bug("%s: NewWindow %p\n", __func__, nwin));
-            extra[0].ti_Tag = TAG_MORE;
+            extra[0].ti_Tag = ops->ops_AttrList == NULL ? TAG_END : TAG_MORE;
             extra[0].ti_Data = (IPTR)ops->ops_AttrList;
         }
 
@@ -632,7 +615,7 @@ static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
                 PGA_Visible, 1,
                 PGA_Top, 0,
                 TAG_END)), 0);
-    
+
     /* Add the horizontal scrollbar */
     AddGadget(my->Window, (struct Gadget *)(my->ScrollH = NewObject(NULL, "propgclass",
                 ICA_TARGET, (IPTR)obj,
@@ -680,7 +663,7 @@ static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
     return rc;
 
 error:
-    while ((wbwi = (APTR)GetHead(&my->IconList))) {
+    while ((wbwi = (APTR)GetHead((struct List *)&my->IconList)) != NULL) {
         Remove((struct Node *)wbwi);
         FreeMem(wbwi, sizeof(*wbwi));
     }
@@ -719,7 +702,7 @@ static IPTR WBWindowDispose(Class *cl, Object *obj, Msg msg)
 
         Forbid();
         msg = (APTR)my->Window->UserPort->mp_MsgList.lh_Head;
-        while ((succ = msg->ExecMessage.mn_Node.ln_Succ )) {
+        while ((succ = msg->ExecMessage.mn_Node.ln_Succ ) != NULL) {
             if (msg->IDCMPWindow == my->Window) {
                 Remove((APTR)msg);
                 ReplyMsg((struct Message *)msg);
@@ -735,7 +718,7 @@ static IPTR WBWindowDispose(Class *cl, Object *obj, Msg msg)
     }
 
     /* We won't need our list of icons anymore */
-    while ((wbwi = (APTR)GetHead(&my->IconList))) {
+    while ((wbwi = (APTR)GetHead((struct List *)&my->IconList)) != NULL) {
         Remove((struct Node *)wbwi);
         FreeMem(wbwi, sizeof(*wbwi));
     }
@@ -888,7 +871,7 @@ static IPTR WBWindowMenuPick(Class *cl, Object *obj, struct wbwm_MenuPick *wbwmp
     struct wbWindow *my = INST_DATA(cl, obj);
     struct MenuItem *item = wbwmp->wbwmp_MenuItem;
     BPTR lock;
-    BOOL rc = TRUE;
+    IPTR rc = TRUE;
 
     switch (WBMENU_ITEM_ID(item)) {
     case WBMENU_ID(WBMENU_WN_OPEN_PARENT):
@@ -901,11 +884,11 @@ static IPTR WBWindowMenuPick(Class *cl, Object *obj, struct wbwm_MenuPick *wbwmp
         }
         break;
     case WBMENU_ID(WBMENU_WN__SHOW_ICONS):
-        my->FilterHook = wbFilterIcons_Hook;
+        my->FilterHook = (APTR)wbFilterIcons_Hook;
         wbRescan(cl, obj);
         break;
     case WBMENU_ID(WBMENU_WN__SHOW_ALL):
-        my->FilterHook = wbFilterAll_Hook;
+        my->FilterHook = (APTR)wbFilterAll_Hook;
         wbRescan(cl, obj);
         break;
     case WBMENU_ID(WBMENU_WB_SHELL):
@@ -960,16 +943,17 @@ static IPTR WBWindowIntuiTick(Class *cl, Object *obj, Msg msg)
     IPTR rc = FALSE;
 
     if (my->Tick == 0) {
-        ULONG val[5];
+        IPTR val[6];
 
-        val[0] = WB_VERSION;
-        val[1] = WB_REVISION;
-        val[2] = AvailMem(MEMF_CHIP) / 1024;
-        val[3] = AvailMem(MEMF_FAST) / 1024;
-        val[4] = AvailMem(MEMF_ANY) / 1024;
+        val[0] = (IPTR)AS_STRING(WB_NAME);
+        val[1] = WB_VERSION;
+        val[2] = WB_REVISION;
+        val[3] = AvailMem(MEMF_CHIP) / 1024;
+        val[4] = AvailMem(MEMF_FAST) / 1024;
+        val[5] = AvailMem(MEMF_ANY) / 1024;
 
         /* Update the window's title */
-        RawDoFmt("Workbook %ld.%ld  Chip: %ldk, Fast: %ldk, Any: %ldk", (RAWARG)val,
+        RawDoFmt("%s %ld.%ld  Chip: %ldk, Fast: %ldk, Any: %ldk", (RAWARG)val,
                  RAWFMTFUNC_STRING, my->ScreenTitle);
 
         SetWindowTitles(my->Window, (CONST_STRPTR)-1, my->ScreenTitle);

@@ -4,9 +4,6 @@
     Desc: Workbook Application Class
 */
 
-#define DEBUG 0
-#include <aros/debug.h>
-
 #include <string.h>
 #include <limits.h>
 
@@ -15,12 +12,12 @@
 #include <proto/intuition.h>
 #include <proto/utility.h>
 #include <proto/gadtools.h>
-#include <proto/workbench.h>
 #include <proto/graphics.h>
 
+#include <dos/dostags.h>
 #include <intuition/classusr.h>
+#include <intuition/intuition.h>
 #include <libraries/gadtools.h>
-#include <workbench/handler.h>
 
 #include "workbook_intern.h"
 #include "workbook_menu.h"
@@ -51,7 +48,7 @@ static void wbOpenDrawer(Class *cl, Object *obj, CONST_STRPTR path)
         struct opMember opmmsg;
         opmmsg.MethodID = OM_ADDMEMBER;
         opmmsg.opam_Object = win;
-        DoMethodA(obj, &opmmsg);
+        DoMethodA(obj, (Msg)&opmmsg);
     }
 }
 
@@ -118,7 +115,7 @@ static IPTR WBAppDispose(Class *cl, Object *obj, Msg msg)
     while ((tmp = NextObject(&tstate))) {
         STACKED ULONG omrmethodID;
         omrmethodID = OM_REMOVE;
-        DoMethodA(tmp, &omrmethodID);
+        DoMethodA(tmp, (Msg)&omrmethodID);
         DisposeObject(obj);
     }
 
@@ -140,7 +137,7 @@ static IPTR WBAppAddMember(Class *cl, Object *obj, struct opMember *opm)
     omatmsg.MethodID = OM_ADDTAIL;
     omatmsg.opat_List = (struct List *)&my->Windows;
 
-    return DoMethodA(opm->opam_Object, &omatmsg);
+    return DoMethodA(opm->opam_Object, (Msg)&omatmsg);
 }
 
 // OM_REMMEMBER
@@ -148,7 +145,7 @@ static IPTR WBAppRemMember(Class *cl, Object *obj, struct opMember *opm)
 {
     STACKED ULONG omrmethodID;
     omrmethodID = OM_REMOVE;
-    return DoMethodA(opm->opam_Object, &omrmethodID);
+    return DoMethodA(opm->opam_Object, (Msg)&omrmethodID);
 }
 
 
@@ -182,7 +179,7 @@ static void wbRefreshWindow(Class *cl, Object *obj, struct Window *win)
     if ((owin = wbLookupWindow(cl, obj, win))) {
         STACKED ULONG wbrefmethodID;
         wbrefmethodID = WBWM_REFRESH;
-        DoMethodA(owin, &wbrefmethodID);
+        DoMethodA(owin, (Msg)&wbrefmethodID);
     }
 }
 
@@ -193,7 +190,7 @@ static void wbNewSizeWindow(Class *cl, Object *obj, struct Window *win)
     if ((owin = wbLookupWindow(cl, obj, win))) {
         STACKED ULONG wbnewsmethodID;
         wbnewsmethodID = WBWM_NEWSIZE;
-        DoMethodA(owin, &wbnewsmethodID);
+        DoMethodA(owin, (Msg)&wbnewsmethodID);
     }
 }
 
@@ -206,7 +203,7 @@ static void wbCloseWindow(Class *cl, Object *obj, struct Window *win)
         struct opMember opmmsg;
         opmmsg.MethodID = OM_REMMEMBER;
         opmmsg.opam_Object = owin;
-        DoMethodA(obj, &opmmsg);
+        DoMethodA(obj, (Msg)&opmmsg);
         DisposeObject(owin);
     }
 }
@@ -218,18 +215,20 @@ static void wbAbout(Class *cl, Object *obj, struct Window *win)
     struct EasyStruct es = {
        .es_StructSize = sizeof(es),
        .es_Flags = 0,
-       .es_Title = "About",
-       .es_TextFormat = "Workbook v%ld.%ld",
+       .es_Title = AS_STRING(WB_NAME),
+       .es_TextFormat = "Release V%ld.%ld\n%s",
        .es_GadgetFormat = "Ok",
     };
 
-    EasyRequest(0, &es, 0, WB_VERSION, WB_REVISION);
+    EasyRequest(0, &es, 0, WB_VERSION, WB_REVISION, (IPTR)AS_STRING(WB_ABOUT));
 }
 
 static void execute_command(struct WorkbookBase *wb, const char *command) {
-    SystemTags(command, SYS_Asynch, TRUE, 
-			SYS_Input, NULL,
-			SYS_Output, SYS_DupStream, TAG_DONE);
+    SystemTags(command,
+            SYS_Asynch, TRUE,
+                        SYS_Input, NULL,
+                        SYS_Output, SYS_DupStream,
+                        TAG_DONE);
 }
 
 static void wbExecute(Class *cl, Object *obj, struct Window *win)
@@ -238,36 +237,36 @@ static void wbExecute(Class *cl, Object *obj, struct Window *win)
     struct Window *executeWindow = NULL;
     struct Gadget *glist = NULL, *gctx, *inputGadget=NULL;
     enum {
-	   textField,
-	   inputField,
-	   executeButton,
-	   cancelButton
+           textField,
+           inputField,
+           executeButton,
+           cancelButton
     };
     struct NewGadget newGadget = {0};
     const char *inputBuffer;
 
-    const int winWidth = 400;
-    const int winHeight = 100;
+    const WORD winWidth = 400;
+    const WORD winHeight = 100;
 
     struct Screen *screen = NULL;
     void *vi = NULL;
-    
+
     screen = LockPubScreen(NULL);
     if (screen == NULL) {
-	    goto exit;
+            goto exit;
     }
 
     vi = GetVisualInfo(screen, TAG_END);
     if (vi == NULL) {
-	    goto exit;
+            goto exit;
     }
 
     gctx = CreateContext(&glist);
     if (gctx == NULL) {
-	    goto exit;
+            goto exit;
     }
 
-    LONG top_border = screen->WBorTop + (screen->Font->ta_YSize + 1);
+    WORD top_border = screen->WBorTop + (screen->Font->ta_YSize + 1);
 
     // Message
     newGadget.ng_TopEdge = top_border + 8;
@@ -279,20 +278,20 @@ static void wbExecute(Class *cl, Object *obj, struct Window *win)
     newGadget.ng_GadgetID = textField;
     newGadget.ng_Flags = NG_HIGHLABEL;
     gctx = CreateGadget(TEXT_KIND, gctx, &newGadget, GTTX_Text, "Enter command and its arguments:", TAG_DONE);
- 
+
     // Create an input field for the command
     newGadget.ng_TopEdge += 20;
     newGadget.ng_Height = 18;
     newGadget.ng_GadgetText = (UBYTE *)""; // Initialize with empty string
     newGadget.ng_GadgetID = inputField;
     inputGadget = gctx = CreateGadget(STRING_KIND, gctx, &newGadget, GTST_String, wb->ExecuteBuffer,
-		   GTST_MaxChars, sizeof(wb->ExecuteBuffer)-1,
-		   GACT_RELVERIFY, TRUE,
-		   TAG_DONE);
+                   GTST_MaxChars, sizeof(wb->ExecuteBuffer)-1,
+                   GACT_RELVERIFY, TRUE,
+                   TAG_DONE);
 
     if (gctx == NULL) {
-	D(bug("No input field!"));
-	goto exit;
+        D(bug("No input field!"));
+        goto exit;
     }
     inputBuffer = ((struct StringInfo *)(gctx->SpecialInfo))->Buffer;
 
@@ -305,8 +304,8 @@ static void wbExecute(Class *cl, Object *obj, struct Window *win)
     gctx = CreateGadget(BUTTON_KIND, gctx, &newGadget, GT_Underscore, '_', TAG_DONE);
 
     if (gctx == NULL) {
-	D(bug("No execute button!"));
-	goto exit;
+        D(bug("No execute button!"));
+        goto exit;
     }
 
     // Create the "Cancel" button
@@ -317,8 +316,8 @@ static void wbExecute(Class *cl, Object *obj, struct Window *win)
     gctx = CreateGadget(BUTTON_KIND, gctx, &newGadget, GT_Underscore, '_', TAG_DONE);
 
     if (gctx == NULL) {
-	D(bug("No cancel button!"));
-	goto exit;
+        D(bug("No cancel button!"));
+        goto exit;
     }
 
     // Create a simple window for the dialog
@@ -328,10 +327,10 @@ static void wbExecute(Class *cl, Object *obj, struct Window *win)
         WA_Width, winWidth,
         WA_Height, winHeight,
         WA_Title, "Execute Command",
-	WA_Gadgets, glist,
-	WA_PubScreen, screen,
-	WA_AutoAdjust, TRUE,
-	WA_SimpleRefresh, TRUE,
+        WA_Gadgets, glist,
+        WA_PubScreen, screen,
+        WA_AutoAdjust, TRUE,
+        WA_SimpleRefresh, TRUE,
         WA_DepthGadget, TRUE,
         WA_DragBar, TRUE,
         WA_Activate, TRUE,
@@ -340,7 +339,7 @@ static void wbExecute(Class *cl, Object *obj, struct Window *win)
         TAG_DONE);
 
     if (executeWindow == NULL) {
-	goto exit;
+        goto exit;
     }
 
     GT_RefreshWindow(executeWindow, NULL);
@@ -359,50 +358,50 @@ static void wbExecute(Class *cl, Object *obj, struct Window *win)
             struct IntuiMessage *msg;
 
             while ((msg = GT_GetIMsg(executeWindow->UserPort)) != NULL) {
-		struct Gadget *gad = (struct Gadget *)msg->IAddress;
+                struct Gadget *gad = (struct Gadget *)msg->IAddress;
 
-		ULONG msgClass = msg->Class;
-		UWORD msgCode = msg->Code;
+                ULONG msgClass = msg->Class;
+                UWORD msgCode = msg->Code;
                 GT_ReplyIMsg(msg);
 
-		switch (msgClass) {
-		case IDCMP_REFRESHWINDOW:
-		    GT_BeginRefresh(executeWindow);
-		    GT_EndRefresh(executeWindow, TRUE);
-		    break;
-		case IDCMP_CLOSEWINDOW:
+                switch (msgClass) {
+                case IDCMP_REFRESHWINDOW:
+                    GT_BeginRefresh(executeWindow);
+                    GT_EndRefresh(executeWindow, TRUE);
+                    break;
+                case IDCMP_CLOSEWINDOW:
                     done = TRUE;
-		    break;
-		case IDCMP_VANILLAKEY:
-		    D(bug("msgCode: %d\n", msgCode));
-		    switch (msgCode) {
-		    case '\r':
-			// fallthrough
-		    case 'e':
-			execute_command(wb, inputBuffer);
-			done = TRUE;
-			break;
-		    case 'c':
-			done = TRUE;
-			break;
-		    }
-		    break;
-		case IDCMP_GADGETUP:
+                    break;
+                case IDCMP_VANILLAKEY:
+                    D(bug("msgCode: %ld\n", msgCode));
+                    switch (msgCode) {
+                    case '\r':
+                        // fallthrough
+                    case 'e':
+                        execute_command(wb, inputBuffer);
+                        done = TRUE;
+                        break;
+                    case 'c':
+                        done = TRUE;
+                        break;
+                    }
+                    break;
+                case IDCMP_GADGETUP:
                     switch (gad->GadgetID) {
-		    case inputField:
-			// fallthrough
-		    case executeButton:
+                    case inputField:
+                        // fallthrough
+                    case executeButton:
                         // "Execute" button was pressed
                         // Get the text from the input field
-			execute_command(wb, inputBuffer);
+                        execute_command(wb, inputBuffer);
                         done = TRUE;
-			break;
-		    case cancelButton:
+                        break;
+                    case cancelButton:
                         // "Cancel" button was pressed
                         done = TRUE;
-			break;
+                        break;
                     }
-		    break;
+                    break;
                 }
             }
         }
@@ -429,9 +428,9 @@ static BOOL wbMenuPick(Class *cl, Object *obj, struct Window *win, UWORD menuNum
 
     owin = wbLookupWindow(cl, obj, win);
 
-    D(bug("Menu: %x\n", menuNumber));
+    D(bug("Menu: %lx\n", menuNumber));
     while (menuNumber != MENUNULL) {
-        BOOL handled = FALSE;
+        ULONG handled = FALSE;
 
         item = ItemAddress(win->MenuStrip, menuNumber);
 
@@ -442,25 +441,46 @@ static BOOL wbMenuPick(Class *cl, Object *obj, struct Window *win, UWORD menuNum
             wbmpmsg.MethodID = WBWM_MENUPICK;
             wbmpmsg.wbwmp_MenuItem = item;
             wbmpmsg.wbwmp_MenuNumber = menuNumber;
-            handled = DoMethodA(owin, &wbmpmsg);
+            handled = DoMethodA(owin, (Msg)&wbmpmsg);
         }
 
         if (!handled) {
+            LONG rc;
+            struct EasyStruct es = {
+                .es_StructSize = sizeof(es),
+                .es_Title = (STRPTR)"Shutdown",
+                .es_TextFormat = (STRPTR)"System is ready to shut down.",
+#ifdef __AROS__
+                .es_GadgetFormat = "Shutdown|Reboot",
+#else
+                .es_GadgetFormat = "Reboot",
+#endif
+            };
             switch (WBMENU_ITEM_ID(item)) {
             case WBMENU_ID(WBMENU_WB_QUIT):
                 quit = TRUE;
                 break;
-	    case WBMENU_ID(WBMENU_WB_ABOUT):
-		wbAbout(cl, obj, win);
-		break;
-	    case WBMENU_ID(WBMENU_WB_EXECUTE):
-		wbExecute(cl, obj, win);
-		break;
+            case WBMENU_ID(WBMENU_WB_ABOUT):
+                wbAbout(cl, obj, win);
+                break;
+            case WBMENU_ID(WBMENU_WB_EXECUTE):
+                wbExecute(cl, obj, win);
+                break;
             case WBMENU_ID(WBMENU_WB_SHUTDOWN):
-                /* TODO: Ask if the user wants a shutdown or reboot */
-                ShutdownA(SD_ACTION_POWEROFF);
-                /* Can't power off. Try to reboot. */
-                ShutdownA(SD_ACTION_COLDREBOOT);
+                rc = EasyRequest(NULL, &es, NULL, TAG_DONE);
+#ifdef __AROS__
+                /* Does the user wants a shutdown or reboot? */
+                if (rc == 1) {
+                    ShutdownA(SD_ACTION_POWEROFF);
+                } else {
+                    /* Try to reboot. */
+                    ShutdownA(SD_ACTION_COLDREBOOT);
+                }
+#endif
+                // If all else fails, ColdReboot()
+                if (rc || !rc) {
+                    ColdReboot();
+                }
                 break;
             }
         }
@@ -478,7 +498,7 @@ static void wbIntuiTick(Class *cl, Object *obj, struct Window *win)
     if ((owin = wbLookupWindow(cl, obj, win))) {
         STACKED ULONG wbintuitmethodID;
         wbintuitmethodID = WBWM_INTUITICK;
-        DoMethodA(owin, &wbintuitmethodID);
+        DoMethodA(owin, (Msg)&wbintuitmethodID);
     }
 }
 
@@ -492,7 +512,7 @@ static void wbHideAllWindows(Class *cl, Object *obj)
     while ((owin = NextObject(&ostate))) {
         STACKED ULONG wbhidemethodid;
         wbhidemethodid = WBWM_HIDE;
-        DoMethodA(owin, &wbhidemethodid);
+        DoMethodA(owin, (Msg)&wbhidemethodid);
     }
 }
 
@@ -506,7 +526,7 @@ static void wbShowAllWindows(Class *cl, Object *obj)
     while ((owin = NextObject(&ostate))) {
         STACKED ULONG wbshowmethodid;
         wbshowmethodid = WBWM_SHOW;
-        DoMethodA(owin, &wbshowmethodid);
+        DoMethodA(owin, (Msg)&wbshowmethodid);
     }
 }
 
@@ -521,7 +541,7 @@ static void wbCloseAllWindows(Class *cl, Object *obj)
         struct opMember opmmsg;
         opmmsg.MethodID = OM_REMMEMBER;
         opmmsg.opam_Object = owin;
-        DoMethodA(obj, &opmmsg);
+        DoMethodA(obj, (Msg)&opmmsg);
         DisposeObject(owin);
     }
 }
@@ -531,7 +551,7 @@ static IPTR WBAppWorkbench(Class *cl, Object *obj, Msg msg)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbApp *my = INST_DATA(cl, obj);
-    BOOL done = FALSE;
+    ULONG done = FALSE;
 
     CurrentDir(BNULL);
 
@@ -562,6 +582,7 @@ static IPTR WBAppWorkbench(Class *cl, Object *obj, Msg msg)
                     /* Refresh an open window/object */
                     break;
                 }
+
                 ReplyMsg((APTR)wbhm);
             }
 
@@ -569,8 +590,6 @@ static IPTR WBAppWorkbench(Class *cl, Object *obj, Msg msg)
                 struct IntuiMessage *im;
 
                 im = GT_GetIMsg(my->WinPort);
-
-                D(bug("im=%p, Class=%d, Code=%d\n", im, im->Class, im->Code));
                 switch (im->Class) {
                 case IDCMP_CLOSEWINDOW:
                     /* Dispose the window */
@@ -589,6 +608,9 @@ static IPTR WBAppWorkbench(Class *cl, Object *obj, Msg msg)
                     break;
                 case IDCMP_INTUITICKS:
                     wbIntuiTick(cl, obj, im->IDCMPWindow);
+                    break;
+                default:
+                    D(bug("im=%p, Class=%ld, Code=%ld\n", im, im->Class, im->Code));
                     break;
                 }
 

@@ -7,12 +7,33 @@
 #ifndef WORKBOOK_H
 #define WORKBOOK_H
 
-#define WB_VERSION	1
-#define WB_REVISION	0
+#ifndef WB_NAME
+#define WB_NAME     "Workbook"
+#endif
+#ifndef WB_VERSION
+#define WB_VERSION      1
+#define WB_REVISION     2
+#endif
 
+#define _D(x)
+#define _AS_STRING(x)   #x
+#define AS_STRING(x) _AS_STRING(x)
+
+#ifdef __AROS__
 #include <dos/bptr.h>
+#include <exec/rawfmt.h>
+#include <proto/workbench.h>
+#include <workbench/handler.h>
+#else
+#include <proto/wb.h>
+#include <workbench/icon.h>
+#endif
 #include <intuition/classes.h>
 #include <intuition/intuition.h>
+
+#ifndef __AROS__
+#include "workbook_vbcc.h"
+#endif // !__AROS__
 
 struct WorkbookBase {
     APTR wb_IntuitionBase;
@@ -60,5 +81,6 @@ extern struct ExecBase *SysBase;
 
 struct Region *wbClipWindow(struct WorkbookBase *wb, struct Window *win);
 void wbUnclipWindow(struct WorkbookBase *wb, struct Window *win, struct Region *clip);
+ULONG WorkbookMain(void);
 
 #endif /* WORKBOOK_H */
