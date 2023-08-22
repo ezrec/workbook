@@ -44,7 +44,6 @@ static BOOL wbvRedimension(Class *cl, Object *obj, WORD vwidth, WORD vheight)
     my->Virt.Width = vwidth;
     my->Virt.Height = vheight;
 
-#pragma dontwarn 166
     if (my->Virt.Left > (my->Virt.Width - gadget->Width)) {
         my->Virt.Left = CLAMP_POS( my->Virt.Width - gadget->Width);
         rc = TRUE;
@@ -54,7 +53,6 @@ static BOOL wbvRedimension(Class *cl, Object *obj, WORD vwidth, WORD vheight)
         my->Virt.Top  = CLAMP_POS( my->Virt.Height - gadget->Height);
         rc = TRUE;
     }
-#pragma popwarn
 
     D(bug("WBVirtual: wbvRedimension(%d,%d) = (%d,%d) %dx%d\n",
                 vwidth,vheight,my->Virt.Left,my->Virt.Top,
@@ -83,12 +81,10 @@ static BOOL wbvMoveTo(Class *cl, Object *obj, WORD left, WORD top)
     D(bug("  VirtSize %dx%d\n", my->Virt.Width, my->Virt.Height));
     D(bug("  wbvMoveTo(%d,%d) =", left,top));
 
-#pragma dontwarn 166
     if (left > (my->Virt.Width - gadget->Width))
         left = CLAMP_POS( my->Virt.Width - gadget->Width);
     if (top > (my->Virt.Height - gadget->Height))
         top = CLAMP_POS( my->Virt.Height - gadget->Height);
-#pragma popwarn
 
     dLeft = left - my->Virt.Left;
     dTop  = top  - my->Virt.Top;
@@ -183,9 +179,7 @@ static IPTR WBVirtualSetUpdate(Class *cl, Object *obj, struct opUpdate *opu)
 
     tstate = opu->opu_AttrList;
     while ((tag = NextTagItem(&tstate))) {
-#pragma dontwarn 166
         val = (WORD)tag->ti_Data;
-#pragma popwarn
 D(bug("%s: Tag=0x%x, val=%d\n", __func__, tag->ti_Tag, val));
         switch (tag->ti_Tag) {
         case WBVA_Gadget:
@@ -194,9 +188,7 @@ D(bug("%s: Tag=0x%x, val=%d\n", __func__, tag->ti_Tag, val));
                 IPTR vwidth = 0, vheight = 0;
                 GetAttr(GA_Width, my->Gadget, &vwidth);
                 GetAttr(GA_Height, my->Gadget, &vheight);
-#pragma dontwarn 166
                 rc |= wbvRedimension(cl, obj, (WORD)vwidth, (WORD)vheight);
-#pragma popwarn
             }
             break;
         case WBVA_VirtTop:
