@@ -44,7 +44,6 @@ struct wbWindow {
     Object        *ScrollV;
     Object        *Area;      /* Virual area of icons */
     Object        *Set;       /* Set of icons */
-    APTR           FilterHook;
 
     ULONG          Flags;
     IPTR           Tick;
@@ -58,6 +57,7 @@ struct wbWindow {
 };
 
 #define WBWF_USERPORT   (1 << 0)    /* Window has a custom port */
+#define WBWF_SHOW_ALL   (1 << 1)    /* Show all files */
 
 #define Broken NM_ITEMDISABLED |
 
@@ -146,44 +146,37 @@ static BOOL wbMenuEnable(Class *cl, Object *obj, int id, BOOL onoff)
     return rc;
 }
 
-static ULONG wbFilterIcons_Hook(struct Hook *hook, LONG *type, struct ExAllData *ead)
+static ULONG wbFilterIcons_Hook(struct Hook *hook, struct ExAllData *ead, LONG *type)
 {
     int i;
+    struct wbWindow *my = hook->h_Data;
 
     if (stricmp(ead->ed_Name, "disk.info") == 0) {
+        D(bug("- %s (disk)\n", ead->ed_Name));
         return FALSE;
     }
 
+    BOOL show_all = (my->Flags & WBWF_SHOW_ALL) != 0;
+
     i = strlen(ead->ed_Name);
     if (i >= 5 && stricmp(&ead->ed_Name[i-5], ".info") == 0) {
-        ead->ed_Name[i-5] = 0;
-        return TRUE;
+        if (show_all) {
+            D(bug("- %s (icon)\n", ead->ed_Name));
+            return FALSE;
+        } else {
+            ead->ed_Name[i-5] = 0;
+            D(bug("+ %s (icon)\n", ead->ed_Name));
+            return TRUE;
+        }
     }
 
     if (stricmp(ead->ed_Name, ".backdrop") == 0) {
+        D(bug("- %s (backdrop)\n", ead->ed_Name));
         return FALSE;
     }
 
-    return FALSE;
-}
-
-static ULONG wbFilterAll_Hook(struct Hook *hook, LONG *type, struct ExAllData *ead)
-{
-    int i;
-
-    if (stricmp(ead->ed_Name, "disk.info") == 0)
-        return FALSE;
-
-    i = strlen(ead->ed_Name);
-    if (i >= 5 && stricmp(&ead->ed_Name[i-5], ".info") == 0) {
-        ead->ed_Name[i-5] = 0;
-        return TRUE;
-    }
-
-    if (stricmp(ead->ed_Name, ".backdrop") == 0)
-        return FALSE;
-
-    return TRUE;
+    D(bug("%lc %s (default)\n", show_all ? '+' : '-', ead->ed_Name));
+    return show_all;
 }
 
 static int wbwiIconCmp(Class *cl, Object *obj, Object *a, Object *b)
@@ -223,6 +216,7 @@ static void wbwiAppend(Class *cl, Object *obj, Object *iobj)
         /* Insert in Alpha order */
         ForeachNode(&my->IconList, tmp) {
             if (wbwiIconCmp(cl, obj, tmp->wbwiObject, wbwi->wbwiObject) == 0) {
+                D(bug("%s: Duplicated icon in '%s'\n", my->Path));
                 DisposeObject(iobj);
                 return;
             }
@@ -245,12 +239,18 @@ static void wbAddFiles(Class *cl, Object *obj)
     TEXT *path;
     int file_part;
 
+    D(bug("%s: Add files...\n", __func__));
+
     path = AllocVec(1024, MEMF_ANY);
-    if (!path)
+    if (!path) {
+        D(bug("%s: Unable to allocate path.\n", __func__));
         return;
+    }
 
     if (!NameFromLock(my->Lock, path, 1024)) {
+        D(bug("%s: Unable to get path from lock.\n", __func__));
         FreeVec(path);
+        return;
     }
     file_part = strlen(path);
 
@@ -262,8 +262,8 @@ static void wbAddFiles(Class *cl, Object *obj)
             LONG more = TRUE;
 
             hook.h_Entry = HookEntry;
-            hook.h_SubEntry = my->FilterHook;
-            hook.h_Data = wb;
+            hook.h_SubEntry = wbFilterIcons_Hook;
+            hook.h_Data = my;
 
             eac->eac_MatchFunc = &hook;
             while (more) {
@@ -271,6 +271,7 @@ static void wbAddFiles(Class *cl, Object *obj)
                 int i;
 
                 more = ExAll(my->Lock, ead, eadSize, ED_NAME, eac);
+                D(bug("%s: more=%ld\n", __func__, more));
                 for (i = 0; i < eac->eac_Entries; i++, tmp=tmp->ed_Next) {
                     Object *iobj;
                     path[file_part] = 0;
@@ -280,8 +281,11 @@ static void wbAddFiles(Class *cl, Object *obj)
                                 WBIA_Label, tmp->ed_Name,
                                 WBIA_Screen, my->Window->WScreen,
                                 TAG_END);
-                        if (iobj != NULL)
+                        if (iobj != NULL) {
                             wbwiAppend(cl, obj, iobj);
+                        }
+                    } else {
+                        D(bug("%s: Out of space for name '%s'\n", tmp->ed_Name));
                     }
                 }
             }
@@ -291,6 +295,8 @@ static void wbAddFiles(Class *cl, Object *obj)
     }
 
     FreeVec(path);
+
+    D(bug("%s: Added!\n", __func__));
 }
 
 static void wbAddVolumeIcons(Class *cl, Object *obj)
@@ -500,7 +506,7 @@ static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
     my = INST_DATA(cl, obj);
 
     NEWLIST(&my->IconList);
-    my->FilterHook = (APTR)wbFilterIcons_Hook;
+    my->Flags = 0;
 
     path = (CONST_STRPTR)GetTagData(WBWA_Path, (IPTR)NULL, ops->ops_AttrList);
     if (path == NULL) {
@@ -632,8 +638,10 @@ static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
     DoMethod(obj, WBWM_INTUITICK);
 
     my->Menu = CreateMenusA((struct NewMenu *)WBWindow_menu, NULL);
-    if (my->Menu == NULL)
+    if (my->Menu == NULL) {
+        D(bug("%s: Unable to create  menus\n", __func__));
         goto error;
+    }
 
     vis = GetVisualInfo(my->Window->WScreen, TAG_END);
     LayoutMenus(my->Menu, vis, TAG_END);
@@ -887,11 +895,11 @@ static IPTR WBWindowMenuPick(Class *cl, Object *obj, struct wbwm_MenuPick *wbwmp
         rc = WBIM_REFRESH;
         break;
     case WBMENU_ID(WBMENU_WN__SHOW_ICONS):
-        my->FilterHook = (APTR)wbFilterIcons_Hook;
+        my->Flags &= ~WBWF_SHOW_ALL;
         rc = WBIM_REFRESH;
         break;
     case WBMENU_ID(WBMENU_WN__SHOW_ALL):
-        my->FilterHook = (APTR)wbFilterAll_Hook;
+        my->Flags |= WBWF_SHOW_ALL;
         rc = WBIM_REFRESH;
         break;
     case WBMENU_ID(WBMENU_WB_SHELL):
