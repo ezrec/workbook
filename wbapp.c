@@ -282,6 +282,7 @@ static BOOL wbMenuPick(Class *cl, Object *obj, struct Window *win, UWORD menuNum
                                   "Enter Command and its Arguments",
                                   "Command:",
                                   wb->ExecuteBuffer, sizeof(wb->ExecuteBuffer),
+                                  NULL,
                                   execute_command, NULL);
                 break;
             case WBMENU_ID(WBMENU_WB_SHUTDOWN):

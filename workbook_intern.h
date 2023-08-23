@@ -87,6 +87,7 @@ IPTR wbPopupAction(struct WorkbookBase *wb,
                          CONST_STRPTR request,
                          STRPTR saveBuffer, // Can be NULL,
                          LONG saveBufferSize, // Can be 0
+                         CONST_STRPTR forbidden,
                          wbPopupActionFunc action,
                          APTR arg);
 struct Region *wbClipWindow(struct WorkbookBase *wb, struct Window *win);

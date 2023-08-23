@@ -10,6 +10,7 @@
 #include <proto/gadtools.h>
 
 #include <libraries/gadtools.h>
+#include <intuition/sghooks.h>
 
 #include "workbook_intern.h"
 
@@ -43,12 +44,46 @@ void wbUnclipWindow(struct WorkbookBase *wb, struct Window *win, struct Region *
     }
 }
 
+static ULONG _wbPopupActionHook(struct Hook *hook, struct SGWork *sgw, ULONG *msg)
+{
+    CONST_STRPTR forbidden = (CONST_STRPTR)hook->h_Data;
+    ULONG rc = ~0UL;
+
+    D(bug("msg: 0x%lx, op: 0x%lx, code: %lc\n", *msg, sgw->EditOp, sgw->Code));
+    switch (*msg) {
+    case SGH_KEY:
+        if ((sgw->EditOp == EO_REPLACECHAR) || (sgw->EditOp == EO_INSERTCHAR)) {
+            BOOL ok = TRUE;
+            for (; ok && forbidden != NULL && *forbidden != 0; forbidden++) {
+                if (*forbidden == sgw->Code) {
+                    D(bug("Forbidden: '%lc'\n", sgw->Code));
+                    ok = FALSE;
+                }
+            }
+
+            if (ok) {
+                sgw->WorkBuffer[sgw->BufferPos - 1] = sgw->Code;
+            } else {
+                sgw->Actions |= SGA_BEEP;
+                sgw->Actions &= ~SGA_USE;
+            }
+        }
+        break;
+    default:
+        rc = 0;
+        break;
+    }
+
+    return rc;
+}
+
 IPTR wbPopupAction(struct WorkbookBase *wb,
                          CONST_STRPTR title,
                          CONST_STRPTR description,
                          CONST_STRPTR request,
                          STRPTR saveBuffer, // Can be NULL,
                          LONG saveBufferSize, // Can be 0
+                         CONST_STRPTR forbidden,
                          wbPopupActionFunc action, APTR arg)
 {
     IPTR rc = 0;
@@ -107,6 +142,12 @@ IPTR wbPopupAction(struct WorkbookBase *wb,
     newGadget.ng_Flags = NG_HIGHLABEL;
     gctx = CreateGadget(TEXT_KIND, gctx, &newGadget, GTTX_Text, request, TAG_DONE);
 
+    struct Hook input_hook = {
+        .h_Entry = HookEntry,
+        .h_SubEntry = _wbPopupActionHook,
+        .h_Data = forbidden,
+    };
+
     // Create an input field for the command
     newGadget.ng_LeftEdge += newGadget.ng_Width;
     newGadget.ng_Width = winWidth - newGadget.ng_LeftEdge - 20;
@@ -117,6 +158,7 @@ IPTR wbPopupAction(struct WorkbookBase *wb,
                    GTST_String, saveBuffer,
                    GTST_MaxChars, saveBufferSize > 0 ? saveBufferSize : 80,
                    GACT_RELVERIFY, TRUE,
+                   GTST_EditHook, forbidden ? &input_hook : NULL,
                    TAG_DONE);
 
     if (gctx == NULL) {
