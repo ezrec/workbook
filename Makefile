@@ -29,20 +29,20 @@ HDRS=$(wildcard *.h)
 SRCS=main.c  wbapp.c  wbicon.c  wbset.c  wbvirtual.c  wbwindow.c  workbook.c  workbook_intern.c
 OBJS=$(patsubst %.c,%.o,$(SRCS))
 
-all: LoadWB
+all: Workbook
 
 clean:
-	$(RM) LoadWB $(OBJS) release.zip
+	$(RM) Workbook $(OBJS) release.zip
 
 %.o: %.c $(HDRS)
 	vc $(CFLAGS) -c $<
 
-LoadWB: $(OBJS)
+Workbook: $(OBJS)
 	vc $(CFLAGS) -o $@ $(OBJS) $(LINKOPTS)
 
-release.zip: LoadWB
+release.zip: Workbook
 	$(MKDIR) System
-	$(CP) LoadWB System/$(WB_NAME)
+	$(CP) Workbook System/$(WB_NAME)
 	$(ZIP) -r $@ System/ README.md
 	$(RM) -r System
 

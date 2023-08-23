@@ -8,11 +8,14 @@
 #define WORKBOOK_H
 
 #ifndef WB_NAME
-#define WB_NAME     "Workbook"
+#define WB_NAME     Workbook
+#endif
+#ifndef WB_ABOUT
+#define WB_ABOUT     Copyright © 2023 The AROS Project
 #endif
 #ifndef WB_VERSION
 #define WB_VERSION      1
-#define WB_REVISION     2
+#define WB_REVISION     3
 #endif
 
 #define _D(x)
