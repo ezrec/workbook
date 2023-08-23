@@ -1,7 +1,7 @@
 WB_NAME="AmiBench"
 WB_VERSION=46
 WB_REVISION=1
-WB_ABOUT="(C) Copyright 2023 AmigaKit Ltd.\\n\\nAmibench uses code from the AROS project.\nWritten by Jason S. McMullan"
+WB_ABOUT="Copyright © 2023 AmigaKit Ltd.\\n\\nAmiBench uses code from the AROS project.\nDeveloped by Jason S. McMullan"
 DEBUG=0
 
 RM=rm -f
