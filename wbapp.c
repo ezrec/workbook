@@ -223,12 +223,14 @@ static void wbAbout(Class *cl, Object *obj, struct Window *win)
     EasyRequest(0, &es, 0, WB_VERSION, WB_REVISION, (IPTR)AS_STRING(WB_ABOUT));
 }
 
-static void execute_command(struct WorkbookBase *wb, CONST_STRPTR command, APTR dummy) {
+static IPTR execute_command(struct WorkbookBase *wb, CONST_STRPTR command, APTR dummy) {
     SystemTags(command,
             SYS_Asynch, TRUE,
                         SYS_Input, NULL,
                         SYS_Output, SYS_DupStream,
                         TAG_DONE);
+
+    return 0;
 }
 
 static BOOL wbMenuPick(Class *cl, Object *obj, struct Window *win, UWORD menuNumber)

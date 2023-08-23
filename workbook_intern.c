@@ -38,11 +38,12 @@ struct Region *wbClipWindow(struct WorkbookBase *wb, struct Window *win)
 void wbUnclipWindow(struct WorkbookBase *wb, struct Window *win, struct Region *clip)
 {
     clip = InstallClipRegion(win->WLayer, clip);
-    if (clip)
+    if (clip) {
             DisposeRegion(clip);
+    }
 }
 
-VOID wbPopupAction(struct WorkbookBase *wb,
+IPTR wbPopupAction(struct WorkbookBase *wb,
                          CONST_STRPTR title,
                          CONST_STRPTR description,
                          CONST_STRPTR request,
@@ -50,6 +51,7 @@ VOID wbPopupAction(struct WorkbookBase *wb,
                          LONG saveBufferSize, // Can be 0
                          wbPopupActionFunc action, APTR arg)
 {
+    IPTR rc = 0;
     struct Window *win = NULL;
     struct Gadget *glist = NULL, *gctx, *inputGadget=NULL;
     enum {
@@ -237,11 +239,12 @@ VOID wbPopupAction(struct WorkbookBase *wb,
     }
 
     if (do_action) {
+        // If we're going to do it, hide this window first.
         HideWindow(win);
-        action(wb, inputBuffer, arg);
+        rc = action(wb, inputBuffer, arg);
     }
 
-    // Save the input for next time.
+    // Save the input for next time, regardless.
     if (saveBuffer != NULL && saveBufferSize > 0) {
         CopyMem(inputBuffer, saveBuffer, saveBufferSize);
         saveBuffer[saveBufferSize-1] = 0;
@@ -253,6 +256,8 @@ exit:
     CloseWindow(win);
     FreeVisualInfo(vi);
     UnlockPubScreen(NULL, screen);
+
+    return rc;
 }
 
 

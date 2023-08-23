@@ -871,7 +871,7 @@ static IPTR WBWindowMenuPick(Class *cl, Object *obj, struct wbwm_MenuPick *wbwmp
     struct wbWindow *my = INST_DATA(cl, obj);
     struct MenuItem *item = wbwmp->wbwmp_MenuItem;
     BPTR lock;
-    IPTR rc = TRUE;
+    IPTR rc = 0;
 
     switch (WBMENU_ITEM_ID(item)) {
     case WBMENU_ID(WBMENU_WN_OPEN_PARENT):
@@ -883,13 +883,16 @@ static IPTR WBWindowMenuPick(Class *cl, Object *obj, struct wbwm_MenuPick *wbwmp
             UnLock(lock);
         }
         break;
+    case WBMENU_ID(WBMENU_WN_UPDATE):
+        rc = WBIM_REFRESH;
+        break;
     case WBMENU_ID(WBMENU_WN__SHOW_ICONS):
         my->FilterHook = (APTR)wbFilterIcons_Hook;
-        wbRescan(cl, obj);
+        rc = WBIM_REFRESH;
         break;
     case WBMENU_ID(WBMENU_WN__SHOW_ALL):
         my->FilterHook = (APTR)wbFilterAll_Hook;
-        wbRescan(cl, obj);
+        rc = WBIM_REFRESH;
         break;
     case WBMENU_ID(WBMENU_WB_SHELL):
         NewCLI(cl, obj);
@@ -928,8 +931,12 @@ static IPTR WBWindowMenuPick(Class *cl, Object *obj, struct wbwm_MenuPick *wbwmp
         rc = WBWindowForSelectedIcons(cl, obj, WBIM_Empty_Trash);
         break;
     default:
-        rc = FALSE;
+        rc = 0;
         break;
+    }
+
+    if (rc & WBIM_REFRESH) {
+        wbRescan(cl, obj);
     }
 
     return rc;

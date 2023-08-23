@@ -79,9 +79,9 @@ extern struct ExecBase *SysBase;
 #include <string.h>
 #include <proto/exec.h>
 
-typedef VOID (*wbPopupActionFunc)(struct WorkbookBase *wb, CONST_STRPTR input, APTR arg);
+typedef IPTR (*wbPopupActionFunc)(struct WorkbookBase *wb, CONST_STRPTR input, APTR arg);
 
-VOID wbPopupAction(struct WorkbookBase *wb,
+IPTR wbPopupAction(struct WorkbookBase *wb,
                          CONST_STRPTR title,
                          CONST_STRPTR description,
                          CONST_STRPTR request,

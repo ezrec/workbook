@@ -5,6 +5,7 @@
 */
 
 #include <string.h>
+#include <stdio.h>
 
 #include <proto/icon.h>
 #include <proto/intuition.h>
@@ -290,13 +291,13 @@ static IPTR wbIconOpen(Class *cl, Object *obj, Msg msg)
             TAG_END);
     D(bug("WBIcon.Open: %s (0x%lx)\n", my->File, (IPTR)proc));
 
-    return (proc != NULL);
+    return 0;
 }
 
 // WBIM_Copy
 static IPTR wbIconCopy(Class *cl, Object *obj, Msg msg)
 {
-    return FALSE;
+    return 0;
 }
 
 // WBIM_Rename
@@ -313,49 +314,49 @@ static IPTR wbIconInfo(Class *cl, Object *obj, Msg msg)
 
     WBInfo(BNULL, my->File, NULL);
 
-    return TRUE;
+    return 0;
 }
 
 // WBIM_Snapshot
 static IPTR wbIconSnapshot(Class *cl, Object *obj, Msg msg)
 {
-    return FALSE;
+    return 0;
 }
 
 // WBIM_Unsnapshot
 static IPTR wbIconUnsnapshot(Class *cl, Object *obj, Msg msg)
 {
-    return FALSE;
+    return 0;
 }
 
 // WBIM_Leave_Out
 static IPTR wbIconLeaveOut(Class *cl, Object *obj, Msg msg)
 {
-    return FALSE;
+    return 0;
 }
 
 // WBIM_Put_Away
 static IPTR wbIconPutAway(Class *cl, Object *obj, Msg msg)
 {
-    return FALSE;
+    return 0;
 }
 
 // WBIM_Delete
 static IPTR wbIconDelete(Class *cl, Object *obj, Msg msg)
 {
-    return FALSE;
+    return 0;
 }
 
 // WBIM_Format
 static IPTR wbIconFormat(Class *cl, Object *obj, Msg msg)
 {
-    return FALSE;
+    return 0;
 }
 
 // WBIM_Empty_Trash
 static IPTR wbIconEmptyTrash(Class *cl, Object *obj, Msg msg)
 {
-    return FALSE;
+    return 0;
 }
 
 static IPTR dispatcher(Class *cl, Object *obj, Msg msg)
