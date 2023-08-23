@@ -1,6 +1,10 @@
 = Workbook
 
-Copy to SYS:System/LoadWB
+Copy to SYS:System/Workbook
+
+- v1.3
+  - Add 'Rename' functionality.
+  - Fix issues with 'Show All Files' functionality.
 
 - v1.2
   - Added 'branding' support via `WB_xxx` macros in Makefile

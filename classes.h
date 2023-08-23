@@ -137,6 +137,9 @@ Class *WBSet_MakeClass(struct WorkbookBase *wb);
 #define WBIM_Format              (WBIM_Dummy + 10)        /* N/A */
 #define WBIM_Empty_Trash         (WBIM_Dummy + 11)        /* N/A */
 
+/* Return flags for WBIM_ methods */
+#define WBIM_REFRESH            (1 << 0)    /* Refresh of containing window requested */
+
 Class *WBIcon_MakeClass(struct WorkbookBase *wb);
 
 #define WBIcon        wb->wb_WBIcon

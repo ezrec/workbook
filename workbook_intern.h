@@ -8,11 +8,14 @@
 #define WORKBOOK_H
 
 #ifndef WB_NAME
-#define WB_NAME     "Workbook"
+#define WB_NAME     Workbook
+#endif
+#ifndef WB_ABOUT
+#define WB_ABOUT     Copyright © 2023 The AROS Project
 #endif
 #ifndef WB_VERSION
 #define WB_VERSION      1
-#define WB_REVISION     2
+#define WB_REVISION     3
 #endif
 
 #define _D(x)
@@ -79,6 +82,17 @@ extern struct ExecBase *SysBase;
 #include <string.h>
 #include <proto/exec.h>
 
+typedef IPTR (*wbPopupActionFunc)(struct WorkbookBase *wb, CONST_STRPTR input, APTR arg);
+
+IPTR wbPopupAction(struct WorkbookBase *wb,
+                         CONST_STRPTR title,
+                         CONST_STRPTR description,
+                         CONST_STRPTR request,
+                         STRPTR saveBuffer, // Can be NULL,
+                         LONG saveBufferSize, // Can be 0
+                         CONST_STRPTR forbidden,
+                         wbPopupActionFunc action,
+                         APTR arg);
 struct Region *wbClipWindow(struct WorkbookBase *wb, struct Window *win);
 void wbUnclipWindow(struct WorkbookBase *wb, struct Window *win, struct Region *clip);
 ULONG WorkbookMain(void);
