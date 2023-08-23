@@ -43,6 +43,46 @@ static const struct TagItem wbIcon_DrawTags[] = {
     { TAG_DONE },
 };
 
+#ifndef __amigaos4__
+#define DN_DEVICEONLY 1
+static BOOL _DevNameFromLock(struct WorkbookBase *wb, BPTR lock, STRPTR buffer, size_t size, ULONG flags)
+{
+    if (lock == 0) {
+        return FALSE;
+    }
+
+    struct DosInfo * di = (struct DosInfo *)BADDR(((struct DosLibrary *)DOSBase)->dl_Root->rn_Info);
+    struct FileLock * fl = (struct FileLock *)BADDR(lock);
+    struct DevInfo * dvi;
+
+    BOOL ok = FALSE;
+    Forbid();
+    for(dvi = (struct DevInfo *)BADDR(di->di_DevInfo) ;
+        dvi != NULL ;
+        dvi = (struct DevInfo *)BADDR(dvi->dvi_Next)) {
+        if(dvi->dvi_Type == DLT_DEVICE && dvi->dvi_Task == fl->fl_Task) {
+           UBYTE * name = AROS_BSTR_ADDR(dvi->dvi_Name);
+           size_t name_len = AROS_BSTR_strlen(dvi->dvi_Name);
+           if (name_len + 1 + 1 > size) {
+               break;
+           }
+
+           CopyMem(name, buffer, name_len);
+           buffer[name_len++] = ':';
+           buffer[name_len++] = 0;
+           ok = TRUE;
+           break;
+        }
+     }
+
+     Permit();
+
+     return ok;
+}
+#define DevNameFromLock(a, b, c, d) _DevNameFromLock(wb, a, b, c, d)
+#endif // !__amigaos4__
+
+
 static void wbIcon_Update(Class *cl, Object *obj)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
@@ -300,10 +340,102 @@ static IPTR wbIconCopy(Class *cl, Object *obj, Msg msg)
     return 0;
 }
 
+static BOOL rename_path(struct WorkbookBase *wb, CONST_STRPTR file, CONST_STRPTR input, CONST_STRPTR suffix) {
+    BOOL ok;
+
+    IPTR suffix_len = STRLEN(suffix);
+    IPTR file_len = STRLEN(file);
+    IPTR path_len = PathPart(file) - file;
+    IPTR oldname_len = path_len + 1 + STRLEN(FilePart(file)) + suffix_len + 1;
+    IPTR newname_len = path_len + 1 + STRLEN(input) + suffix_len + 1;
+    STRPTR oldname = AllocVec(oldname_len + newname_len, MEMF_ANY);
+    STRPTR newname = &oldname[oldname_len];
+
+    // Construct old name
+    CopyMem(file, oldname, file_len);
+    CopyMem(suffix, &oldname[file_len], suffix_len + 1);
+
+    // Construct new name
+    CopyMem(file, newname, path_len);
+    newname[path_len] = 0;
+    AddPart(newname, input, newname_len);
+    CopyMem(suffix, &newname[STRLEN(newname)], suffix_len + 1);
+
+    ok = Rename(oldname, newname);
+    FreeVec(oldname);
+
+    return ok;
+}
+
+static IPTR rename_action(struct WorkbookBase *wb, CONST_STRPTR input, APTR arg){
+    struct wbIcon *my = arg;
+    CONST_STRPTR title = "Rename";
+    BOOL ok;
+
+    LONG len = STRLEN(my->File);
+    if (my->File[len-1] == ':') {
+        BPTR lock = Lock(my->File, SHARED_LOCK);
+        ok = FALSE;
+        if (!lock) {
+            D(bug("%s: Can't get lock\n", my->File));
+        } else {
+            char buff[256];
+            if (!DevNameFromLock(lock, buff, sizeof(buff), DN_DEVICEONLY)) {
+                UnLock(lock);
+                D(bug("%s: Can't get name from lock.\n", my->File));
+            } else {
+                UnLock(lock);
+                ok = Relabel(buff, input);
+                if (!ok) {
+                    D(bug("%s: Can't relabel %s -> %s\n", buff, input));
+                }
+            }
+        }
+        title = "Relabel";
+    } else {
+        ok = rename_path(wb, my->File, input, "");
+        if (ok) {
+            ok = rename_path(wb, my->File, input, ".info");
+        }
+    }
+
+    if (!ok) {
+        struct EasyStruct es = {
+           .es_StructSize = sizeof(es),
+           .es_Flags = 0,
+           .es_Title = (STRPTR)title,
+           .es_TextFormat = "%s",
+           .es_GadgetFormat = "Ok",
+        };
+        char buff[80];
+        Fault(IoErr(), my->File, buff, sizeof(buff));
+        EasyRequest(0, &es, 0, buff, input);
+    }
+
+    return ok;
+}
+
 // WBIM_Rename
 static IPTR wbIconRename(Class *cl, Object *obj, Msg msg)
 {
-    return FALSE;
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbIcon *my = INST_DATA(cl, obj);
+
+    ULONG len = STRLEN(my->File);
+    IPTR ok = FALSE;
+
+    if (len > 0 && my->File[len-1] == ':') {
+        // Volume rename
+        STRPTR name = AllocVec(FILENAME_MAX, MEMF_ANY);
+        CopyMem(my->File, name, len);
+        name[len - 1] = 0;
+        ok = wbPopupAction(wb, "Relabel", "Enter a new volume name.", "New Name:", name, 0, ":/", rename_action, my);
+        FreeVec(name);
+    } else {
+        ok = wbPopupAction(wb, "Rename", "Enter a new file name.", "New Name:", FilePart(my->File), 0, ":/", rename_action, my);
+    }
+
+    return ok ? WBIM_REFRESH : 0;
 }
 
 // WBIM_Info
