@@ -630,6 +630,7 @@ static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
         } else {
             UnLock(lock);
         }
+        wbMenuEnable(cl, obj, WBMENU_ID(WBMENU_IC_FORMAT), FALSE);
     }
 
     SetAttrs(my->Set, WBSA_MaxWidth, my->Window->Width - (my->Window->BorderLeft + my->Window->BorderRight));

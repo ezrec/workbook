@@ -477,9 +477,28 @@ static IPTR wbIconDelete(Class *cl, Object *obj, Msg msg)
     return 0;
 }
 
-// WBIM_Format
+// WBwbwiAppendIM_Format
 static IPTR wbIconFormat(Class *cl, Object *obj, Msg msg)
 {
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbIcon *my = INST_DATA(cl, obj);
+
+    BPTR lock = Lock(my->File, ACCESS_READ);
+    BOOL ok = FALSE;
+    if (OpenWorkbenchObject("SYS:System/Format",
+                WBOPENA_ArgLock, lock,
+                WBOPENA_ArgName, (lock != BNULL) ? "" : my->File,
+                TAG_DONE)) {
+        ok = TRUE;
+    } else {
+        D(bug("%s: Can't run SYS:System/Format.\n", my->File));
+    }
+    UnLock(lock);
+
+    if (!ok) {
+        wbPopupIoErr(wb, "Format", 0, my->File);
+    }
+
     return 0;
 }
 

@@ -61,7 +61,7 @@
 #define WBMENU_IC_LEAVE_OUT         66, "Leave out",       "L", Broken 0, 0
 #define WBMENU_IC_PUT_AWAY          67, "Put away",        "P", Broken 0, 0
 #define WBMENU_IC_DELETE            70, "Delete...",         0, Broken 0, 0
-#define WBMENU_IC_FORMAT            71, "Format...",         0, Broken 0, 0
+#define WBMENU_IC_FORMAT            71, "Format...",         0, 0, 0
 #define WBMENU_IC_EMPTY_TRASH       72, "Empty trash",       0, Broken 0, 0
 
 #endif /* WORKBOOK_MENU_H */

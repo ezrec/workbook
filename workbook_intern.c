@@ -314,7 +314,12 @@ VOID wbPopupIoErr(struct WorkbookBase *wb, CONST_STRPTR title, LONG ioerr, CONST
        .es_GadgetFormat = "Ok",
     };
     char buff[256];
-    Fault(ioerr, prefix, buff, sizeof(buff));
+    if (ioerr == 0) {
+        strcpy(buff, prefix);
+        strcat(buff, ": ????");
+    } else {
+        Fault(ioerr, prefix, buff, sizeof(buff));
+    }
     EasyRequest(0, &es, 0, buff);
 }
 
