@@ -633,7 +633,7 @@ static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
         wbMenuEnable(cl, obj, WBMENU_ID(WBMENU_IC_FORMAT), FALSE);
     }
 
-    SetAttrs(my->Set, WBSA_MaxWidth, my->Window->Width - (my->Window->BorderLeft + my->Window->BorderRight));
+    SetAttrs(my->Set, WBSA_MaxWidth, my->Window->Width - (my->Window->BorderLeft + my->Window->BorderRight), TAG_END);
     RefreshGadgets(my->Window->FirstGadget, my->Window, NULL);
 
     wbRescan(cl, obj);
@@ -788,7 +788,7 @@ static IPTR WBWindowNewSize(Class *cl, Object *obj, Msg msg)
     struct Window *win = my->Window;
     struct Region *clip;
 
-    SetAttrs(my->Set, WBSA_MaxWidth, win->Width - (win->BorderLeft + win->BorderRight));
+    SetAttrs(my->Set, WBSA_MaxWidth, win->Width - (win->BorderLeft + win->BorderRight), TAG_END);
 
     /* Clip to the window for drawing */
     clip = wbClipWindow(wb, win);

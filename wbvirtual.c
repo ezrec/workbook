@@ -106,7 +106,8 @@ static BOOL wbvMoveTo(Class *cl, Object *obj, WORD left, WORD top)
     /* Set the position of the child */
     if (my->Gadget) {
         SetAttrs(my->Gadget, GA_Top, gadget->TopEdge - my->Virt.Top,
-                             GA_Left, gadget->LeftEdge - my->Virt.Left);
+                             GA_Left, gadget->LeftEdge - my->Virt.Left,
+                             TAG_END);
     }
 
     return TRUE;
