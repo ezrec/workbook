@@ -434,8 +434,15 @@ static IPTR wbIconInfo(Class *cl, Object *obj, Msg msg)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
+    BPTR lock;
 
-    WBInfo(BNULL, my->File, NULL);
+    lock = Lock(my->File, SHARED_LOCK);
+    if (lock == BNULL) {
+        wbPopupIoErr(wb, "Info", IoErr(), my->File);
+    } else {
+        WBInfo(lock, my->File, my->Screen);
+        UnLock(lock);
+    }
 
     return 0;
 }
