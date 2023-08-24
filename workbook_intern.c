@@ -5,6 +5,8 @@
  *
  * Licensed under the AROS PUBLIC LICENSE (APL) Version 1.1
  */
+
+#include <proto/dos.h>
 #include <proto/graphics.h>
 #include <proto/layers.h>
 #include <proto/gadtools.h>
@@ -302,4 +304,17 @@ exit:
     return rc;
 }
 
+VOID wbPopupIoErr(struct WorkbookBase *wb, CONST_STRPTR title, LONG ioerr, CONST_STRPTR prefix)
+{
+    struct EasyStruct es = {
+       .es_StructSize = sizeof(es),
+       .es_Flags = 0,
+       .es_Title = (STRPTR)title,
+       .es_TextFormat = "%s",
+       .es_GadgetFormat = "Ok",
+    };
+    char buff[256];
+    Fault(ioerr, prefix, buff, sizeof(buff));
+    EasyRequest(0, &es, 0, buff);
+}
 

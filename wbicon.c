@@ -400,16 +400,7 @@ static IPTR rename_action(struct WorkbookBase *wb, CONST_STRPTR input, APTR arg)
     }
 
     if (!ok) {
-        struct EasyStruct es = {
-           .es_StructSize = sizeof(es),
-           .es_Flags = 0,
-           .es_Title = (STRPTR)title,
-           .es_TextFormat = "%s",
-           .es_GadgetFormat = "Ok",
-        };
-        char buff[80];
-        Fault(IoErr(), my->File, buff, sizeof(buff));
-        EasyRequest(0, &es, 0, buff, input);
+        wbPopupIoErr(wb, "Rename", IoErr(), my->File);
     }
 
     return ok;
