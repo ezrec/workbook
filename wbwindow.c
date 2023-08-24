@@ -146,36 +146,37 @@ static BOOL wbMenuEnable(Class *cl, Object *obj, int id, BOOL onoff)
     return rc;
 }
 
-static ULONG wbFilterIcons_Hook(struct Hook *hook, struct ExAllData *ead, LONG *type)
+static BOOL wbFilterFileInfoBlock(struct wbWindow *my, struct FileInfoBlock *fib)
 {
     int i;
-    struct wbWindow *my = hook->h_Data;
 
-    if (stricmp(ead->ed_Name, "disk.info") == 0) {
-        D(bug("- %s (disk)\n", ead->ed_Name));
+    D(bug("%s ", fib->fib_FileName));
+
+    if (stricmp(fib->fib_FileName, "disk.info") == 0) {
+        D(bug("- (disk)\n"));
         return FALSE;
     }
 
     BOOL show_all = (my->Flags & WBWF_SHOW_ALL) != 0;
 
-    i = strlen(ead->ed_Name);
-    if (i >= 5 && stricmp(&ead->ed_Name[i-5], ".info") == 0) {
+    i = strlen(fib->fib_FileName);
+    if (i >= 5 && stricmp(&fib->fib_FileName[i-5], ".info") == 0) {
         if (show_all) {
-            D(bug("- %s (icon)\n", ead->ed_Name));
+            D(bug("- (icon)\n"));
             return FALSE;
         } else {
-            ead->ed_Name[i-5] = 0;
-            D(bug("+ %s (icon)\n", ead->ed_Name));
+            fib->fib_FileName[i-5] = 0;
+            D(bug("+ (icon)\n"));
             return TRUE;
         }
     }
 
-    if (stricmp(ead->ed_Name, ".backdrop") == 0) {
-        D(bug("- %s (backdrop)\n", ead->ed_Name));
+    if (stricmp(fib->fib_FileName, ".backdrop") == 0) {
+        D(bug("- (backdrop)\n"));
         return FALSE;
     }
 
-    D(bug("%lc %s (default)\n", show_all ? '+' : '-', ead->ed_Name));
+    D(bug("%lc (default)\n", show_all ? '+' : '-'));
     return show_all;
 }
 
@@ -233,68 +234,36 @@ static void wbAddFiles(Class *cl, Object *obj)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbWindow *my = INST_DATA(cl, obj);
-    struct ExAllControl *eac;
-    struct ExAllData *ead;
-    const ULONG eadSize = sizeof(struct ExAllData) + 1024;
-    TEXT *path;
-    int file_part;
 
     D(bug("%s: Add files...\n", __func__));
 
-    path = AllocVec(1024, MEMF_ANY);
-    if (!path) {
-        D(bug("%s: Unable to allocate path.\n", __func__));
-        return;
-    }
-
-    if (!NameFromLock(my->Lock, path, 1024)) {
-        D(bug("%s: Unable to get path from lock.\n", __func__));
-        FreeVec(path);
-        return;
-    }
-    file_part = strlen(path);
-
-    ead = AllocVec(eadSize, MEMF_CLEAR);
-    if (ead != NULL) {
-        eac = AllocDosObject(DOS_EXALLCONTROL, NULL);
-        if (eac != NULL) {
-            struct Hook hook;
-            LONG more = TRUE;
-
-            hook.h_Entry = HookEntry;
-            hook.h_SubEntry = wbFilterIcons_Hook;
-            hook.h_Data = my;
-
-            eac->eac_MatchFunc = &hook;
-            while (more) {
-                struct ExAllData *tmp = ead;
-                int i;
-
-                more = ExAll(my->Lock, ead, eadSize, ED_NAME, eac);
-                D(bug("%s: more=%ld\n", __func__, more));
-                for (i = 0; i < eac->eac_Entries; i++, tmp=tmp->ed_Next) {
-                    Object *iobj;
-                    path[file_part] = 0;
-                    if (AddPart(path, tmp->ed_Name, 1024)) {
-                        iobj = NewObject(WBIcon, NULL,
-                                WBIA_File, path,
-                                WBIA_Label, tmp->ed_Name,
-                                WBIA_Screen, my->Window->WScreen,
-                                TAG_END);
-                        if (iobj != NULL) {
-                            wbwiAppend(cl, obj, iobj);
-                        }
-                    } else {
-                        D(bug("%s: Out of space for name '%s'\n", tmp->ed_Name));
+    struct FileInfoBlock *fib = AllocDosObject(DOS_FIB, NULL);
+    if (fib != NULL) {
+        if (!Examine(my->Lock, fib)) {
+            wbPopupIoErr(wb, "Update", IoErr(), my->Path);
+        } else {
+            while (ExNext(my->Lock, fib)) {
+                if (wbFilterFileInfoBlock(my, fib)) {
+                    char abspath[1024];
+                    strcpy(abspath, my->Path);
+                    AddPart(abspath, fib->fib_FileName, sizeof(abspath));
+                    Object *iobj = NewObject(WBIcon, NULL,
+                            WBIA_File, abspath,
+                            WBIA_Label, fib->fib_FileName,
+                            WBIA_Screen, my->Window->WScreen,
+                            TAG_END);
+                    if (iobj != NULL) {
+                        wbwiAppend(cl, obj, iobj);
                     }
                 }
             }
-            FreeDosObject(DOS_EXALLCONTROL, eac);
+            LONG ioerr = IoErr();
+            if (ioerr != ERROR_NO_MORE_ENTRIES) {
+                wbPopupIoErr(wb, "Update", ioerr, my->Path);
+            }
         }
-        FreeVec(ead);
     }
-
-    FreeVec(path);
+    FreeDosObject(DOS_FIB, fib);
 
     D(bug("%s: Added!\n", __func__));
 }
@@ -661,6 +630,7 @@ static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
         } else {
             UnLock(lock);
         }
+        wbMenuEnable(cl, obj, WBMENU_ID(WBMENU_IC_FORMAT), FALSE);
     }
 
     SetAttrs(my->Set, WBSA_MaxWidth, my->Window->Width - (my->Window->BorderLeft + my->Window->BorderRight));

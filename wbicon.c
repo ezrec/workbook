@@ -400,16 +400,7 @@ static IPTR rename_action(struct WorkbookBase *wb, CONST_STRPTR input, APTR arg)
     }
 
     if (!ok) {
-        struct EasyStruct es = {
-           .es_StructSize = sizeof(es),
-           .es_Flags = 0,
-           .es_Title = (STRPTR)title,
-           .es_TextFormat = "%s",
-           .es_GadgetFormat = "Ok",
-        };
-        char buff[80];
-        Fault(IoErr(), my->File, buff, sizeof(buff));
-        EasyRequest(0, &es, 0, buff, input);
+        wbPopupIoErr(wb, "Rename", IoErr(), my->File);
     }
 
     return ok;
@@ -443,8 +434,15 @@ static IPTR wbIconInfo(Class *cl, Object *obj, Msg msg)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
+    BPTR lock;
 
-    WBInfo(BNULL, my->File, NULL);
+    lock = Lock(my->File, SHARED_LOCK);
+    if (lock == BNULL) {
+        wbPopupIoErr(wb, "Info", IoErr(), my->File);
+    } else {
+        WBInfo(lock, my->File, my->Screen);
+        UnLock(lock);
+    }
 
     return 0;
 }
@@ -479,9 +477,28 @@ static IPTR wbIconDelete(Class *cl, Object *obj, Msg msg)
     return 0;
 }
 
-// WBIM_Format
+// WBwbwiAppendIM_Format
 static IPTR wbIconFormat(Class *cl, Object *obj, Msg msg)
 {
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbIcon *my = INST_DATA(cl, obj);
+
+    BPTR lock = Lock(my->File, ACCESS_READ);
+    BOOL ok = FALSE;
+    if (OpenWorkbenchObject("SYS:System/Format",
+                WBOPENA_ArgLock, lock,
+                WBOPENA_ArgName, (lock != BNULL) ? "" : my->File,
+                TAG_DONE)) {
+        ok = TRUE;
+    } else {
+        D(bug("%s: Can't run SYS:System/Format.\n", my->File));
+    }
+    UnLock(lock);
+
+    if (!ok) {
+        wbPopupIoErr(wb, "Format", 0, my->File);
+    }
+
     return 0;
 }
 

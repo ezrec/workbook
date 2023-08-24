@@ -93,6 +93,7 @@ IPTR wbPopupAction(struct WorkbookBase *wb,
                          CONST_STRPTR forbidden,
                          wbPopupActionFunc action,
                          APTR arg);
+VOID wbPopupIoErr(struct WorkbookBase *wb, CONST_STRPTR title, LONG ioerr, CONST_STRPTR prefix);
 struct Region *wbClipWindow(struct WorkbookBase *wb, struct Window *win);
 void wbUnclipWindow(struct WorkbookBase *wb, struct Window *win, struct Region *clip);
 ULONG WorkbookMain(void);
