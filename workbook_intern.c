@@ -124,7 +124,7 @@ IPTR wbPopupAction(struct WorkbookBase *wb,
 
     // Description
     newGadget.ng_TopEdge = top_border + 8;
-    newGadget.ng_Width = 50 * 8;
+    newGadget.ng_Width = STRLEN(descriptionField) * 8;
     newGadget.ng_LeftEdge = 20;
     newGadget.ng_VisualInfo = vi;
     newGadget.ng_Height = 12;
