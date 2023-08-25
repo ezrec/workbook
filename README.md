@@ -2,6 +2,12 @@
 
 Copy to SYS:System/Workbook
 
+- v1.4
+  - Add select all/none menu items.
+  - Add shift-select and mutual exclusion selection modes.
+  - Enable 'Format...' functionality for disk devices.
+  - Fix issue with overlog Execute... label.
+
 - v1.3
   - Add 'Rename' functionality.
   - Fix issues with 'Show All Files' functionality.
