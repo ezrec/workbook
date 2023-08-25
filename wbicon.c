@@ -32,6 +32,7 @@ struct wbIcon {
     struct DiskObject *Icon;
     STRPTR             Label;
     struct Screen     *Screen;
+    Object            *Set;
 
     struct timeval LastActive;
 };
@@ -135,6 +136,7 @@ static IPTR wbIconNew(Class *cl, Object *obj, struct opSet *ops)
 
     my = INST_DATA(cl, obj);
 
+    my->Set = (Object *)GetTagData(WBIA_Set, (IPTR)NULL, ops->ops_AttrList);
     my->File = NULL;
     my->Icon = (struct DiskObject *)GetTagData(WBIA_Icon, (IPTR)NULL, ops->ops_AttrList);
     my->Screen = (struct Screen *)GetTagData(WBIA_Screen, (IPTR)NULL, ops->ops_AttrList);
@@ -230,6 +232,24 @@ static IPTR wbIconGet(Class *cl, Object *obj, struct opGet *opg)
     return rc;
 }
 
+static IPTR wbIconSet(Class *cl, Object *obj, struct opSet *ops)
+{
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbIcon *my = INST_DATA(cl, obj);
+    struct TagItem *tags = ops->ops_AttrList;
+    struct TagItem *ti;
+
+    while ((ti = NextTagItem(&tags)) != NULL) {
+        switch (ti->ti_Tag) {
+        case WBIA_Set:
+            my->Set = (Object *)ti->ti_Data;
+            break;
+        }
+    }
+
+    return DoSuperMethodA(cl, obj, (Msg)ops);
+}
+
 // GM_RENDER
 static IPTR wbIconRender(Class *cl, Object *obj, struct gpRender *gpr)
 {
@@ -244,13 +264,117 @@ static IPTR wbIconRender(Class *cl, Object *obj, struct gpRender *gpr)
     x = gadget->LeftEdge;
     y = gadget->TopEdge;
 
-    /* Clip to the window for drawing */
-    clip = wbClipWindow(wb, win);
-    DrawIconStateA(rp, my->Icon, (STRPTR)my->Label, x, y,
-        (gadget->Flags & GFLG_SELECTED) ? TRUE : FALSE, (struct TagItem *)wbIcon_DrawTags);
-    wbUnclipWindow(wb, win, clip);
+    if (rp == NULL) {
+        rp = ObtainGIRPort(gpr->gpr_GInfo);
+    }
+
+    if (rp) {
+        /* Clip to the window for drawing */
+        clip = wbClipWindow(wb, win);
+        DrawIconStateA(rp, my->Icon, (STRPTR)my->Label, x, y,
+            (gadget->Flags & GFLG_SELECTED) ? IDS_SELECTED : IDS_NORMAL, (struct TagItem *)wbIcon_DrawTags);
+        wbUnclipWindow(wb, win, clip);
+
+        if (gpr->gpr_RPort == NULL) {
+            ReleaseGIRPort(rp);
+        }
+    }
 
     return 0;
+}
+
+// If multiple are selected, clear all and mark this as selected.
+// If none are selected or only this is selected, clear all and toggle selection mark.
+// If shift-selecting, toggle selection mark.
+static void wbIconToggleSelected(Class *cl, Object *obj, struct GadgetInfo *gi, UWORD qualifier)
+{
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbIcon *my = INST_DATA(cl, obj);
+    IPTR count = 0;
+
+    // Toggle selection
+    IPTR selected = FALSE;
+    GetAttr(GA_SELECTED, obj, &selected);
+
+    if (my->Set) {
+        GetAttr(WBSA_SelectedCount, my->Set, &count);
+    } else {
+        count = selected ? 1 : 0;
+    }
+
+    // Are we in shift-select mode?
+    BOOL shift_select = (qualifier & (IEQUALIFIER_LSHIFT | IEQUALIFIER_LSHIFT)) == 1;
+
+    BOOL deselect;
+
+    if (!shift_select) {
+        // Normal select mode
+        if (count == 0) {
+            // If none are selected, set outselves as selected.
+            selected = TRUE;
+            deselect = FALSE;
+        } else if (count == 1) {
+            if (!selected) {
+                // If one is selected, and we are not selected, deselect all and set outselves as selected.
+                selected = TRUE;
+                deselect = TRUE;
+            } else {
+                // If one is selected, and we are selected, set outselves as deselected.
+                selected = FALSE;
+                deselect = FALSE;
+            }
+        } else {
+            if (!selected) {
+                // If many are selected, and we are not selected, deselect all and set outselves as selected.
+                selected = TRUE;
+                deselect = TRUE;
+            } else {
+                // If many are selected, and we are selected, deselect all and set outselves as selected.
+                selected = TRUE;
+                deselect = TRUE;
+            }
+        }
+    } else {
+        // Shift-select mode
+        if (count == 0) {
+            // If none are selected, set outselves as selected.
+            selected = TRUE;
+            deselect = FALSE;
+        } else {
+            if (!selected) {
+                // If any are selected, and we are not selected, set outselves as selected.
+                selected = TRUE;
+                deselect = FALSE;
+            } else {
+                // If any are selected, and we are selected, set outselves as not selected.
+                selected = FALSE;
+                deselect = FALSE;
+            }
+        }
+    }
+
+    if (deselect) {
+        // De-select all items.
+        D(bug("%s: %lx - clear parent set %lx\n", __func__, obj, my->Set));
+        if (my->Set) {
+            struct wbsm_Select wbss = {
+                .MethodID = WBSM_SELECT,
+                .wbss_GInfo = gi,
+                .wbss_All = FALSE,
+            };
+            DoMethodA(my->Set, (Msg)&wbss);
+        }
+    }
+
+    SetAttrs(obj, GA_SELECTED, selected, TAG_DONE);
+
+    // Redraw
+    struct gpRender gpr = {
+        .MethodID = GM_RENDER,
+        .gpr_GInfo = gi,
+        .gpr_Redraw = GREDRAW_TOGGLE,
+    };
+    DoMethodA(obj, (Msg)&gpr);
 }
 
 // GM_GOACTIVE
@@ -259,61 +383,88 @@ static IPTR wbIconGoActive(Class *cl, Object *obj, struct gpInput *gpi)
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
     struct Gadget *gadget = (struct Gadget *)obj;
-    BOOL dclicked;
-    struct Region *clip;
-    struct RastPort *rp;
+    BOOL dclicked = FALSE;
+    IPTR rc = GMR_NOREUSE;
 
-    if ((rp = ObtainGIRPort(gpi->gpi_GInfo))) {
-        struct gpRender rmsg;
-        rmsg.MethodID = GM_RENDER;
-        rmsg.gpr_GInfo = gpi->gpi_GInfo;
-        rmsg.gpr_RPort = rp;
-        rmsg.gpr_Redraw = GREDRAW_TOGGLE;
+    if (gpi->gpi_IEvent != NULL) {
+        my->LastActive = gpi->gpi_IEvent->ie_TimeStamp;
 
-        gadget->Flags ^= GFLG_SELECTED;
-        /* Clip to the window for drawing */
-        clip = wbClipWindow(wb, gpi->gpi_GInfo->gi_Window);
-        DoMethodA(obj, (Msg)&rmsg);
-        wbUnclipWindow(wb, gpi->gpi_GInfo->gi_Window, clip);
-        ReleaseGIRPort(rp);
+        // Select this item.
+        wbIconToggleSelected(cl, obj, gpi->gpi_GInfo, gpi->gpi_IEvent->ie_Qualifier);
+        rc = GMR_MEACTIVE;
     }
 
-    /* On a double-click, don't go 'active', just
-     * do the action.
-     */
-    dclicked = DoubleClick(my->LastActive.tv_secs,
-                           my->LastActive.tv_micro,
-                           gpi->gpi_IEvent->ie_TimeStamp.tv_secs,
-                           gpi->gpi_IEvent->ie_TimeStamp.tv_micro);
-
-    my->LastActive = gpi->gpi_IEvent->ie_TimeStamp;
-
-    if (dclicked)
-    {
-        STACKED ULONG openmethodID;
-        openmethodID = WBIM_Open;
-        DoMethodA(obj, (Msg)&openmethodID);
-    }
-
-    return GMR_MEACTIVE;
-}
-
-// GM_GOINACTIVE
-static IPTR wbIconGoInactive(Class *cl, Object *obj, struct gpGoInactive *gpgi)
-{
-    return GMR_NOREUSE;
+    return rc;
 }
 
 // GM_HANDLEINPUT
 static IPTR wbIconHandleInput(Class *cl, Object *obj, struct gpInput *gpi)
 {
+    struct wbIcon *my = INST_DATA(cl, obj);
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct InputEvent *iev = gpi->gpi_IEvent;
+    struct Gadget *gadget = (struct Gadget *)obj;
 
-    if ((iev->ie_Class == IECLASS_RAWMOUSE) &&
-        (iev->ie_Code  == SELECTUP))
-        return GMR_REUSE;
+    IPTR rc = GMR_MEACTIVE;
 
-    return GMR_MEACTIVE;
+    if (iev->ie_Class == IECLASS_RAWMOUSE) {
+        switch (iev->ie_Code) {
+        case SELECTDOWN:
+            if ( (gpi->gpi_Mouse.X < 0) ||
+                                 (gpi->gpi_Mouse.X > gadget->Width) ||
+                                 (gpi->gpi_Mouse.Y < 0) ||
+                                 (gpi->gpi_Mouse.Y > gadget->Height) ) {
+                D(bug("%s: (%ld,%ld) clicked out of bounds (%ld,%ld)-(%ld,%ld)\n", __func__, 
+                            gpi->gpi_Mouse.X, gpi->gpi_Mouse.Y,
+                            0, 0, gadget->Width, gadget->Height
+                            ));
+                rc = GMR_REUSE;
+            } else {
+
+                /* On a double-click, don't go 'active', just
+                 * do the action.
+                 */
+                BOOL dclicked = DoubleClick(my->LastActive.tv_secs,
+                                           my->LastActive.tv_micro,
+                                           gpi->gpi_IEvent->ie_TimeStamp.tv_secs,
+                                           gpi->gpi_IEvent->ie_TimeStamp.tv_micro);
+
+                my->LastActive = gpi->gpi_IEvent->ie_TimeStamp;
+
+                if (dclicked)
+                {
+                    STACKED ULONG openmethodID;
+                    openmethodID = WBIM_Open;
+                    DoMethodA(obj, (Msg)&openmethodID);
+                }
+
+                wbIconToggleSelected(cl, obj, gpi->gpi_GInfo, gpi->gpi_IEvent->ie_Qualifier);
+                rc = GMR_MEACTIVE;
+            }
+            break;
+        case SELECTUP:
+            rc = GMR_MEACTIVE;
+            if ( (gpi->gpi_Mouse.X < 0) ||
+                                 (gpi->gpi_Mouse.X > gadget->Width) ||
+                                 (gpi->gpi_Mouse.Y < 0) ||
+                                 (gpi->gpi_Mouse.Y > gadget->Height) ) {
+                D(bug("%s: (%ld,%ld) clicked out of bounds (%ld,%ld)-(%ld,%ld)\n", __func__, 
+                            gpi->gpi_Mouse.X, gpi->gpi_Mouse.Y,
+                            0, 0, gadget->Width, gadget->Height
+                            ));
+                rc = GMR_REUSE;
+            }
+            break;
+        case MENUDOWN:
+            rc = GMR_REUSE;
+            break;
+        default:
+            rc = GMR_MEACTIVE;
+            break;
+        }
+    }
+
+    return rc;
 }
 
 // WBIM_Open
@@ -517,9 +668,9 @@ static IPTR dispatcher(Class *cl, Object *obj, Msg msg)
     case OM_NEW:           rc = wbIconNew(cl, obj, (APTR)msg); break;
     case OM_DISPOSE:       rc = wbIconDispose(cl, obj, (APTR)msg); break;
     case OM_GET:           rc = wbIconGet(cl, obj, (APTR)msg); break;
+    case OM_SET:           rc = wbIconSet(cl, obj, (APTR)msg); break;
     case GM_RENDER:        rc = wbIconRender(cl, obj, (APTR)msg); break;
     case GM_GOACTIVE:      rc = wbIconGoActive(cl, obj, (APTR)msg); break;
-    case GM_GOINACTIVE:    rc = wbIconGoInactive(cl, obj, (APTR)msg); break;
     case GM_HANDLEINPUT:   rc = wbIconHandleInput(cl, obj, (APTR)msg); break;
     case WBIM_Open:        rc = wbIconOpen(cl, obj, msg); break;
     case WBIM_Copy:        rc = wbIconCopy(cl, obj, msg); break;
