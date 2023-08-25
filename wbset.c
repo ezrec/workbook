@@ -23,12 +23,12 @@
 struct wbSetNode {
     struct MinNode sn_Node;
     Object        *sn_Object;      /* Gadget object */
+    BOOL sn_Fixed;
 };
 
 struct wbSet {
     LONG MaxWidth;
-    struct List FixedObjects;
-    struct List AutoObjects;
+    struct List SetObjects;
 };
 
 static void wbGABox(Object *obj, struct IBox *box)
@@ -49,8 +49,10 @@ static void rearrange(Class *cl, Object *obj)
     WORD CurrRight, CurrBottom;
 
     /* First, remove all autoobjects from the superclass */
-    ForeachNode(&my->AutoObjects, node) {
-        DoSuperMethod(cl, obj, OM_REMMEMBER, node->sn_Object);
+    ForeachNode(&my->SetObjects, node) {
+        if (!node->sn_Fixed) {
+            DoSuperMethod(cl, obj, OM_REMMEMBER, node->sn_Object);
+        }
     }
 
     /* Find the set size with just the fixed objects */
@@ -63,7 +65,11 @@ static void rearrange(Class *cl, Object *obj)
     CurrBottom = sbox.Top + sbox.Height;
 
     /* For each item in the auto list, add it to the right */
-    ForeachNode(&my->AutoObjects, node) {
+    ForeachNode(&my->SetObjects, node) {
+        if (node->sn_Fixed) {
+            continue;
+        }
+
         Object *iobj = node->sn_Object;
         struct IBox ibox;
 
@@ -103,12 +109,8 @@ static IPTR WBSetAddMember(Class *cl, Object *obj, struct opMember *opm)
     /* Get bounding box of item to add */
     wbGABox(iobj, &ibox);
 
-    if (ibox.Left == ~0 ||
-        ibox.Top == ~0) {
-        AddHead(&my->AutoObjects, (struct Node *)&node->sn_Node);
-    } else {
-        AddHead(&my->FixedObjects, (struct Node *)&node->sn_Node);
-    }
+    node->sn_Fixed = (ibox.Left != ~0) && (ibox.Top != ~0 );
+    AddHead(&my->SetObjects, (struct Node *)&node->sn_Node);
 
     rc = DoSuperMethodA(cl, obj, (Msg)opm);
 
@@ -127,14 +129,7 @@ static IPTR WBSetRemMember(Class *cl, Object *obj, struct opMember *opm)
 
     rc = DoSuperMethodA(cl, obj, (Msg)opm);
 
-    ForeachNodeSafe(&my->FixedObjects, node, next) {
-        if (node->sn_Object == iobj) {
-            Remove((struct Node *)node);
-            FreeMem(node, sizeof(*node));
-        }
-    }
-
-    ForeachNodeSafe(&my->AutoObjects, node, next) {
+    ForeachNodeSafe(&my->SetObjects, node, next) {
         if (node->sn_Object == iobj) {
             Remove((struct Node *)node);
             FreeMem(node, sizeof(*node));
@@ -162,8 +157,7 @@ static IPTR WBSetNew(Class *cl, Object *obj, struct opSet *ops)
 
     my->MaxWidth = GetTagData(WBSA_MaxWidth, 0, ops->ops_AttrList);
 
-    NEWLIST(&my->FixedObjects);
-    NEWLIST(&my->AutoObjects);
+    NEWLIST(&my->SetObjects);
 
     return rc;
 }
@@ -223,12 +217,7 @@ static IPTR WBSetDispose(Class *cl, Object *obj, Msg msg)
     struct wbSetNode *node, *next;
 
     /* Remove all the nodes */
-    ForeachNodeSafe(&my->FixedObjects, node, next) {
-        Remove((struct Node *)node);
-        FreeMem(node, sizeof(*node));
-    }
-
-    ForeachNodeSafe(&my->AutoObjects, node, next) {
+    ForeachNodeSafe(&my->SetObjects, node, next) {
         Remove((struct Node *)node);
         FreeMem(node, sizeof(*node));
     }
