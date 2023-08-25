@@ -835,8 +835,9 @@ static IPTR WBWindowForSelectedIcons(Class *cl, Object *obj, IPTR MethodID)
         IPTR selected = FALSE;
 
         GetAttr(GA_Selected, wbwi->wbwiObject, &selected);
-        if (selected)
+        if (selected) {
             rc |= DoMethodA(wbwi->wbwiObject, (Msg)&MethodID);
+        }
     }
 
     return rc;
@@ -860,6 +861,14 @@ static IPTR WBWindowMenuPick(Class *cl, Object *obj, struct wbwm_MenuPick *wbwmp
             }
             UnLock(lock);
         }
+        break;
+    case WBMENU_ID(WBMENU_WN_SELECT_ALL):
+        DoGadgetMethod((struct Gadget *)my->Set, my->Window, NULL, (IPTR)WBSM_SELECT, NULL, (IPTR)TRUE);
+        rc = 0;
+        break;
+    case WBMENU_ID(WBMENU_WN_SELECT_NONE):
+        DoGadgetMethod((struct Gadget *)my->Set, my->Window, NULL, (IPTR)WBSM_SELECT, NULL, (IPTR)FALSE);
+        rc = 0;
         break;
     case WBMENU_ID(WBMENU_WN_UPDATE):
         rc = WBIM_REFRESH;
