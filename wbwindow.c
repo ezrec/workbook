@@ -633,7 +633,7 @@ static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
         wbMenuEnable(cl, obj, WBMENU_ID(WBMENU_IC_FORMAT), FALSE);
     }
 
-    SetAttrs(my->Set, WBSA_MaxWidth, my->Window->Width - (my->Window->BorderLeft + my->Window->BorderRight));
+    SetAttrs(my->Set, WBSA_MaxWidth, my->Window->Width - (my->Window->BorderLeft + my->Window->BorderRight), TAG_END);
     RefreshGadgets(my->Window->FirstGadget, my->Window, NULL);
 
     wbRescan(cl, obj);
@@ -788,7 +788,7 @@ static IPTR WBWindowNewSize(Class *cl, Object *obj, Msg msg)
     struct Window *win = my->Window;
     struct Region *clip;
 
-    SetAttrs(my->Set, WBSA_MaxWidth, win->Width - (win->BorderLeft + win->BorderRight));
+    SetAttrs(my->Set, WBSA_MaxWidth, win->Width - (win->BorderLeft + win->BorderRight), TAG_END);
 
     /* Clip to the window for drawing */
     clip = wbClipWindow(wb, win);
@@ -835,8 +835,9 @@ static IPTR WBWindowForSelectedIcons(Class *cl, Object *obj, IPTR MethodID)
         IPTR selected = FALSE;
 
         GetAttr(GA_Selected, wbwi->wbwiObject, &selected);
-        if (selected)
+        if (selected) {
             rc |= DoMethodA(wbwi->wbwiObject, (Msg)&MethodID);
+        }
     }
 
     return rc;
@@ -860,6 +861,14 @@ static IPTR WBWindowMenuPick(Class *cl, Object *obj, struct wbwm_MenuPick *wbwmp
             }
             UnLock(lock);
         }
+        break;
+    case WBMENU_ID(WBMENU_WN_SELECT_ALL):
+        DoGadgetMethod((struct Gadget *)my->Set, my->Window, NULL, (IPTR)WBSM_SELECT, NULL, (IPTR)TRUE);
+        rc = 0;
+        break;
+    case WBMENU_ID(WBMENU_WN_SELECT_NONE):
+        DoGadgetMethod((struct Gadget *)my->Set, my->Window, NULL, (IPTR)WBSM_SELECT, NULL, (IPTR)FALSE);
+        rc = 0;
         break;
     case WBMENU_ID(WBMENU_WN_UPDATE):
         rc = WBIM_REFRESH;
