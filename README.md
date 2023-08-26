@@ -2,6 +2,11 @@
 
 Copy to SYS:System/Workbook
 
+- v1.5
+  - Rename process/task to 'Workbench' for AmigaOS tool (ie WBRun) compatibility.
+  - Only refresh title bar when AvailMem actually changes
+  - Add 'Clean Up' functionality
+  - Render icons with 3D borders (workaround for AROS icon.library bugs)
 - v1.4
   - Add select all/none menu items.
   - Add shift-select and mutual exclusion selection modes.
