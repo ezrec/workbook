@@ -71,6 +71,9 @@ static const struct NewMenu WBWindow_menu[] =  {
         WBMENU_ITEM(WBMENU_WB_SHELL),
         WBMENU_ITEM(WBMENU_WB_ABOUT),
         WBMENU_BAR,
+        WBMENU_ITEM(WBMENU_WB_CUST_UPDATER),
+        WBMENU_ITEM(WBMENU_WB_CUST_AMISTORE),
+        WBMENU_BAR,
         WBMENU_ITEM(WBMENU_WB_QUIT),
         WBMENU_ITEM(WBMENU_WB_SHUTDOWN),
     WBMENU_TITLE(WBMENU_WN),
@@ -625,6 +628,9 @@ static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
      */
     if (my->Lock == BNULL) {
         wbMenuEnable(cl, obj, WBMENU_ID(WBMENU_WN_OPEN_PARENT), FALSE);
+        wbMenuEnable(cl, obj, WBMENU_ID(WBMENU_IC_FORMAT), TRUE);
+        wbMenuEnable(cl, obj, WBMENU_ID(WBMENU_WN__SHOW), FALSE);
+        wbMenuEnable(cl, obj, WBMENU_ID(WBMENU_WN__VIEW), FALSE);
     } else {
         BPTR lock = ParentDir(my->Lock);
         if (lock == BNULL) {
@@ -633,6 +639,26 @@ static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
             UnLock(lock);
         }
         wbMenuEnable(cl, obj, WBMENU_ID(WBMENU_IC_FORMAT), FALSE);
+        wbMenuEnable(cl, obj, WBMENU_ID(WBMENU_WN__SHOW), TRUE);
+        wbMenuEnable(cl, obj, WBMENU_ID(WBMENU_WN__VIEW), TRUE);
+    }
+
+    // Check for tools in the filesystem
+    struct {
+        int id;
+        CONST_STRPTR path;
+    } tools[] = {
+        { WBMENU_ID(WBMENU_WB_CUST_UPDATER), "SYS:System/Updater" },
+        { WBMENU_ID(WBMENU_WB_CUST_AMISTORE), "SYS:Utilities/Amistore" },
+        { WBMENU_ID(WBMENU_IC_FORMAT), "SYS:System/Format" },
+    };
+    for (size_t n = 0; n < sizeof(tools)/sizeof(tools[0]); n++) {
+        BPTR lock = Lock(tools[n].path, SHARED_LOCK);
+        if (lock == BNULL) {
+            wbMenuEnable(cl, obj, tools[n].id, FALSE);
+        } else {
+            UnLock(lock);
+        }
     }
 
     RefreshGadgets(my->Window->FirstGadget, my->Window, NULL);
