@@ -262,6 +262,12 @@ static BOOL wbMenuPick(Class *cl, Object *obj, struct Window *win, UWORD menuNum
 #endif
             };
             switch (WBMENU_ITEM_ID(item)) {
+            case WBMENU_ID(WBMENU_WB_CUST_UPDATER):
+                OpenWorkbenchObject("SYS:System/Updater", TAG_END);
+                break;
+            case WBMENU_ID(WBMENU_WB_CUST_AMISTORE):
+                OpenWorkbenchObject("SYS:Utilities/Amistore", TAG_END);
+                break;
             case WBMENU_ID(WBMENU_WB_QUIT):
                 quit = TRUE;
                 break;
