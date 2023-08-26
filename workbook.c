@@ -141,8 +141,17 @@ ULONG WorkbookMain(void)
     if (wb->wb_OpenerSegList == BNULL)
         goto error;
 
+    // Set process and task name to "Workbench", for old AmigaOS tools
+    SetProgramName("Workbench");
+    struct Task *task = FindTask(NULL);
+    STRPTR oldName = task->tc_Node.ln_Name;
+    task->tc_Node.ln_Name = (STRPTR)"Workbench";
+
     SetConsoleTask(NULL);
     rc = WB_Main(wb);
+
+    // Restore (possibly allocated) task name.
+    task->tc_Node.ln_Name = oldName;
 
     UnLoadSeg(wb->wb_OpenerSegList);
 
