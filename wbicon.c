@@ -232,6 +232,16 @@ static IPTR wbIconGet(Class *cl, Object *obj, struct opGet *opg)
     return rc;
 }
 
+static void wbGABox(Object *obj, struct IBox *box)
+{
+    struct Gadget *gadget = (struct Gadget *)obj;
+    box->Top = gadget->TopEdge;
+    box->Left = gadget->LeftEdge;
+    box->Width = gadget->Width;
+    box->Height = gadget->Height;
+}
+
+// OM_SET
 static IPTR wbIconSet(Class *cl, Object *obj, struct opSet *ops)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
@@ -239,15 +249,23 @@ static IPTR wbIconSet(Class *cl, Object *obj, struct opSet *ops)
     struct TagItem *tags = ops->ops_AttrList;
     struct TagItem *ti;
 
+    BOOL render = FALSE;
+
     while ((ti = NextTagItem(&tags)) != NULL) {
         switch (ti->ti_Tag) {
+        case GA_Selected:
+            // Re-render if this attribute is present.
+            render = TRUE;
+            break;
         case WBIA_Set:
             my->Set = (Object *)ti->ti_Data;
             break;
         }
     }
 
-    return DoSuperMethodA(cl, obj, (Msg)ops);
+    render |= DoSuperMethodA(cl, obj, (Msg)ops);
+
+    return render;
 }
 
 // GM_RENDER
@@ -294,7 +312,7 @@ static void wbIconToggleSelected(Class *cl, Object *obj, struct GadgetInfo *gi, 
 
     // Toggle selection
     IPTR selected = FALSE;
-    GetAttr(GA_SELECTED, obj, &selected);
+    GetAttr(GA_Selected, obj, &selected);
 
     if (my->Set) {
         GetAttr(WBSA_SelectedCount, my->Set, &count);
@@ -356,25 +374,22 @@ static void wbIconToggleSelected(Class *cl, Object *obj, struct GadgetInfo *gi, 
     if (deselect) {
         // De-select all items.
         D(bug("%s: %lx - clear parent set %lx\n", __func__, obj, my->Set));
+        // Deselect ourself, so that we are not re-rendered.
+        SetAttrs(obj, GA_Selected, FALSE, TAG_END);
+
         if (my->Set) {
-            struct wbsm_Select wbss = {
-                .MethodID = WBSM_SELECT,
-                .wbss_GInfo = gi,
-                .wbss_All = FALSE,
-            };
-            DoMethodA(my->Set, (Msg)&wbss);
+            DoMethod(my->Set, WBSM_SELECT, gi, (IPTR)FALSE);
         }
     }
 
-    SetAttrs(obj, GA_SELECTED, selected, TAG_DONE);
+    SetAttrs(obj, GA_Selected, selected, TAG_END);
 
     // Redraw
-    struct gpRender gpr = {
-        .MethodID = GM_RENDER,
-        .gpr_GInfo = gi,
-        .gpr_Redraw = GREDRAW_TOGGLE,
-    };
-    DoMethodA(obj, (Msg)&gpr);
+    struct RastPort *rp;
+    if ((rp = ObtainGIRPort(gi)) != NULL) {
+        DoMethod(obj, GM_RENDER, gi, rp, GREDRAW_TOGGLE);
+        ReleaseGIRPort(rp);
+    }
 }
 
 // GM_GOACTIVE
@@ -639,7 +654,7 @@ static IPTR wbIconFormat(Class *cl, Object *obj, Msg msg)
     if (OpenWorkbenchObject("SYS:System/Format",
                 WBOPENA_ArgLock, lock,
                 WBOPENA_ArgName, (lock != BNULL) ? "" : my->File,
-                TAG_DONE)) {
+                TAG_END)) {
         ok = TRUE;
     } else {
         D(bug("%s: Can't run SYS:System/Format.\n", my->File));

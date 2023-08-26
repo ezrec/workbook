@@ -38,8 +38,8 @@
 #define WBMENU_WN_NEW_DRAWER        20, "New drawer",      "N", Broken 0, 0
 #define WBMENU_WN_OPEN_PARENT       21, "Open parent",     "K", 0, 0
 #define WBMENU_WN_UPDATE            22, "Update",            0, 0, 0
-#define WBMENU_WN_SELECT_ALL        23, "Select contents", "A", 0, 0
-#define WBMENU_WN_SELECT_NONE       24, "Unselect all",      0, 0, 0
+#define WBMENU_WN_SELECT_CONTENTS   23, "Select contents", "A", 0, 0
+#define WBMENU_WN_CLEAN_UP          24, "Clean Up",        ".", 0, 0
 #define WBMENU_WN__SNAP         "Snapshot"
 #define WBMENU_WN__SNAP_WINDOW      40, "Window",            0, Broken 0, 0
 #define WBMENU_WN__SNAP_ALL         41, "All",               0, Broken 0, 0

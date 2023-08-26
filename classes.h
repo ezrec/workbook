@@ -98,19 +98,25 @@ Class *WBVirtual_MakeClass(struct WorkbookBase *wb);
 
 /* Attributes */
 #define WBSA_Dummy               (TAG_USER | 0x40430000)
-#define WBSA_MaxWidth            (WBSA_Dummy + 1)
 #define WBSA_MemberCount         (WBSA_Dummy + 2)   // ULONG Count of the number of members
 #define WBSA_SelectedCount       (WBSA_Dummy + 3)   // ULONG Count of the number of selected members
 
 /* Methods */
 #define WBSM_Dummy               (TAG_USER | 0x40430100)
 #define WBSM_SELECT              (WBSM_Dummy + 1)
+#define WBSM_CLEAN_UP            (WBSM_Dummy + 2)
 
 struct wbsm_Select {
     STACKED ULONG MethodID;
     STACKED struct GadgetInfo	*wbss_GInfo;	/* gadget context		*/
     STACKED ULONG wbss_All;   // True to select all, false to select none.
 };
+
+struct wbsm_CleanUp {
+    STACKED ULONG MethodID;
+    STACKED struct GadgetInfo	*wbscu_GInfo;	/* gadget context		*/
+};
+
 
 Class *WBSet_MakeClass(struct WorkbookBase *wb);
 

@@ -133,7 +133,7 @@ IPTR wbPopupAction(struct WorkbookBase *wb,
     newGadget.ng_GadgetText = (UBYTE *)""; // Initialize with empty string
     newGadget.ng_GadgetID = descriptionField;
     newGadget.ng_Flags = NG_HIGHLABEL;
-    gctx = CreateGadget(TEXT_KIND, gctx, &newGadget, GTTX_Text, description, TAG_DONE);
+    gctx = CreateGadget(TEXT_KIND, gctx, &newGadget, GTTX_Text, description, TAG_END);
 
     // Request
     newGadget.ng_TopEdge += 20;
@@ -142,7 +142,7 @@ IPTR wbPopupAction(struct WorkbookBase *wb,
     newGadget.ng_GadgetText = (UBYTE *)""; // Initialize with empty string
     newGadget.ng_GadgetID = requestField;
     newGadget.ng_Flags = NG_HIGHLABEL;
-    gctx = CreateGadget(TEXT_KIND, gctx, &newGadget, GTTX_Text, request, TAG_DONE);
+    gctx = CreateGadget(TEXT_KIND, gctx, &newGadget, GTTX_Text, request, TAG_END);
 
     struct Hook input_hook = {
         .h_Entry = HookEntry,
@@ -161,7 +161,7 @@ IPTR wbPopupAction(struct WorkbookBase *wb,
                    GTST_MaxChars, saveBufferSize > 0 ? saveBufferSize : 80,
                    GACT_RELVERIFY, TRUE,
                    GTST_EditHook, forbidden ? &input_hook : NULL,
-                   TAG_DONE);
+                   TAG_END);
 
     if (gctx == NULL) {
         D(bug("No input field!"));
@@ -176,7 +176,7 @@ IPTR wbPopupAction(struct WorkbookBase *wb,
     newGadget.ng_Height = 20;
     newGadget.ng_GadgetText = "_Ok";
     newGadget.ng_GadgetID = okButton;
-    gctx = CreateGadget(BUTTON_KIND, gctx, &newGadget, GT_Underscore, '_', TAG_DONE);
+    gctx = CreateGadget(BUTTON_KIND, gctx, &newGadget, GT_Underscore, '_', TAG_END);
 
     if (gctx == NULL) {
         D(bug("No Ok button!"));
@@ -188,7 +188,7 @@ IPTR wbPopupAction(struct WorkbookBase *wb,
     newGadget.ng_LeftEdge = winWidth - 20 - newGadget.ng_Width;
     newGadget.ng_GadgetText = "_Cancel";
     newGadget.ng_GadgetID = cancelButton;
-    gctx = CreateGadget(BUTTON_KIND, gctx, &newGadget, GT_Underscore, '_', TAG_DONE);
+    gctx = CreateGadget(BUTTON_KIND, gctx, &newGadget, GT_Underscore, '_', TAG_END);
 
     if (gctx == NULL) {
         D(bug("No Cancel button!"));
@@ -211,7 +211,7 @@ IPTR wbPopupAction(struct WorkbookBase *wb,
         WA_Activate, TRUE,
         WA_CloseGadget, TRUE,
         WA_IDCMP, IDCMP_CLOSEWINDOW | IDCMP_REFRESHWINDOW | STRINGIDCMP | BUTTONIDCMP | IDCMP_VANILLAKEY,
-        TAG_DONE);
+        TAG_END);
 
     if (win == NULL) {
         goto exit;
