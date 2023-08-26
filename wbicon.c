@@ -606,6 +606,8 @@ static IPTR wbIconInfo(Class *cl, Object *obj, Msg msg)
     if (lock == BNULL) {
         wbPopupIoErr(wb, "Info", IoErr(), my->File);
     } else {
+        // We'd like to use 'WBInfo', but the AROS ROMs directly call WANDERER:Tools/Info.
+        // Sigh.
         WBInfo(lock, my->File, my->Screen);
         UnLock(lock);
     }
