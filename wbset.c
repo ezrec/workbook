@@ -20,16 +20,19 @@
 #include "workbook_intern.h"
 #include "classes.h"
 
+#define WBICON_ROW_MARGIN   5
+#define WBICON_COL_MARGIN   5
+
 struct wbSetNode {
     struct MinNode sn_Node;
-    Object        *sn_Object;      /* Gadget object */
-    BOOL sn_Fixed;
+    Object        *sn_Object;   // Gadget object
+    BOOL sn_Fixed;              // Is in a fixed location
+    BOOL sn_Arranged;           // Has been arranged?
 };
 
 struct wbSet {
-    LONG MaxWidth;
     ULONG MemberCount;
-    struct List SetObjects;
+    struct MinList SetObjects;
 };
 
 static void wbGABox(Object *obj, struct IBox *box)
@@ -41,63 +44,6 @@ static void wbGABox(Object *obj, struct IBox *box)
     box->Height = gadget->Height;
 }
 
-static void rearrange(Class *cl, Object *obj)
-{
-    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
-    struct wbSet *my = INST_DATA(cl, obj);
-    struct wbSetNode *node;
-    struct IBox sbox;
-    WORD CurrRight, CurrBottom;
-
-    /* First, remove all autoobjects from the superclass */
-    ForeachNode(&my->SetObjects, node) {
-        if (!node->sn_Fixed) {
-            DoSuperMethod(cl, obj, OM_REMMEMBER, node->sn_Object);
-        }
-    }
-
-    /* Find the set size with just the fixed objects */
-    wbGABox(obj, &sbox);
-
-    /* Set the start of the auto area to be
-     * immediately below the fixed objects.
-     */
-    CurrRight = sbox.Left;
-    CurrBottom = sbox.Top + sbox.Height;
-
-    /* For each item in the auto list, add it to the right */
-    my->MemberCount = 0;
-    ForeachNode(&my->SetObjects, node) {
-        my->MemberCount++;
-
-        if (node->sn_Fixed) {
-            continue;
-        }
-
-        Object *iobj = node->sn_Object;
-        struct IBox ibox;
-
-        wbGABox(iobj, &ibox);
-
-        if ((CurrRight + ibox.Width) < my->MaxWidth) {
-            ibox.Left = CurrRight;
-        } else {
-            wbGABox(obj, &sbox);
-            ibox.Left = sbox.Left;
-            CurrRight = sbox.Left;
-            CurrBottom = sbox.Top + sbox.Height;
-        }
-        ibox.Top  = CurrBottom;
-        CurrRight += ibox.Width;
-
-        D(bug("New icon position: @%d,%d\n", ibox.Left, ibox.Top));
-
-        SetAttrs(iobj, GA_Left, ibox.Left, GA_Top, ibox.Top, TAG_END);
-
-        DoSuperMethod(cl, obj, OM_ADDMEMBER, iobj);
-    }
-}
-
 // OM_ADDMEMBER
 static IPTR WBSetAddMember(Class *cl, Object *obj, struct opMember *opm)
 {
@@ -106,7 +52,6 @@ static IPTR WBSetAddMember(Class *cl, Object *obj, struct opMember *opm)
     struct IBox ibox;
     struct wbSet *my = INST_DATA(cl, obj);
     struct wbSetNode *node;
-    IPTR rc;
 
     node = AllocMem(sizeof(*node), MEMF_ANY);
     node->sn_Object = iobj;
@@ -117,15 +62,13 @@ static IPTR WBSetAddMember(Class *cl, Object *obj, struct opMember *opm)
     /* Get bounding box of item to add */
     wbGABox(iobj, &ibox);
 
+    node->sn_Arranged = FALSE;
     node->sn_Fixed = (ibox.Left != ~0) && (ibox.Top != ~0 );
-    AddHead(&my->SetObjects, (struct Node *)&node->sn_Node);
+    AddTailMinList(&my->SetObjects, &node->sn_Node);
 
-    rc = DoSuperMethodA(cl, obj, (Msg)opm);
+    my->MemberCount++;
 
-    /* Recalculate the set's positions */
-    rearrange(cl, obj);
-
-    return rc;
+    return DoSuperMethodA(cl, obj, (Msg)opm);
 }
 
 static IPTR WBSetRemMember(Class *cl, Object *obj, struct opMember *opm)
@@ -140,16 +83,15 @@ static IPTR WBSetRemMember(Class *cl, Object *obj, struct opMember *opm)
 
     ForeachNodeSafe(&my->SetObjects, node, next) {
         if (node->sn_Object == iobj) {
-            Remove((struct Node *)node);
+            RemoveMinNode(&node->sn_Node);
             FreeMem(node, sizeof(*node));
         }
     }
 
-    /* Recalculate the set's positions */
-    rearrange(cl, obj);
-
     // Clear the WBIA_Set attribute
     SetAttrs(iobj, WBIA_Set, NULL, TAG_END);
+
+    my->MemberCount--;
 
     return rc;
 }
@@ -168,9 +110,8 @@ static IPTR WBSetNew(Class *cl, Object *obj, struct opSet *ops)
     my = INST_DATA(cl, rc);
 
     my->MemberCount = 0;
-    my->MaxWidth = GetTagData(WBSA_MaxWidth, 0, ops->ops_AttrList);
 
-    NEWLIST(&my->SetObjects);
+    NewMinList(&my->SetObjects);
 
     return rc;
 }
@@ -182,7 +123,7 @@ static ULONG WBSetSelectedCount(struct WorkbookBase *wb, struct wbSet *my)
 
     ForeachNodeSafe(&my->SetObjects, node, next) {
         IPTR selected = FALSE;
-        GetAttr(GA_SELECTED, node->sn_Object, &selected);
+        GetAttr(GA_Selected, node->sn_Object, &selected);
         if (selected) {
             count++;
         }
@@ -198,9 +139,6 @@ static IPTR WBSetGet(Class *cl, Object *obj, struct opGet *opg)
     IPTR rc = TRUE;
 
     switch (opg->opg_AttrID) {
-    case WBSA_MaxWidth:
-        *(opg->opg_Storage) = (IPTR)my->MaxWidth;
-        break;
     case WBSA_MemberCount:
         *(opg->opg_Storage) = (IPTR)my->MemberCount;
         break;
@@ -215,37 +153,6 @@ static IPTR WBSetGet(Class *cl, Object *obj, struct opGet *opg)
     return rc;
 }
 
-// OM_SET/OM_UPDATE
-static IPTR WBSetUpdate(Class *cl, Object *obj, struct opUpdate *opu)
-{
-    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
-    struct wbSet *my = INST_DATA(cl, obj);
-    IPTR rc;
-    struct TagItem *tag;
-    struct TagItem *tstate;
-
-    rc = DoSuperMethodA(cl, obj, (Msg)opu);
-
-    if ((opu->MethodID == OM_UPDATE) && (opu->opu_Flags & OPUF_INTERIM))
-        return rc;
-
-    tstate = opu->opu_AttrList;
-    while ((tag = NextTagItem(&tstate))) {
-        switch (tag->ti_Tag) {
-        case WBSA_MaxWidth:
-            my->MaxWidth = tag->ti_Data;
-            rearrange(cl, obj);
-            rc |= TRUE;
-        default:
-            break;
-        }
-    }
-
-    return rc;
-}
-
-
-
 // OM_DISPOSE
 static IPTR WBSetDispose(Class *cl, Object *obj, Msg msg)
 {
@@ -254,27 +161,11 @@ static IPTR WBSetDispose(Class *cl, Object *obj, Msg msg)
 
     /* Remove all the nodes */
     ForeachNodeSafe(&my->SetObjects, node, next) {
-        Remove((struct Node *)node);
+        RemoveMinNode(&node->sn_Node);
         FreeMem(node, sizeof(*node));
     }
 
     return DoSuperMethodA(cl, obj, msg);
-}
-
-// GM_RENDER
-static IPTR WBSetRender(Class *cl, Object *obj, struct gpRender *gpr)
-{
-    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
-    struct IBox box;
-
-    wbGABox(obj, &box);
-
-    /* Clear the area first */
-    EraseRect(gpr->gpr_RPort, box.Left, box.Top,
-              box.Left + box.Width - 1,
-              box.Top  + box.Height - 1);
-
-    return DoSuperMethodA(cl, obj, (Msg)gpr);
 }
 
 // WBSM_SELECT
@@ -286,37 +177,145 @@ static IPTR WBSetSelect(Class *cl, Object *obj, struct wbsm_Select *wbss)
 
     ForeachNodeSafe(&my->SetObjects, node, next) {
         IPTR selected = FALSE;
-        GetAttr(GA_SELECTED, node->sn_Object, &selected);
+        GetAttr(GA_Selected, node->sn_Object, &selected);
         if (!!selected != !!wbss->wbss_All) {
-            D(bug("%s: %lx - deselect %lx\n", __func__, obj, node->sn_Object));
-            SetAttrs(node->sn_Object, GA_SELECTED, !!wbss->wbss_All, TAG_DONE);
-            struct gpRender gpr = {
-                .MethodID = GM_RENDER,
-                .gpr_GInfo = wbss->wbss_GInfo,
-                .gpr_Redraw = GREDRAW_TOGGLE,
-            };
-            DoMethodA(node->sn_Object, (Msg)&gpr);
+            D(bug("%s: %lx - (de)select %lx\n", __func__, obj, node->sn_Object));
+            SetAttrs(node->sn_Object, GA_Selected, !!wbss->wbss_All, TAG_END);
+            DoMethod(node->sn_Object, GM_RENDER, wbss->wbss_GInfo, NULL, GREDRAW_TOGGLE);
         }
     }
 
     return 0;
 }
 
+// WBSM_CLEAN_UP
+static IPTR WBSetCleanUp(Class *cl, Object *obj, struct wbsm_CleanUp *wbscu)
+{
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbSet *my = INST_DATA(cl, obj);
+    struct wbSetNode *node, *next;
+
+    ForeachNodeSafe(&my->SetObjects, node, next) {
+        node->sn_Fixed = FALSE;
+        node->sn_Arranged = FALSE;
+    }
+
+    return DoMethod(obj, GM_RENDER, wbscu->wbscu_GInfo, NULL, (IPTR)GREDRAW_REDRAW);
+}
+
+static IPTR WBSetRender(Class *cl, Object *obj, struct gpRender *gpr)
+{
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbSet *my = INST_DATA(cl, obj);
+    struct wbSetNode *node;
+    struct RastPort *rp = gpr->gpr_RPort;
+    struct IBox sbox;   // Surrounding box, before rearrangement.
+
+    if (!rp) {
+        rp = ObtainGIRPort(gpr->gpr_GInfo);
+    }
+
+    struct Region *clip = wbClipWindow(wb, gpr->gpr_GInfo->gi_Window);
+
+    // Erase surrounding box.
+    wbGABox(obj, &sbox);
+    D(bug("%s: Erase box @(%ld,%ld) %ldx%ld\n", __func__, sbox.Left, sbox.Top, sbox.Width, sbox.Height));
+    EraseRect(rp, sbox.Left, sbox.Top, sbox.Left+sbox.Width, sbox.Top+sbox.Height);
+
+    // Re-arrange anything that needs to be.
+    WORD CurrRight, CurrBottom;
+    /* First, remove all autoobjects from the superclass */
+    BOOL render = FALSE;
+    struct MinList floating;
+
+    // Remove members that are not fixed nor arranged.
+    ForeachNode(&my->SetObjects, node) {
+        if (!node->sn_Fixed && !node->sn_Arranged) {
+            D(bug("%s: %lx - Fixed=FALSE and Arranged=FALSE\n", __func__, node));
+            DoSuperMethod(cl, obj, OM_REMMEMBER, node->sn_Object);
+        }
+    }
+
+    /* Find the set size with just the fixed and arranged objects */
+    wbGABox(obj, &sbox);
+    D(bug("%s: Prearrange box @(%ld,%ld) %ldx%ld\n", __func__, sbox.Left, sbox.Top, sbox.Width, sbox.Height));
+
+    /* Set the start of the auto area to be
+     * immediately below the current objects.
+     */
+    CurrRight = sbox.Left;
+    CurrBottom = sbox.Top + sbox.Height;
+
+    /* For each item in the auto list, add it to the right */
+    ForeachNode(&my->SetObjects, node) {
+        if (node->sn_Fixed || node->sn_Arranged) {
+            continue;
+        }
+
+        Object *iobj = node->sn_Object;
+        struct IBox ibox;
+
+        wbGABox(iobj, &ibox);
+
+        if ((CurrRight + ibox.Width) < gpr->gpr_GInfo->gi_Domain.Width) {
+            ibox.Left = CurrRight;
+            D(bug("%s: %lx add to right @(%ld,%ld)\n", __func__, node, CurrRight, CurrBottom));
+        } else {
+            wbGABox(obj, &sbox);
+            ibox.Left = sbox.Left;
+            CurrRight = sbox.Left;
+            CurrBottom = sbox.Top + sbox.Height + WBICON_ROW_MARGIN;
+            D(bug("%s: %lx start new line @(%ld,%ld)\n", __func__, node, CurrRight, CurrBottom));
+        }
+        ibox.Top  = CurrBottom;
+        CurrRight += ibox.Width + WBICON_COL_MARGIN;
+        D(bug("%s: %lx next: @%ld,%ld\n", __func__, node, CurrRight, CurrBottom));
+
+        // Mark as arranged
+        D(bug("%s: %lx arranged position: @%ld,%ld\n", __func__, node, ibox.Left, ibox.Top));
+
+        // Adjust gadget location _without_ re-rendering.
+        SetAttrs(iobj, GA_Top, ibox.Top, GA_Left, ibox.Left, TAG_END);
+
+        DoSuperMethod(cl, obj, OM_ADDMEMBER, iobj);
+
+        node->sn_Arranged = TRUE;
+    }
+
+    wbGABox(obj, &sbox);
+    D(bug("%s: Arranged box @(%ld,%ld) %ldx%ld\n", __func__, sbox.Left, sbox.Top, sbox.Width, sbox.Height));
+
+    // Call supermethod to render the new arrangement.
+    IPTR rc = DoSuperMethod(cl, obj, GM_RENDER, gpr->gpr_GInfo, rp, GREDRAW_UPDATE);
+
+    wbUnclipWindow(wb, gpr->gpr_GInfo->gi_Window, clip);
+
+    if (gpr->gpr_RPort == NULL) {
+        ReleaseGIRPort(rp);
+    }
+
+    return rc;
+}
+
+
+
 static IPTR dispatcher(Class *cl, Object *obj, Msg msg)
 {
     IPTR rc = 0;
 
-    _D(bug("WBSet: dispatch 0x%lx\n", msg->MethodID));
+    if (msg->MethodID != GM_HANDLEINPUT) {
+        D(bug("WBSet: dispatch 0x%lx\n", msg->MethodID));
+    }
+
     switch (msg->MethodID) {
     case OM_NEW:        rc = WBSetNew(cl, obj, (APTR)msg); break;
     case OM_DISPOSE:    rc = WBSetDispose(cl, obj, (APTR)msg); break;
     case OM_GET:        rc = WBSetGet(cl, obj, (APTR)msg); break;
-    case OM_SET:        rc = WBSetUpdate(cl, obj, (APTR)msg); break;
-    case OM_UPDATE:     rc = WBSetUpdate(cl, obj, (APTR)msg); break;
     case OM_ADDMEMBER:  rc = WBSetAddMember(cl, obj, (APTR)msg); break;
     case OM_REMMEMBER:  rc = WBSetRemMember(cl, obj, (APTR)msg); break;
     case GM_RENDER:     rc = WBSetRender(cl, obj, (APTR)msg); break;
     case WBSM_SELECT:   rc = WBSetSelect(cl, obj, (APTR)msg); break;
+    case WBSM_CLEAN_UP: rc = WBSetCleanUp(cl, obj, (APTR)msg); break;
     default:            rc = DoSuperMethodA(cl, obj, msg); break;
     }
 

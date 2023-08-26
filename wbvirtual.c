@@ -30,7 +30,7 @@ struct wbVirtual {
     struct IBox    Virt;     /* Virtual pos in, and total size of the scroll area */
 };
 
-static BOOL wbvRedimension(Class *cl, Object *obj, WORD vwidth, WORD vheight)
+static BOOL wbvRedimension(Class *cl, Object *obj, struct GadgetInfo *gi, WORD vwidth, WORD vheight)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbVirtual *my = INST_DATA(cl, obj);
@@ -38,8 +38,9 @@ static BOOL wbvRedimension(Class *cl, Object *obj, WORD vwidth, WORD vheight)
     BOOL rc = FALSE;
 
     if ((my->Virt.Width != vwidth) ||
-        (my->Virt.Height != vheight))
+        (my->Virt.Height != vheight)) {
         rc = TRUE;
+    }
 
     my->Virt.Width = vwidth;
     my->Virt.Height = vheight;
@@ -62,9 +63,12 @@ static BOOL wbvRedimension(Class *cl, Object *obj, WORD vwidth, WORD vheight)
                 gadget->Width, gadget->Height));
 
     if (my->Gadget) {
-        SetAttrs(my->Gadget, GA_Top,   gadget->TopEdge - my->Virt.Top,
-                             GA_Left,  gadget->LeftEdge - my->Virt.Left,
-                             TAG_END);
+        struct TagItem tags[] = {
+            { GA_Top,   gadget->TopEdge - my->Virt.Top },
+            { GA_Left,  gadget->LeftEdge - my->Virt.Left },
+            { TAG_END }
+        };
+        rc |= DoMethod(my->Gadget, OM_SET, tags, gi);
     }
 
     return rc;
@@ -122,13 +126,8 @@ static IPTR WBVirtualNew(Class *cl, Object *obj, struct opSet *ops)
     if (rc == 0)
         return rc;
 
-    struct opSet smsg;
-    obj = (Object *)rc;
-    smsg.MethodID = OM_SET;
-    smsg.ops_GInfo = ops->ops_GInfo;
-    smsg.ops_AttrList = ops->ops_AttrList;
-
-    DoMethodA(obj, (Msg)&smsg);
+    // Set attributes on the new object.
+    DoMethod((Object *)rc, OM_SET, ops->ops_AttrList, ops->ops_GInfo);
 
     return rc;
 }
@@ -170,6 +169,7 @@ static IPTR WBVirtualSetUpdate(Class *cl, Object *obj, struct opUpdate *opu)
     struct wbVirtual *my = INST_DATA(cl, obj);
     struct TagItem *tag;
     struct TagItem *tstate;
+    struct GadgetInfo *gi = opu->opu_GInfo;
     IPTR rc;
     WORD val;
 
@@ -189,7 +189,7 @@ D(bug("%s: Tag=0x%x, val=%d\n", __func__, tag->ti_Tag, val));
                 IPTR vwidth = 0, vheight = 0;
                 GetAttr(GA_Width, my->Gadget, &vwidth);
                 GetAttr(GA_Height, my->Gadget, &vheight);
-                rc |= wbvRedimension(cl, obj, (WORD)vwidth, (WORD)vheight);
+                rc |= wbvRedimension(cl, obj, gi, (WORD)vwidth, (WORD)vheight);
             }
             break;
         case WBVA_VirtTop:
@@ -199,14 +199,14 @@ D(bug("%s: Tag=0x%x, val=%d\n", __func__, tag->ti_Tag, val));
             rc |= wbvMoveTo(cl, obj, val, my->Virt.Top);
             break;
         case WBVA_VirtHeight:
-            rc |= wbvRedimension(cl, obj, my->Virt.Width, val);
+            rc |= wbvRedimension(cl, obj, gi, my->Virt.Width, val);
             break;
         case WBVA_VirtWidth:
-            rc |= wbvRedimension(cl, obj, val, my->Virt.Height);
+            rc |= wbvRedimension(cl, obj, gi, val, my->Virt.Height);
             break;
         case GA_Width:
         case GA_Height:
-            rc |= wbvRedimension(cl, obj, my->Virt.Width, my->Virt.Height);
+            rc |= wbvRedimension(cl, obj, gi, my->Virt.Width, my->Virt.Height);
             break;
         default:
             break;
@@ -308,7 +308,7 @@ static IPTR dispatcher(Class *cl, Object *obj, Msg msg)
     switch (msg->MethodID) {
     case OM_NEW:     rc = WBVirtualNew(cl, obj, (APTR)msg); break;
     case OM_GET:     rc = WBVirtualGet(cl, obj, (APTR)msg); break;
-    case OM_SET:
+    case OM_SET:     // fallthrough
     case OM_UPDATE:  rc = WBVirtualSetUpdate(cl, obj, (APTR)msg); break;
     case GM_RENDER:  rc = WBVirtualRender(cl, obj, (APTR)msg); break;
     case GM_HITTEST: rc = WBVirtualHitTest(cl, obj, (APTR)msg); break;

@@ -74,8 +74,9 @@ static const struct NewMenu WBWindow_menu[] =  {
         WBMENU_ITEM(WBMENU_WN_NEW_DRAWER),
         WBMENU_ITEM(WBMENU_WN_OPEN_PARENT),
         WBMENU_ITEM(WBMENU_WN_UPDATE),
-        WBMENU_ITEM(WBMENU_WN_SELECT_ALL),
-        WBMENU_ITEM(WBMENU_WN_SELECT_NONE),
+        WBMENU_ITEM(WBMENU_WN_SELECT_CONTENTS),
+        WBMENU_ITEM(WBMENU_WN_CLEAN_UP),
+        WBMENU_BAR,
         WBMENU_SUBTITLE(WBMENU_WN__SNAP),
             WBMENU_SUBITEM(WBMENU_WN__SNAP_WINDOW),
             WBMENU_SUBITEM(WBMENU_WN__SNAP_ALL),
@@ -389,7 +390,6 @@ static void wbRedimension(Class *cl, Object *obj)
 /* Rescan the Lock for new entries */
 static void wbRescan(Class *cl, Object *obj)
 {
-    struct opMember opmmsg;
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbWindow *my = INST_DATA(cl, obj);
     struct wbWindow_Icon *wbwi;
@@ -399,10 +399,8 @@ static void wbRescan(Class *cl, Object *obj)
     SetWindowPointer(my->Window, WA_BusyPointer, TRUE, TAG_END);
 
     /* Remove and undisplay any existing icons */
-    opmmsg.MethodID = OM_REMMEMBER;
     while ((wbwi = (struct wbWindow_Icon *)REMHEAD((struct List *)&my->IconList)) != NULL) {
-        opmmsg.opam_Object = wbwi->wbwiObject;
-        DoMethodA(my->Set, (Msg)&opmmsg);
+        DoMethod(my->Set, OM_REMMEMBER, wbwi->wbwiObject);
         DisposeObject(wbwi->wbwiObject);
         FreeMem(wbwi, sizeof(*wbwi));
     }
@@ -418,13 +416,14 @@ static void wbRescan(Class *cl, Object *obj)
         wbAddFiles(cl, obj);
     }
 
-    /* Display the new icons */
-    opmmsg.MethodID = OM_ADDMEMBER;
+    /* Add the new icons */
     ForeachNode(&my->IconList, wbwi)
     {
-        opmmsg.opam_Object = wbwi->wbwiObject;
-        DoMethodA(my->Set, (Msg)&opmmsg);
+        DoMethod(my->Set, OM_ADDMEMBER, (IPTR)wbwi->wbwiObject);
     }
+
+    /* Re-render the set */
+    DoGadgetMethod((struct Gadget *)my->Set, my->Window, NULL, GM_RENDER, NULL, NULL, GREDRAW_REDRAW);
 
     /* Adjust the scrolling regions */
     wbRedimension(cl, obj);
@@ -633,7 +632,6 @@ static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
         wbMenuEnable(cl, obj, WBMENU_ID(WBMENU_IC_FORMAT), FALSE);
     }
 
-    SetAttrs(my->Set, WBSA_MaxWidth, my->Window->Width - (my->Window->BorderLeft + my->Window->BorderRight), TAG_END);
     RefreshGadgets(my->Window->FirstGadget, my->Window, NULL);
 
     wbRescan(cl, obj);
@@ -788,8 +786,6 @@ static IPTR WBWindowNewSize(Class *cl, Object *obj, Msg msg)
     struct Window *win = my->Window;
     struct Region *clip;
 
-    SetAttrs(my->Set, WBSA_MaxWidth, win->Width - (win->BorderLeft + win->BorderRight), TAG_END);
-
     /* Clip to the window for drawing */
     clip = wbClipWindow(wb, win);
     wbRedimension(cl, obj);
@@ -862,12 +858,12 @@ static IPTR WBWindowMenuPick(Class *cl, Object *obj, struct wbwm_MenuPick *wbwmp
             UnLock(lock);
         }
         break;
-    case WBMENU_ID(WBMENU_WN_SELECT_ALL):
+    case WBMENU_ID(WBMENU_WN_SELECT_CONTENTS):
         DoGadgetMethod((struct Gadget *)my->Set, my->Window, NULL, (IPTR)WBSM_SELECT, NULL, (IPTR)TRUE);
         rc = 0;
         break;
-    case WBMENU_ID(WBMENU_WN_SELECT_NONE):
-        DoGadgetMethod((struct Gadget *)my->Set, my->Window, NULL, (IPTR)WBSM_SELECT, NULL, (IPTR)FALSE);
+    case WBMENU_ID(WBMENU_WN_CLEAN_UP):
+        DoGadgetMethod((struct Gadget *)my->Set, my->Window, NULL, (IPTR)WBSM_CLEAN_UP, NULL);
         rc = 0;
         break;
     case WBMENU_ID(WBMENU_WN_UPDATE):

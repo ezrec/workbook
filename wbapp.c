@@ -45,10 +45,7 @@ static void wbOpenDrawer(Class *cl, Object *obj, CONST_STRPTR path)
 
     if (win)
     {
-        struct opMember opmmsg;
-        opmmsg.MethodID = OM_ADDMEMBER;
-        opmmsg.opam_Object = win;
-        DoMethodA(obj, (Msg)&opmmsg);
+        DoMethod(obj, OM_ADDMEMBER, win);
     }
 }
 
@@ -131,21 +128,15 @@ static IPTR WBAppDispose(Class *cl, Object *obj, Msg msg)
 // OM_ADDMEMBER
 static IPTR WBAppAddMember(Class *cl, Object *obj, struct opMember *opm)
 {
-    struct opAddTail omatmsg;
     struct wbApp *my = INST_DATA(cl, obj);
 
-    omatmsg.MethodID = OM_ADDTAIL;
-    omatmsg.opat_List = (struct List *)&my->Windows;
-
-    return DoMethodA(opm->opam_Object, (Msg)&omatmsg);
+    return DoMethod(opm->opam_Object, OM_ADDTAIL, &my->Windows);
 }
 
 // OM_REMMEMBER
 static IPTR WBAppRemMember(Class *cl, Object *obj, struct opMember *opm)
 {
-    STACKED ULONG omrmethodID;
-    omrmethodID = OM_REMOVE;
-    return DoMethodA(opm->opam_Object, (Msg)&omrmethodID);
+    return DoMethod(opm->opam_Object, OM_REMOVE);
 }
 
 
@@ -228,7 +219,7 @@ static IPTR execute_command(struct WorkbookBase *wb, CONST_STRPTR command, APTR 
             SYS_Asynch, TRUE,
                         SYS_Input, NULL,
                         SYS_Output, SYS_DupStream,
-                        TAG_DONE);
+                        TAG_END);
 
     return 0;
 }
@@ -286,7 +277,7 @@ static BOOL wbMenuPick(Class *cl, Object *obj, struct Window *win, UWORD menuNum
                                   execute_command, NULL);
                 break;
             case WBMENU_ID(WBMENU_WB_SHUTDOWN):
-                rc = EasyRequest(NULL, &es, NULL, TAG_DONE);
+                rc = EasyRequest(NULL, &es, NULL, TAG_END);
 #ifdef __AROS__
                 /* Does the user wants a shutdown or reboot? */
                 if (rc == 1) {
@@ -329,9 +320,7 @@ static void wbHideAllWindows(Class *cl, Object *obj)
     Object *owin;
 
     while ((owin = NextObject(&ostate))) {
-        STACKED ULONG wbhidemethodid;
-        wbhidemethodid = WBWM_HIDE;
-        DoMethodA(owin, (Msg)&wbhidemethodid);
+        DoMethod(owin, WBWM_HIDE);
     }
 }
 
@@ -343,9 +332,7 @@ static void wbShowAllWindows(Class *cl, Object *obj)
     Object *owin;
 
     while ((owin = NextObject(&ostate))) {
-        STACKED ULONG wbshowmethodid;
-        wbshowmethodid = WBWM_SHOW;
-        DoMethodA(owin, (Msg)&wbshowmethodid);
+        DoMethod(owin, WBWM_SHOW);
     }
 }
 
@@ -357,10 +344,7 @@ static void wbCloseAllWindows(Class *cl, Object *obj)
     Object *owin;
 
     while ((owin = NextObject(&ostate))) {
-        struct opMember opmmsg;
-        opmmsg.MethodID = OM_REMMEMBER;
-        opmmsg.opam_Object = owin;
-        DoMethodA(obj, (Msg)&opmmsg);
+        DoMethod(obj, OM_REMMEMBER, owin);
         DisposeObject(owin);
     }
 }
