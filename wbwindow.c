@@ -46,11 +46,14 @@ struct wbWindow {
     Object        *Set;       /* Set of icons */
 
     ULONG          Flags;
-    IPTR           Tick;
 
     /* Temporary path buffer */
     TEXT           PathBuffer[PATH_MAX];
     TEXT           ScreenTitle[256];
+
+    ULONG          AvailChip;
+    ULONG          AvailFast;
+    ULONG          AvailAny;
 
     /* List of icons in this window */
     struct MinList IconList;
@@ -932,15 +935,33 @@ static IPTR WBWindowIntuiTick(Class *cl, Object *obj, Msg msg)
     struct wbWindow *my = INST_DATA(cl, obj);
     IPTR rc = FALSE;
 
-    if (my->Tick == 0) {
+    BOOL changed = FALSE;
+    ULONG avail = AvailMem(MEMF_CHIP) / 1024;
+    if (my->AvailChip != avail) {
+        my->AvailChip = avail;
+        changed = TRUE;
+    }
+    avail = AvailMem(MEMF_FAST) / 1024;
+    if (my->AvailFast != avail) {
+        my->AvailFast = avail;
+        changed = TRUE;
+    }
+
+    avail = AvailMem(MEMF_ANY) / 1024;
+    if (my->AvailAny != avail) {
+        my->AvailAny = avail;
+        changed = TRUE;
+    }
+
+    if (changed) {
         IPTR val[6];
 
         val[0] = (IPTR)AS_STRING(WB_NAME);
         val[1] = WB_VERSION;
         val[2] = WB_REVISION;
-        val[3] = AvailMem(MEMF_CHIP) / 1024;
-        val[4] = AvailMem(MEMF_FAST) / 1024;
-        val[5] = AvailMem(MEMF_ANY) / 1024;
+        val[3] = my->AvailChip;
+        val[4] = my->AvailFast;
+        val[5] = my->AvailAny;
 
         /* Update the window's title */
         RawDoFmt("%s %ld.%ld  Chip: %ldk, Fast: %ldk, Any: %ldk", (RAWARG)val,
@@ -949,9 +970,6 @@ static IPTR WBWindowIntuiTick(Class *cl, Object *obj, Msg msg)
         SetWindowTitles(my->Window, (CONST_STRPTR)-1, my->ScreenTitle);
         rc = TRUE;
     }
-
-    /* Approx 10 IntuiTicks per second */
-    my->Tick = (my->Tick + 1) % 10;
 
     return rc;
 }
