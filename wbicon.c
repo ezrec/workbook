@@ -38,10 +38,10 @@ struct wbIcon {
 };
 
 static const struct TagItem wbIcon_DrawTags[] = {
-    { ICONDRAWA_Frameless, TRUE, },
-    { ICONDRAWA_Borderless, TRUE, },
-    { ICONDRAWA_EraseBackground, FALSE, },
-    { TAG_DONE },
+    { ICONDRAWA_Frameless, FALSE, },
+    { ICONDRAWA_Borderless, FALSE, },
+    { ICONDRAWA_EraseBackground, TRUE, },
+    { TAG_END },
 };
 
 #ifndef __amigaos4__
