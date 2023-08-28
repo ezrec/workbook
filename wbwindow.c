@@ -45,7 +45,8 @@ struct wbWindow {
     Object        *Area;      /* Virual area of icons */
     Object        *Set;       /* Set of icons */
 
-    ULONG          Flags;
+    ULONG          dd_Flags;
+    UWORD          dd_ViewModes;
 
     /* Temporary path buffer */
     TEXT           PathBuffer[PATH_MAX];
@@ -58,9 +59,6 @@ struct wbWindow {
     /* List of icons in this window */
     struct MinList IconList;
 };
-
-#define WBWF_USERPORT   (1 << 0)    /* Window has a custom port */
-#define WBWF_SHOW_ALL   (1 << 1)    /* Show all files */
 
 #define Broken NM_ITEMDISABLED |
 
@@ -109,13 +107,10 @@ static const struct NewMenu WBWindow_menu[] =  {
     { NM_END },
 };
 
-static BOOL wbMenuEnable(Class *cl, Object *obj, int id, BOOL onoff)
+static ULONG wbMenuNumber(int id)
 {
-    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
-    struct wbWindow *my = INST_DATA(cl, obj);
     int menu = -1, item = -1, sub = -1;
-    UWORD MenuNumber = MENUNULL;
-    BOOL rc = FALSE;
+    ULONG menu_number = MENUNULL;
 
     for (const struct NewMenu *nm = WBWindow_menu; nm->nm_Type != NM_END; nm++) {
         switch (nm->nm_Type) {
@@ -136,21 +131,12 @@ static BOOL wbMenuEnable(Class *cl, Object *obj, int id, BOOL onoff)
         }
 
         if (nm->nm_UserData == (APTR)(IPTR)id) {
-            MenuNumber = FULLMENUNUM(menu, item, sub);
+            menu_number = FULLMENUNUM(menu, item, sub);
             break;
         }
     }
 
-    if (MenuNumber != MENUNULL) {
-        if (onoff)
-            OnMenu(my->Window, MenuNumber);
-        else
-            OffMenu(my->Window, MenuNumber);
-
-        rc = TRUE;
-    }
-
-    return rc;
+    return menu_number;
 }
 
 static BOOL wbFilterFileInfoBlock(struct wbWindow *my, struct FileInfoBlock *fib)
@@ -164,7 +150,7 @@ static BOOL wbFilterFileInfoBlock(struct wbWindow *my, struct FileInfoBlock *fib
         return FALSE;
     }
 
-    BOOL show_all = (my->Flags & WBWF_SHOW_ALL) != 0;
+    BOOL show_all = (my->dd_Flags & DDFLAGS_SHOWALL) != 0;
 
     i = strlen(fib->fib_FileName);
     if (i >= 5 && stricmp(&fib->fib_FileName[i-5], ".info") == 0) {
@@ -461,11 +447,11 @@ static void wbFixBorders(struct Window *win)
     win->BorderRight += br;
 }
 
+// OM_NEW
 static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbWindow *my;
-    struct MsgPort *userport;
     CONST_STRPTR path;
     ULONG idcmp;
     IPTR rc = 0;
@@ -479,8 +465,10 @@ static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
     obj = (Object *)rc;
     my = INST_DATA(cl, obj);
 
+    my->dd_Flags = DDFLAGS_SHOWDEFAULT;
+    my->dd_ViewModes = DDVM_BYDEFAULT;
+
     NEWLIST(&my->IconList);
-    my->Flags = 0;
 
     path = (CONST_STRPTR)GetTagData(WBWA_Path, (IPTR)NULL, ops->ops_AttrList);
     if (path == NULL) {
@@ -518,7 +506,7 @@ static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
     } else {
         struct DiskObject *icon;
         struct NewWindow *nwin = NULL;
-        struct TagItem extra[] = {
+        struct TagItem extra[5] = {
             { WA_Left, 64 },
             { WA_Top, 64 },
             { WA_Width, 200, },
@@ -536,6 +524,9 @@ static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
             D(bug("%s: NewWindow %p\n", __func__, nwin));
             extra[0].ti_Tag = ops->ops_AttrList == NULL ? TAG_END : TAG_MORE;
             extra[0].ti_Data = (IPTR)ops->ops_AttrList;
+            extra[1].ti_Tag = TAG_IGNORE;
+            extra[2].ti_Tag = TAG_IGNORE;
+            extra[3].ti_Tag = TAG_IGNORE;
         }
 
         idcmp |= IDCMP_NEWSIZE | IDCMP_CLOSEWINDOW;
@@ -562,6 +553,11 @@ static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
         if (my->Window)
             wbFixBorders(my->Window);
 
+        if (icon->do_DrawerData) {
+            my->dd_Flags = icon->do_DrawerData->dd_Flags;
+            my->dd_ViewModes = icon->do_DrawerData->dd_ViewModes;
+        }
+
         FreeDiskObject(icon);
     }
 
@@ -569,11 +565,7 @@ static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
         goto error;
 
     /* If we want a shared port, do it. */
-    userport = (struct MsgPort *)GetTagData(WBWA_UserPort, (IPTR)NULL, ops->ops_AttrList);
-    if (userport) {
-        my->Flags |= WBWF_USERPORT;
-        my->Window->UserPort = userport;
-    }
+    my->Window->UserPort = (struct MsgPort *)GetTagData(WBWA_UserPort, (IPTR)NULL, ops->ops_AttrList);
     ModifyIDCMP(my->Window, idcmp);
 
     /* The gadgets' layout will be performed during wbRedimension
@@ -617,6 +609,21 @@ static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
         goto error;
     }
 
+    // Get some useful menu numbers.
+    ULONG mn_show_icons = wbMenuNumber(WBMENU_ID(WBMENU_WN__SHOW_ICONS));
+    ULONG mn_show_all = wbMenuNumber(WBMENU_ID(WBMENU_WN__SHOW_ALL));
+
+    // Sync menu checkmarks
+    struct MenuItem *item_show_all = ItemAddress(my->Menu, mn_show_all);
+    struct MenuItem *item_show_icons = ItemAddress(my->Menu, mn_show_icons);
+    if (my->dd_Flags & DDFLAGS_SHOWALL) {
+        item_show_icons->Flags &= ~CHECKED;
+        item_show_all->Flags |= CHECKED;
+    } else {
+        item_show_icons->Flags |= CHECKED;
+        item_show_all->Flags &= ~CHECKED;
+    }
+
     vis = GetVisualInfo(my->Window->WScreen, TAG_END);
     LayoutMenus(my->Menu, vis, TAG_END);
     FreeVisualInfo(vis);
@@ -626,21 +633,26 @@ static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
     /* Disable opening the parent for root window
      * and disk paths.
      */
+    ULONG mn_open_parent = wbMenuNumber(WBMENU_ID(WBMENU_WN_OPEN_PARENT));
+    ULONG mn_ic_format = wbMenuNumber(WBMENU_ID(WBMENU_IC_FORMAT));
+    ULONG mn_wn_show = wbMenuNumber(WBMENU_ID(WBMENU_WN__SHOW));
+    ULONG mn_wn_view = wbMenuNumber(WBMENU_ID(WBMENU_WN__VIEW));
     if (my->Lock == BNULL) {
-        wbMenuEnable(cl, obj, WBMENU_ID(WBMENU_WN_OPEN_PARENT), FALSE);
-        wbMenuEnable(cl, obj, WBMENU_ID(WBMENU_IC_FORMAT), TRUE);
-        wbMenuEnable(cl, obj, WBMENU_ID(WBMENU_WN__SHOW), FALSE);
-        wbMenuEnable(cl, obj, WBMENU_ID(WBMENU_WN__VIEW), FALSE);
+        OffMenu(my->Window, mn_open_parent);
+        OnMenu(my->Window, mn_ic_format);
+        OffMenu(my->Window, mn_wn_show);
+        OffMenu(my->Window, mn_wn_view);
     } else {
         BPTR lock = ParentDir(my->Lock);
         if (lock == BNULL) {
-            wbMenuEnable(cl, obj, WBMENU_ID(WBMENU_WN_OPEN_PARENT), FALSE);
+            OffMenu(my->Window, mn_open_parent);
         } else {
+            OnMenu(my->Window, mn_open_parent);
             UnLock(lock);
         }
-        wbMenuEnable(cl, obj, WBMENU_ID(WBMENU_IC_FORMAT), FALSE);
-        wbMenuEnable(cl, obj, WBMENU_ID(WBMENU_WN__SHOW), TRUE);
-        wbMenuEnable(cl, obj, WBMENU_ID(WBMENU_WN__VIEW), TRUE);
+        OffMenu(my->Window, mn_ic_format);
+        OnMenu(my->Window, mn_wn_show);
+        OnMenu(my->Window, mn_wn_view);
     }
 
     // Check for tools in the filesystem
@@ -653,11 +665,14 @@ static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
         { WBMENU_ID(WBMENU_IC_FORMAT), "SYS:System/Format" },
     };
     for (size_t n = 0; n < sizeof(tools)/sizeof(tools[0]); n++) {
-        BPTR lock = Lock(tools[n].path, SHARED_LOCK);
-        if (lock == BNULL) {
-            wbMenuEnable(cl, obj, tools[n].id, FALSE);
-        } else {
-            UnLock(lock);
+        ULONG menu_number = wbMenuNumber(tools[n].id);
+        if (menu_number != MENUNULL) {
+            BPTR lock = Lock(tools[n].path, SHARED_LOCK);
+            if (lock == BNULL) {
+                OnMenu(my->Window, menu_number);
+            } else {
+                UnLock(lock);
+            }
         }
     }
 
@@ -701,7 +716,7 @@ static IPTR WBWindowDispose(Class *cl, Object *obj, Msg msg)
     /* If we have a custom user port, be paranoid.
      * See the Autodocs for CloseWindow().
      */
-    if (my->Flags & WBWF_USERPORT) {
+    if (my->Window->UserPort) {
         struct IntuiMessage *msg;
         struct Node *succ;
 
@@ -849,6 +864,42 @@ static void NewCLI(Class *cl, Object *obj)
     SetWindowPointer(my->Window, WA_BusyPointer, FALSE, TAG_END);
 }
 
+static IPTR WBWindowSnapshot(Class *cl, Object *obj, BOOL all)
+{
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbWindow *my = INST_DATA(cl, obj);
+
+    // Snapshot myself.
+    //
+    // Note that we set ICONPUTA_OnlyUpdatePosition to FALSE, so that a new icon will be
+    // created if needed to store the drawer data.
+    struct DiskObject *diskObject = GetDiskObjectNew(my->Path);
+    if (diskObject) {
+        if (diskObject->do_DrawerData) {
+            diskObject->do_DrawerData->dd_NewWindow.LeftEdge = my->Window->LeftEdge;
+            diskObject->do_DrawerData->dd_NewWindow.TopEdge = my->Window->TopEdge;
+            diskObject->do_DrawerData->dd_NewWindow.Width = my->Window->Width;
+            diskObject->do_DrawerData->dd_NewWindow.Height = my->Window->Height;
+            diskObject->do_DrawerData->dd_CurrentX = my->Window->LeftEdge;
+            diskObject->do_DrawerData->dd_CurrentY = my->Window->TopEdge;
+            diskObject->do_DrawerData->dd_Flags = my->dd_Flags;
+            diskObject->do_DrawerData->dd_ViewModes = my->dd_ViewModes;
+            PutIconTags(my->Path, diskObject, ICONPUTA_OnlyUpdatePosition, FALSE, TAG_END);
+            FreeDiskObject(diskObject);
+        }
+    }
+
+    if (all) {
+        // Snapshot all icons.
+        struct wbWindow_Icon *wbwi;
+        ForeachNode(&my->IconList, wbwi) {
+            DoMethod(wbwi->wbwiObject, WBIM_Snapshot);
+        }
+    }
+
+    return 0;
+}
+
 static IPTR WBWindowForSelectedIcons(Class *cl, Object *obj, IPTR MethodID)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
@@ -898,12 +949,18 @@ static IPTR WBWindowMenuPick(Class *cl, Object *obj, struct wbwm_MenuPick *wbwmp
     case WBMENU_ID(WBMENU_WN_UPDATE):
         rc = WBIM_REFRESH;
         break;
+    case WBMENU_ID(WBMENU_WN__SNAP_WINDOW):
+        rc = WBWindowSnapshot(cl, obj, FALSE);
+        break;
+    case WBMENU_ID(WBMENU_WN__SNAP_ALL):
+        rc = WBWindowSnapshot(cl, obj, TRUE);
+        break;
     case WBMENU_ID(WBMENU_WN__SHOW_ICONS):
-        my->Flags &= ~WBWF_SHOW_ALL;
+        my->dd_Flags = DDFLAGS_SHOWICONS;
         rc = WBIM_REFRESH;
         break;
     case WBMENU_ID(WBMENU_WN__SHOW_ALL):
-        my->Flags |= WBWF_SHOW_ALL;
+        my->dd_Flags = DDFLAGS_SHOWALL;
         rc = WBIM_REFRESH;
         break;
     case WBMENU_ID(WBMENU_WB_SHELL):

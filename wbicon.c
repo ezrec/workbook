@@ -29,7 +29,7 @@
 
 struct wbIcon {
     STRPTR             File;
-    struct DiskObject *Icon;
+    struct DiskObject *DiskObject;
     STRPTR             Label;
     struct Screen     *Screen;
     Object            *Set;
@@ -93,7 +93,7 @@ static void wbIcon_Update(Class *cl, Object *obj)
 
     /* Update the parent's idea of how big we are
      */
-    GetIconRectangleA(&my->Screen->RastPort, my->Icon, (STRPTR)my->Label, &rect, (struct TagItem *)wbIcon_DrawTags);
+    GetIconRectangleA(&my->Screen->RastPort, my->DiskObject, (STRPTR)my->Label, &rect, (struct TagItem *)wbIcon_DrawTags);
 
     w = (rect.MaxX - rect.MinX) + 1;
     h = (rect.MaxY - rect.MinY) + 1;
@@ -101,23 +101,23 @@ static void wbIcon_Update(Class *cl, Object *obj)
     /* If the icon is outside of the bounds for this
      * screen, ignore the position information
      */
-    if ((my->Icon->do_CurrentX != (LONG)NO_ICON_POSITION ||
-         my->Icon->do_CurrentY != (LONG)NO_ICON_POSITION) && my->Screen) {
-        if ((my->Icon->do_CurrentX != (LONG)NO_ICON_POSITION &&
-            (my->Icon->do_CurrentX < my->Screen->LeftEdge ||
-            (my->Icon->do_CurrentX > (my->Screen->LeftEdge + my->Screen->Width - w)))) ||
-            (my->Icon->do_CurrentY != (LONG)NO_ICON_POSITION &&
-            (my->Icon->do_CurrentY < my->Screen->TopEdge ||
-            (my->Icon->do_CurrentY > (my->Screen->TopEdge + my->Screen->Height - h))))) {
-            my->Icon->do_CurrentY = (LONG)NO_ICON_POSITION;
-            my->Icon->do_CurrentX = (LONG)NO_ICON_POSITION;
+    if ((my->DiskObject->do_CurrentX != (LONG)NO_ICON_POSITION ||
+         my->DiskObject->do_CurrentY != (LONG)NO_ICON_POSITION) && my->Screen) {
+        if ((my->DiskObject->do_CurrentX != (LONG)NO_ICON_POSITION &&
+            (my->DiskObject->do_CurrentX < my->Screen->LeftEdge ||
+            (my->DiskObject->do_CurrentX > (my->Screen->LeftEdge + my->Screen->Width - w)))) ||
+            (my->DiskObject->do_CurrentY != (LONG)NO_ICON_POSITION &&
+            (my->DiskObject->do_CurrentY < my->Screen->TopEdge ||
+            (my->DiskObject->do_CurrentY > (my->Screen->TopEdge + my->Screen->Height - h))))) {
+            my->DiskObject->do_CurrentY = (LONG)NO_ICON_POSITION;
+            my->DiskObject->do_CurrentX = (LONG)NO_ICON_POSITION;
         }
     }
 
-    D(bug("%s: %ldx%ld @%ld,%ld (%s)\n", my->File, w, h, my->Icon->do_CurrentX, my->Icon->do_CurrentY, my->Label));
+    D(bug("%s: %ldx%ld @%ld,%ld (%s)\n", my->File, w, h, my->DiskObject->do_CurrentX, my->DiskObject->do_CurrentY, my->Label));
     SetAttrs(obj,
-        GA_Left, (my->Icon->do_CurrentX == (LONG)NO_ICON_POSITION) ? ~0 : my->Icon->do_CurrentX,
-        GA_Top, (my->Icon->do_CurrentY == (LONG)NO_ICON_POSITION) ? ~0 : my->Icon->do_CurrentY,
+        GA_Left, (my->DiskObject->do_CurrentX == (LONG)NO_ICON_POSITION) ? ~0 : my->DiskObject->do_CurrentX,
+        GA_Top, (my->DiskObject->do_CurrentY == (LONG)NO_ICON_POSITION) ? ~0 : my->DiskObject->do_CurrentY,
         GA_Width, w,
         GA_Height, h,
         TAG_END);
@@ -138,12 +138,12 @@ static IPTR wbIconNew(Class *cl, Object *obj, struct opSet *ops)
 
     my->Set = (Object *)GetTagData(WBIA_Set, (IPTR)NULL, ops->ops_AttrList);
     my->File = NULL;
-    my->Icon = (struct DiskObject *)GetTagData(WBIA_Icon, (IPTR)NULL, ops->ops_AttrList);
+    my->DiskObject = (struct DiskObject *)GetTagData(WBIA_Icon, (IPTR)NULL, ops->ops_AttrList);
     my->Screen = (struct Screen *)GetTagData(WBIA_Screen, (IPTR)NULL, ops->ops_AttrList);
-    if (my->Icon != NULL) {
-        if (my->Icon->do_Gadget.GadgetText != NULL &&
-            my->Icon->do_Gadget.GadgetText->IText != NULL)
-            label = my->Icon->do_Gadget.GadgetText->IText;
+    if (my->DiskObject != NULL) {
+        if (my->DiskObject->do_Gadget.GadgetText != NULL &&
+            my->DiskObject->do_Gadget.GadgetText->IText != NULL)
+            label = my->DiskObject->do_Gadget.GadgetText->IText;
     } else {
         file = (CONST_STRPTR)GetTagData(WBIA_File, (IPTR)NULL, ops->ops_AttrList);
         if (file == NULL)
@@ -157,11 +157,11 @@ static IPTR wbIconNew(Class *cl, Object *obj, struct opSet *ops)
 
         label = FilePart(my->File);
 
-        my->Icon = GetIconTags(my->File,
+        my->DiskObject = GetIconTags(my->File,
                                ICONGETA_Screen, my->Screen,
                                ICONGETA_FailIfUnavailable, FALSE,
                                TAG_END);
-        if (my->Icon == NULL)
+        if (my->DiskObject == NULL)
             goto error;
 
     }
@@ -192,17 +192,17 @@ static IPTR wbIconDispose(Class *cl, Object *obj, Msg msg)
         { TAG_END } };
 
     /* If need be, update the on-disk Icon's position information */
-    PutIconTagList(my->File, my->Icon, tags);
+    PutIconTagList(my->File, my->DiskObject, tags);
 #endif
 
     /* If my->File is set, then we allocated it
-     * and my->Icon. Otherwise, Icon was passed in
+     * and my->DiskObject. Otherwise, Icon was passed in
      * via WBIA_Icon, and its the caller's responsibility.
      */
     if (my->File) {
         FreeVec(my->File);
-        if (my->Icon)
-            FreeDiskObject(my->Icon);
+        if (my->DiskObject)
+            FreeDiskObject(my->DiskObject);
     }
 
     if (my->Label)
@@ -289,7 +289,7 @@ static IPTR wbIconRender(Class *cl, Object *obj, struct gpRender *gpr)
     if (rp) {
         /* Clip to the window for drawing */
         clip = wbClipWindow(wb, win);
-        DrawIconStateA(rp, my->Icon, (STRPTR)my->Label, x, y,
+        DrawIconStateA(rp, my->DiskObject, (STRPTR)my->Label, x, y,
             (gadget->Flags & GFLG_SELECTED) ? IDS_SELECTED : IDS_NORMAL, (struct TagItem *)wbIcon_DrawTags);
         wbUnclipWindow(wb, win, clip);
 
@@ -618,12 +618,30 @@ static IPTR wbIconInfo(Class *cl, Object *obj, Msg msg)
 // WBIM_Snapshot
 static IPTR wbIconSnapshot(Class *cl, Object *obj, Msg msg)
 {
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbIcon *my = INST_DATA(cl, obj);
+    struct Gadget *gadget = (struct Gadget *)obj;
+
+    D(bug("%s: %s\n", my->File));
+
+    my->DiskObject->do_CurrentX = gadget->LeftEdge;
+    my->DiskObject->do_CurrentY = gadget->TopEdge;
+    PutIconTags(my->File, my->DiskObject, ICONPUTA_OnlyUpdatePosition, TRUE, TAG_END);
+
     return 0;
 }
 
 // WBIM_Unsnapshot
 static IPTR wbIconUnsnapshot(Class *cl, Object *obj, Msg msg)
 {
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbIcon *my = INST_DATA(cl, obj);
+
+    D(bug("%s: %s\n", my->File));
+
+    my->DiskObject->do_CurrentX = (LONG)NO_ICON_POSITION;
+    my->DiskObject->do_CurrentY = (LONG)NO_ICON_POSITION;
+    PutIconTags(my->File, my->DiskObject, ICONPUTA_OnlyUpdatePosition, TRUE, TAG_END);
     return 0;
 }
 

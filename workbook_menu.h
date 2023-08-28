@@ -44,8 +44,8 @@
 #define WBMENU_WN_SELECT_CONTENTS   24, "Select contents", "A", 0, 0
 #define WBMENU_WN_CLEAN_UP          25, "Clean Up",        ".", 0, 0
 #define WBMENU_WN__SNAP         40, "Snapshot", 0, 0, 0
-#define WBMENU_WN__SNAP_WINDOW      41, "Window",            0, Broken 0, 0
-#define WBMENU_WN__SNAP_ALL         42, "All",               0, Broken 0, 0
+#define WBMENU_WN__SNAP_WINDOW      41, "Window",            0, 0, 0
+#define WBMENU_WN__SNAP_ALL         42, "All",               0, 0, 0
 #define WBMENU_WN__SHOW         45, "Show", 0, 0, 0
 #define WBMENU_WN__SHOW_ICONS       46, "Only icons",      "-", MENUTOGGLE|CHECKIT|CHECKED, ~((1 << 0))
 #define WBMENU_WN__SHOW_ALL         47, "All files",       "+", MENUTOGGLE|CHECKIT, ~((1 << 1))
@@ -59,8 +59,8 @@
 #define WBMENU_IC_COPY              62, "Copy",            "C", Broken 0, 0
 #define WBMENU_IC_RENAME            63, "Rename...",       "R", 0, 0
 #define WBMENU_IC_INFO              64, "Information...",  "I", Broken 0, 0
-#define WBMENU_IC_SNAPSHOT          65, "Snapshot",        "S", Broken 0, 0
-#define WBMENU_IC_UNSNAPSHOT        66, "Unsnapshot",      "U", Broken 0, 0
+#define WBMENU_IC_SNAPSHOT          65, "Snapshot",        "S", 0, 0
+#define WBMENU_IC_UNSNAPSHOT        66, "Unsnapshot",      "U", 0, 0
 #define WBMENU_IC_LEAVE_OUT         67, "Leave out",       "L", Broken 0, 0
 #define WBMENU_IC_PUT_AWAY          68, "Put away",        "P", Broken 0, 0
 #define WBMENU_IC_DELETE            69, "Delete...",         0, Broken 0, 0
