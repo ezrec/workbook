@@ -498,7 +498,6 @@ static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
                         WA_WBenchWindow, TRUE,
                         WA_Borderless,  TRUE,
                         WA_Activate,    TRUE,
-                        WA_SmartRefresh, TRUE,
                         WA_NewLookMenus, TRUE,
                         WA_PubScreen, NULL,
                         ops->ops_AttrList == NULL ? TAG_END : TAG_MORE, ops->ops_AttrList );
@@ -539,7 +538,6 @@ static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
                         WA_Backdrop, FALSE,
                         WA_WBenchWindow, TRUE,
                         WA_Title,    my->Path,
-                        WA_SmartRefresh, TRUE,
                         WA_SizeGadget, TRUE,
                         WA_DragBar, TRUE,
                         WA_DepthGadget, TRUE,
@@ -844,8 +842,9 @@ static IPTR WBWindowRefresh(Class *cl, Object *obj, Msg msg)
     struct wbWindow *my = INST_DATA(cl, obj);
     struct Window *win = my->Window;
 
-    BeginRefresh(win);
-    EndRefresh(win, TRUE);
+    // Gadtools window refresh.
+    GT_BeginRefresh(win);
+    GT_EndRefresh(win, TRUE);
 
     return 0;
 }
