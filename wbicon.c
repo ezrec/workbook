@@ -34,6 +34,8 @@ struct wbIcon {
     struct Screen     *Screen;
     Object            *Set;
 
+    struct Rectangle  HitBox;  // Icon image hit box, which does not include label.
+
     struct timeval LastActive;
 };
 
@@ -45,6 +47,7 @@ static const struct TagItem wbIcon_DrawTags[] = {
 };
 
 #ifndef __amigaos4__
+// Shim function from AmigaOS 4 API.
 #define DN_DEVICEONLY 1
 static BOOL _DevNameFromLock(struct WorkbookBase *wb, BPTR lock, STRPTR buffer, size_t size, ULONG flags)
 {
@@ -89,37 +92,36 @@ static void wbIcon_Update(Class *cl, Object *obj)
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
     struct Rectangle rect;
-    UWORD w,h;
+    UWORD icon_w,icon_h;
 
-    /* Update the parent's idea of how big we are
+    /* Update the parent's idea of how big we are with labels.
      */
     GetIconRectangleA(&my->Screen->RastPort, my->DiskObject, (STRPTR)my->Label, &rect, (struct TagItem *)wbIcon_DrawTags);
 
-    w = (rect.MaxX - rect.MinX) + 1;
-    h = (rect.MaxY - rect.MinY) + 1;
+    icon_w = (rect.MaxX - rect.MinX) + 1;
+    icon_h = (rect.MaxY - rect.MinY) + 1;
 
-    /* If the icon is outside of the bounds for this
-     * screen, ignore the position information
-     */
-    if ((my->DiskObject->do_CurrentX != (LONG)NO_ICON_POSITION ||
-         my->DiskObject->do_CurrentY != (LONG)NO_ICON_POSITION) && my->Screen) {
-        if ((my->DiskObject->do_CurrentX != (LONG)NO_ICON_POSITION &&
-            (my->DiskObject->do_CurrentX < my->Screen->LeftEdge ||
-            (my->DiskObject->do_CurrentX > (my->Screen->LeftEdge + my->Screen->Width - w)))) ||
-            (my->DiskObject->do_CurrentY != (LONG)NO_ICON_POSITION &&
-            (my->DiskObject->do_CurrentY < my->Screen->TopEdge ||
-            (my->DiskObject->do_CurrentY > (my->Screen->TopEdge + my->Screen->Height - h))))) {
-            my->DiskObject->do_CurrentY = (LONG)NO_ICON_POSITION;
-            my->DiskObject->do_CurrentX = (LONG)NO_ICON_POSITION;
-        }
+    // Get the hit box (image without label)
+    GetIconRectangleA(&my->Screen->RastPort, my->DiskObject, NULL, &my->HitBox, (struct TagItem *)wbIcon_DrawTags);
+    UWORD image_w = (my->HitBox.MaxX - rect.MinX) + 1;
+    if (icon_w > image_w) {
+        // Label bigger than icon? Move the hitbox to the center.
+        my->HitBox.MinX += (icon_w - image_w) / 2;
+        my->HitBox.MaxX += (icon_w - image_w) / 2;
     }
 
-    D(bug("%s: %ldx%ld @%ld,%ld (%s)\n", my->File, w, h, my->DiskObject->do_CurrentX, my->DiskObject->do_CurrentY, my->Label));
+    D(bug("%s: %ldx%ld @%ld,%ld [hitbox (%ld,%ld)-(%ld,%ld)] (%s)\n",
+                my->File, image_w, image_h,
+                my->DiskObject->do_CurrentX, my->DiskObject->do_CurrentY,
+                my->HitBox.MinX, my->HitBox.MinY,
+                my->HitBox.MaxX, my->HixBox.MaxY,
+                my->Label));
+
     SetAttrs(obj,
         GA_Left, (my->DiskObject->do_CurrentX == (LONG)NO_ICON_POSITION) ? ~0 : my->DiskObject->do_CurrentX,
         GA_Top, (my->DiskObject->do_CurrentY == (LONG)NO_ICON_POSITION) ? ~0 : my->DiskObject->do_CurrentY,
-        GA_Width, w,
-        GA_Height, h,
+        GA_Width, icon_w,
+        GA_Height, icon_h,
         TAG_END);
 }
 
@@ -390,6 +392,20 @@ static void wbIconToggleSelected(Class *cl, Object *obj, struct GadgetInfo *gi, 
         DoMethod(obj, GM_RENDER, gi, rp, GREDRAW_TOGGLE);
         ReleaseGIRPort(rp);
     }
+}
+
+// GM_HITTEST
+static IPTR wbIconHitTest(Class *cl, Object *obj, struct gpHitTest *gpht) {
+    struct wbIcon *my = INST_DATA(cl, obj);
+
+    IPTR rc = 0;
+
+    if (gpht->gpht_Mouse.X >= my->HitBox.MinX && gpht->gpht_Mouse.X <= my->HitBox.MaxX &&
+        gpht->gpht_Mouse.Y >= my->HitBox.MinY && gpht->gpht_Mouse.Y <= my->HitBox.MaxY) {
+        rc = GMR_GADGETHIT;
+    }
+
+    return rc;
 }
 
 // GM_GOACTIVE
@@ -705,6 +721,7 @@ static IPTR dispatcher(Class *cl, Object *obj, Msg msg)
     case OM_GET:           rc = wbIconGet(cl, obj, (APTR)msg); break;
     case OM_SET:           rc = wbIconSet(cl, obj, (APTR)msg); break;
     case GM_RENDER:        rc = wbIconRender(cl, obj, (APTR)msg); break;
+    case GM_HITTEST:       rc = wbIconHitTest(cl, obj, (APTR)msg); break;
     case GM_GOACTIVE:      rc = wbIconGoActive(cl, obj, (APTR)msg); break;
     case GM_HANDLEINPUT:   rc = wbIconHandleInput(cl, obj, (APTR)msg); break;
     case WBIM_Open:        rc = wbIconOpen(cl, obj, msg); break;
