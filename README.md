@@ -2,6 +2,10 @@
 
 Copy to SYS:System/Workbook
 
+- v1.6
+  - Add 'Snapshot' functionality
+  - Disable broken 'Information...' menu item for now.
+  - Add hard-coded custom items to the menu (Updater and Amistore)
 - v1.5
   - Rename process/task to 'Workbench' for AmigaOS tool (ie WBRun) compatibility.
   - Only refresh title bar when AvailMem actually changes
