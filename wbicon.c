@@ -111,10 +111,10 @@ static void wbIcon_Update(Class *cl, Object *obj)
     }
 
     D(bug("%s: %ldx%ld @%ld,%ld [hitbox (%ld,%ld)-(%ld,%ld)] (%s)\n",
-                my->File, image_w, image_h,
+                my->File, icon_w, icon_h,
                 my->DiskObject->do_CurrentX, my->DiskObject->do_CurrentY,
                 my->HitBox.MinX, my->HitBox.MinY,
-                my->HitBox.MaxX, my->HixBox.MaxY,
+                my->HitBox.MaxX, my->HitBox.MaxY,
                 my->Label));
 
     SetAttrs(obj,
