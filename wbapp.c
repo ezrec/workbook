@@ -30,6 +30,9 @@ struct wbApp {
     ULONG           AppMask;   /* Mask of our port(s) */
     Object         *Root;      /* Background 'root' window */
     struct MinList  Windows; /* Subwindows */
+
+    // Execute... command buffer
+    char ExecuteBuffer[128+1];
 };
 
 static void wbOpenDrawer(Class *cl, Object *obj, CONST_STRPTR path)
@@ -227,6 +230,7 @@ static IPTR execute_command(struct WorkbookBase *wb, CONST_STRPTR command, APTR 
 static BOOL wbMenuPick(Class *cl, Object *obj, struct Window *win, UWORD menuNumber)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbApp *my = INST_DATA(cl, obj);
     Object *owin;
     struct MenuItem *item;
     BOOL quit = FALSE;
@@ -278,7 +282,7 @@ static BOOL wbMenuPick(Class *cl, Object *obj, struct Window *win, UWORD menuNum
                 wbPopupAction(wb, "Execute a file",
                                   "Enter Command and its Arguments",
                                   "Command:",
-                                  wb->ExecuteBuffer, sizeof(wb->ExecuteBuffer),
+                                  my->ExecuteBuffer, sizeof(my->ExecuteBuffer),
                                   NULL,
                                   execute_command, NULL);
                 break;

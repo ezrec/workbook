@@ -60,9 +60,6 @@ struct WorkbookBase {
      * it's argment.
      */
     BPTR wb_OpenerSegList;
-
-    // Execute... command buffer
-    char ExecuteBuffer[128+1];
 };
 
 /* FIXME: Remove these #define xxxBase hacks
