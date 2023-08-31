@@ -57,11 +57,17 @@ Class *WBApp_MakeClass(struct WorkbookBase *wb);
 #define WBWM_Hide                (WBWM_Dummy+4)  /* N/A */
 #define WBWM_Show                (WBWM_Dummy+5)  /* N/A */
 #define WBWM_Refresh             (WBWM_Dummy+6)  /* N/A */
+#define WBWM_ForSelected         (WBWM_Dummy+7)  /* Msg */
 
 struct wbwm_MenuPick {
     STACKED ULONG             MethodID;
     STACKED struct MenuItem  *wbwmp_MenuItem;
     STACKED UWORD             wbwmp_MenuNumber;
+};
+
+struct wbwm_ForSelected {
+    STACKED ULONG             MethodID;
+    STACKED Msg               wbwmf_Msg;    // Msg to send to all selected icons in the window.
 };
 
 Class *WBWindow_MakeClass(struct WorkbookBase *wb);

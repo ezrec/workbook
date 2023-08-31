@@ -227,6 +227,39 @@ static IPTR execute_command(struct WorkbookBase *wb, CONST_STRPTR command, APTR 
     return 0;
 }
 
+// Broadcast a message to all selected icons in all windows.
+//
+// Returns a count of selected icons.
+static IPTR wbAppForSelectedA(Class *cl, Object *obj, Msg msg)
+{
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbApp *my = INST_DATA(cl, obj);
+    Object *ostate = (Object *)my->Windows.mlh_Head;
+    Object *owin;
+
+    // Broadcast to Root window
+    IPTR rc = DoMethodA(my->Root, msg);
+
+    // Broadcast to all child windows.
+    while ((owin = NextObject(&ostate)) != NULL) {
+        rc += DoMethod(owin, WBWM_ForSelected, msg);
+    }
+
+    return rc;
+}
+
+#ifdef __AROS__
+#define wbAppForSelected(cl, obj, ...) ({ \
+    IPTR  msg[] = { AROS_PP_VARIADIC_CAST2IPTR(__VA_ARGS__) }; \
+    IPTR rc = wbAppForSelectedA(cl, obj, (Msg)msg);\
+    rc; })
+#else
+static IPTR wbAppForSelected(Class *cl, Object *obj, ULONG method, ...)
+{
+    return wbAppForSelectedA(cl, obj, (Msg)&method);
+}
+#endif
+
 static BOOL wbMenuPick(Class *cl, Object *obj, struct Window *win, UWORD menuNumber)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
@@ -301,6 +334,39 @@ static BOOL wbMenuPick(Class *cl, Object *obj, struct Window *win, UWORD menuNum
                 if (rc || !rc) {
                     ColdReboot();
                 }
+                break;
+            case WBMENU_ID(WBMENU_IC_OPEN):
+                wbAppForSelected(cl, obj, WBIM_Open);
+                break;
+            case WBMENU_ID(WBMENU_IC_COPY):
+                wbAppForSelected(cl, obj, WBIM_Copy);
+                break;
+            case WBMENU_ID(WBMENU_IC_RENAME):
+                wbAppForSelected(cl, obj, WBIM_Rename);
+                break;
+            case WBMENU_ID(WBMENU_IC_INFO):
+                wbAppForSelected(cl, obj, WBIM_Info);
+                break;
+            case WBMENU_ID(WBMENU_IC_SNAPSHOT):
+                wbAppForSelected(cl, obj, WBIM_Snapshot);
+                break;
+            case WBMENU_ID(WBMENU_IC_UNSNAPSHOT):
+                wbAppForSelected(cl, obj, WBIM_Unsnapshot);
+                break;
+            case WBMENU_ID(WBMENU_IC_LEAVE_OUT):
+                wbAppForSelected(cl, obj, WBIM_Leave_Out);
+                break;
+            case WBMENU_ID(WBMENU_IC_PUT_AWAY):
+                wbAppForSelected(cl, obj, WBIM_Put_Away);
+                break;
+            case WBMENU_ID(WBMENU_IC_DELETE):
+                wbAppForSelected(cl, obj, WBIM_Delete);
+                break;
+            case WBMENU_ID(WBMENU_IC_FORMAT):
+                wbAppForSelected(cl, obj, WBIM_Format);
+                break;
+            case WBMENU_ID(WBMENU_IC_EMPTY_TRASH):
+                wbAppForSelected(cl, obj, WBIM_Empty_Trash);
                 break;
             }
         }

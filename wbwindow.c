@@ -900,7 +900,8 @@ static IPTR wbWindowSnapshot(Class *cl, Object *obj, BOOL all)
     return 0;
 }
 
-static IPTR wbWindowForSelectedIcons(Class *cl, Object *obj, IPTR MethodID)
+// Returns count of selected objects.
+static IPTR WBWindow__WBWM_ForSelected(Class *cl, Object *obj, struct wbwm_ForSelected *wbwmf)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbWindow *my = INST_DATA(cl, obj);
@@ -912,12 +913,18 @@ static IPTR wbWindowForSelectedIcons(Class *cl, Object *obj, IPTR MethodID)
 
         GetAttr(GA_Selected, wbwi->wbwiObject, &selected);
         if (selected) {
-            rc |= DoMethodA(wbwi->wbwiObject, (Msg)&MethodID);
+            DoMethodA(wbwi->wbwiObject, wbwmf->wbwmf_Msg);
+            rc += 1;
         }
+    }
+
+    if (rc > 0) {
+        wbRescan(cl, obj);
     }
 
     return rc;
 }
+
 
 // WBWM_MenuPick
 static IPTR WBWindow__WBWM_MenuPick(Class *cl, Object *obj, struct wbwm_MenuPick *wbwmp)
@@ -965,39 +972,6 @@ static IPTR WBWindow__WBWM_MenuPick(Class *cl, Object *obj, struct wbwm_MenuPick
         break;
     case WBMENU_ID(WBMENU_WB_SHELL):
         NewCLI(cl, obj);
-        break;
-    case WBMENU_ID(WBMENU_IC_OPEN):
-        rc = wbWindowForSelectedIcons(cl, obj, WBIM_Open);
-        break;
-    case WBMENU_ID(WBMENU_IC_COPY):
-        rc = wbWindowForSelectedIcons(cl, obj, WBIM_Copy);
-        break;
-    case WBMENU_ID(WBMENU_IC_RENAME):
-        rc = wbWindowForSelectedIcons(cl, obj, WBIM_Rename);
-        break;
-    case WBMENU_ID(WBMENU_IC_INFO):
-        rc = wbWindowForSelectedIcons(cl, obj, WBIM_Info);
-        break;
-    case WBMENU_ID(WBMENU_IC_SNAPSHOT):
-        rc = wbWindowForSelectedIcons(cl, obj, WBIM_Snapshot);
-        break;
-    case WBMENU_ID(WBMENU_IC_UNSNAPSHOT):
-        rc = wbWindowForSelectedIcons(cl, obj, WBIM_Unsnapshot);
-        break;
-    case WBMENU_ID(WBMENU_IC_LEAVE_OUT):
-        rc = wbWindowForSelectedIcons(cl, obj, WBIM_Leave_Out);
-        break;
-    case WBMENU_ID(WBMENU_IC_PUT_AWAY):
-        rc = wbWindowForSelectedIcons(cl, obj, WBIM_Put_Away);
-        break;
-    case WBMENU_ID(WBMENU_IC_DELETE):
-        rc = wbWindowForSelectedIcons(cl, obj, WBIM_Delete);
-        break;
-    case WBMENU_ID(WBMENU_IC_FORMAT):
-        rc = wbWindowForSelectedIcons(cl, obj, WBIM_Format);
-        break;
-    case WBMENU_ID(WBMENU_IC_EMPTY_TRASH):
-        rc = wbWindowForSelectedIcons(cl, obj, WBIM_Empty_Trash);
         break;
     default:
         rc = 0;
@@ -1070,6 +1044,7 @@ static IPTR WBWindow_dispatcher(Class *cl, Object *obj, Msg msg)
     METHOD_CASE(WBWindow, WBWM_MenuPick);
     METHOD_CASE(WBWindow, WBWM_IntuiTick);
     METHOD_CASE(WBWindow, WBWM_Refresh);
+    METHOD_CASE(WBWindow, WBWM_ForSelected);
     default:             rc = DoSuperMethodA(cl, obj, msg); break;
     }
 
