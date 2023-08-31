@@ -909,23 +909,34 @@ static IPTR WBWindow__WBWM_ForSelected(Class *cl, Object *obj, struct wbwm_ForSe
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbWindow *my = INST_DATA(cl, obj);
     struct wbWindow_Icon *wbwi;
-    IPTR rc = 0;
+    IPTR count = 0;
+    BOOL rescan = FALSE;
 
+    D(bug("%s: send MethodID %lx\n", __func__, wbwmf->wbwmf_Msg->MethodID));
     ForeachNode(&my->IconList, wbwi) {
         IPTR selected = FALSE;
-
         GetAttr(GA_Selected, wbwi->wbwiObject, &selected);
         if (selected) {
-            DoMethodA(wbwi->wbwiObject, wbwmf->wbwmf_Msg);
-            rc += 1;
+            IPTR rc = DoMethodA(wbwi->wbwiObject, wbwmf->wbwmf_Msg);
+            if (wbwmf->wbwmf_Msg->MethodID == WBIM_Rename && rc == WBIM_REFRESH) {
+                rescan |= TRUE;
+            }
+            GetAttr(GA_Selected, wbwi->wbwiObject, &selected);
+            if (!selected) {
+                // Refresh the gadget.
+                RefreshGList((struct Gadget *)wbwi->wbwiObject, my->Window, NULL, 1);
+            }
+            count += 1;
         }
     }
 
-    if (rc > 0) {
+    if (rescan) {
         wbRescan(cl, obj);
     }
 
-    return rc;
+    D(bug("%s: %ld selected.\n", __func__, count));
+
+    return count;
 }
 
 

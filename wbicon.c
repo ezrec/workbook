@@ -32,7 +32,6 @@ struct wbIcon {
     struct DiskObject *DiskObject;
     STRPTR             Label;
     struct Screen     *Screen;
-    Object            *Set;
 
     struct Rectangle  HitBox;  // Icon image hit box, which does not include label.
 
@@ -138,7 +137,6 @@ static IPTR WBIcon__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
 
     my = INST_DATA(cl, obj);
 
-    my->Set = (Object *)GetTagData(WBIA_Set, (IPTR)NULL, ops->ops_AttrList);
     my->File = NULL;
     my->DiskObject = (struct DiskObject *)GetTagData(WBIA_Icon, (IPTR)NULL, ops->ops_AttrList);
     my->Screen = (struct Screen *)GetTagData(WBIA_Screen, (IPTR)NULL, ops->ops_AttrList);
@@ -188,14 +186,6 @@ static IPTR WBIcon__OM_DISPOSE(Class *cl, Object *obj, Msg msg)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
-#if 0
-    struct TagItem tags[] = {
-        { ICONPUTA_OnlyUpdatePosition, TRUE },
-        { TAG_END } };
-
-    /* If need be, update the on-disk Icon's position information */
-    PutIconTagList(my->File, my->DiskObject, tags);
-#endif
 
     /* If my->File is set, then we allocated it
      * and my->DiskObject. Otherwise, Icon was passed in
@@ -259,9 +249,6 @@ static IPTR WBIcon__OM_SET(Class *cl, Object *obj, struct opSet *ops)
             // Re-render if this attribute is present.
             render = TRUE;
             break;
-        case WBIA_Set:
-            my->Set = (Object *)ti->ti_Data;
-            break;
         }
     }
 
@@ -306,7 +293,9 @@ static IPTR WBIcon__GM_RENDER(Class *cl, Object *obj, struct gpRender *gpr)
 // If multiple are selected, clear all and mark this as selected.
 // If none are selected or only this is selected, clear all and toggle selection mark.
 // If shift-selecting, toggle selection mark.
-static void wbIconToggleSelected(Class *cl, Object *obj, struct GadgetInfo *gi, UWORD qualifier)
+//
+// Returns new selection state
+static BOOL wbIconToggleSelected(Class *cl, Object *obj, struct GadgetInfo *gi, UWORD qualifier)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
@@ -316,11 +305,8 @@ static void wbIconToggleSelected(Class *cl, Object *obj, struct GadgetInfo *gi, 
     IPTR selected = FALSE;
     GetAttr(GA_Selected, obj, &selected);
 
-    if (my->Set) {
-        GetAttr(WBSA_SelectedCount, my->Set, &count);
-    } else {
-        count = selected ? 1 : 0;
-    }
+    IPTR msg[] = { OM_Dummy };
+    count = DoMethod(wb->wb_App, WBAM_ForSelected, (Msg)msg);
 
     // Are we in shift-select mode?
     BOOL shift_select = (qualifier & (IEQUALIFIER_LSHIFT | IEQUALIFIER_LSHIFT)) == 1;
@@ -375,13 +361,7 @@ static void wbIconToggleSelected(Class *cl, Object *obj, struct GadgetInfo *gi, 
 
     if (deselect) {
         // De-select all items.
-        D(bug("%s: %lx - clear parent set %lx\n", __func__, obj, my->Set));
-        // Deselect ourself, so that we are not re-rendered.
-        SetAttrs(obj, GA_Selected, FALSE, TAG_END);
-
-        if (my->Set) {
-            DoMethod(my->Set, WBSM_Select, gi, (IPTR)FALSE);
-        }
+        DoMethod(wb->wb_App, WBAM_ClearSelected);
     }
 
     SetAttrs(obj, GA_Selected, selected, TAG_END);
@@ -392,6 +372,8 @@ static void wbIconToggleSelected(Class *cl, Object *obj, struct GadgetInfo *gi, 
         DoMethod(obj, GM_RENDER, gi, rp, GREDRAW_TOGGLE);
         ReleaseGIRPort(rp);
     }
+
+    return selected;
 }
 
 // GM_HITTEST
@@ -414,15 +396,37 @@ static IPTR WBIcon__GM_GOACTIVE(Class *cl, Object *obj, struct gpInput *gpi)
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
     struct Gadget *gadget = (struct Gadget *)obj;
-    BOOL dclicked = FALSE;
     IPTR rc = GMR_NOREUSE;
 
-    if (gpi->gpi_IEvent != NULL) {
-        my->LastActive = gpi->gpi_IEvent->ie_TimeStamp;
 
-        // Select this item.
-        wbIconToggleSelected(cl, obj, gpi->gpi_GInfo, gpi->gpi_IEvent->ie_Qualifier);
-        rc = GMR_MEACTIVE;
+    /* On a double-click, don't go 'active', just
+     * do the action.
+     */
+    BOOL dclicked = DoubleClick(my->LastActive.tv_secs,
+                               my->LastActive.tv_micro,
+                               gpi->gpi_IEvent->ie_TimeStamp.tv_secs,
+                               gpi->gpi_IEvent->ie_TimeStamp.tv_micro);
+
+    my->LastActive = gpi->gpi_IEvent->ie_TimeStamp;
+
+    if (dclicked)
+    {
+        D(bug("%s: Double-clicked => %lx\n", __func__, wb->wb_App));
+
+        // Open all.
+        SetAttrs(obj, GA_Selected, TRUE, TAG_END);
+        IPTR msg[] = { WBIM_Open };
+        DoMethod(wb->wb_App, WBAM_ForSelected, (Msg)msg);
+        // De-select all.
+        DoMethod(wb->wb_App, WBAM_ClearSelected);
+    } else {
+        if (gpi->gpi_IEvent != NULL) {
+            my->LastActive = gpi->gpi_IEvent->ie_TimeStamp;
+
+            // Select this item.
+            wbIconToggleSelected(cl, obj, gpi->gpi_GInfo, gpi->gpi_IEvent->ie_Qualifier);
+            rc = GMR_MEACTIVE;
+        }
     }
 
     return rc;
@@ -440,51 +444,9 @@ static IPTR WBIcon__GM_HANDLEINPUT(Class *cl, Object *obj, struct gpInput *gpi)
 
     if (iev->ie_Class == IECLASS_RAWMOUSE) {
         switch (iev->ie_Code) {
-        case SELECTDOWN:
-            if ( (gpi->gpi_Mouse.X < 0) ||
-                                 (gpi->gpi_Mouse.X > gadget->Width) ||
-                                 (gpi->gpi_Mouse.Y < 0) ||
-                                 (gpi->gpi_Mouse.Y > gadget->Height) ) {
-                D(bug("%s: (%ld,%ld) clicked out of bounds (%ld,%ld)-(%ld,%ld)\n", __func__, 
-                            gpi->gpi_Mouse.X, gpi->gpi_Mouse.Y,
-                            0, 0, gadget->Width, gadget->Height
-                            ));
-                rc = GMR_REUSE;
-            } else {
-
-                /* On a double-click, don't go 'active', just
-                 * do the action.
-                 */
-                BOOL dclicked = DoubleClick(my->LastActive.tv_secs,
-                                           my->LastActive.tv_micro,
-                                           gpi->gpi_IEvent->ie_TimeStamp.tv_secs,
-                                           gpi->gpi_IEvent->ie_TimeStamp.tv_micro);
-
-                my->LastActive = gpi->gpi_IEvent->ie_TimeStamp;
-
-                if (dclicked)
-                {
-                    STACKED ULONG openmethodID;
-                    openmethodID = WBIM_Open;
-                    DoMethodA(obj, (Msg)&openmethodID);
-                }
-
-                wbIconToggleSelected(cl, obj, gpi->gpi_GInfo, gpi->gpi_IEvent->ie_Qualifier);
-                rc = GMR_MEACTIVE;
-            }
             break;
         case SELECTUP:
-            rc = GMR_MEACTIVE;
-            if ( (gpi->gpi_Mouse.X < 0) ||
-                                 (gpi->gpi_Mouse.X > gadget->Width) ||
-                                 (gpi->gpi_Mouse.Y < 0) ||
-                                 (gpi->gpi_Mouse.Y > gadget->Height) ) {
-                D(bug("%s: (%ld,%ld) clicked out of bounds (%ld,%ld)-(%ld,%ld)\n", __func__, 
-                            gpi->gpi_Mouse.X, gpi->gpi_Mouse.Y,
-                            0, 0, gadget->Width, gadget->Height
-                            ));
-                rc = GMR_REUSE;
-            }
+            rc = GMR_REUSE;
             break;
         case MENUDOWN:
             rc = GMR_REUSE;

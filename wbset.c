@@ -56,9 +56,6 @@ static IPTR WBSet__OM_ADDMEMBER(Class *cl, Object *obj, struct opMember *opm)
     node = AllocMem(sizeof(*node), MEMF_ANY);
     node->sn_Object = iobj;
 
-    // Set the WBIA_Set attribute
-    SetAttrs(iobj, WBIA_Set, obj, TAG_END);
-
     /* Get bounding box of item to add */
     wbGABox(iobj, &ibox);
 
@@ -87,9 +84,6 @@ static IPTR WBSet__OM_REMMEMBER(Class *cl, Object *obj, struct opMember *opm)
             FreeMem(node, sizeof(*node));
         }
     }
-
-    // Clear the WBIA_Set attribute
-    SetAttrs(iobj, WBIA_Set, NULL, TAG_END);
 
     my->MemberCount--;
 

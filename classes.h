@@ -21,14 +21,20 @@
 
 /* Methods */
 #define WBAM_Dummy               (TAG_USER | 0x40400100)
-#define WBAM_Workbench           (WBAM_Dummy+1)
+#define WBAM_Workbench           (WBAM_Dummy+0)
+#define WBAM_ForSelected         (WBAM_Dummy+1)         // Coerce message for all selected items.
+#define WBAM_ClearSelected       (WBAM_Dummy+2)         // Clear all selections.
+
+struct wbam_ForSelected {
+    STACKED ULONG             MethodID;
+    STACKED Msg               wbamf_Msg;   // Message to send to all selected icons
+};
 
 Class *WBApp_MakeClass(struct WorkbookBase *wb);
 
 #define WBApp        wb->wb_WBApp
 
-
-/* WBWindow class 
+/* WBWindow class
  * This is a 'scrolled view' of a directory of
  * icons, that also creates and manages its
  * own struct Window.
@@ -42,9 +48,9 @@ Class *WBApp_MakeClass(struct WorkbookBase *wb);
 
 /* Attributes (also takes all WA_* tags) */
 #define WBWA_Dummy               (TAG_USER | 0x40410000)
-#define WBWA_Path                (WBWA_Dummy+1)  /* CONST_STRPTR    */
-#define WBWA_UserPort            (WBWA_Dummy+2)  /* struct MsgPort * */
-#define WBWA_Window              (WBWA_Dummy+3)  /* struct Window * */
+#define WBWA_Path                (WBWA_Dummy+1)  // (CONST_STRPTR) [OM_NEW, OM_GET]
+#define WBWA_UserPort            (WBWA_Dummy+2)  // (struct MsgPort *) [OM_NEW]
+#define WBWA_Window              (WBWA_Dummy+3)  // (struct Window *) [OM_NEW]
 
 /* Internal Attributes */
 #define WBWA_ActiveIconID        (WBWA_Dummy+128)
@@ -144,7 +150,6 @@ Class *WBSet_MakeClass(struct WorkbookBase *wb);
 #define WBIA_Icon                (WBIA_Dummy+2)        /* struct DiskObject * */
 #define WBIA_Label               (WBIA_Dummy+3)        /* CONST_STRPTR */
 #define WBIA_Screen              (WBIA_Dummy+4)        /* struct Screen * */
-#define WBIA_Set                 (WBIA_Dummy+5)        /* struct WBSet * */
 
 /* Methods */
 #define WBIM_Dummy               (TAG_USER | 0x40440100)

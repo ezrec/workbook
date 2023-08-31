@@ -230,7 +230,7 @@ static IPTR execute_command(struct WorkbookBase *wb, CONST_STRPTR command, APTR 
 // Broadcast a message to all selected icons in all windows.
 //
 // Returns a count of selected icons.
-static IPTR wbAppForSelectedA(Class *cl, Object *obj, Msg msg)
+static IPTR WBApp__WBAM_ForSelected(Class *cl, Object *obj, struct wbam_ForSelected *wbamf)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbApp *my = INST_DATA(cl, obj);
@@ -238,11 +238,13 @@ static IPTR wbAppForSelectedA(Class *cl, Object *obj, Msg msg)
     Object *owin;
 
     // Broadcast to Root window
-    IPTR rc = DoMethodA(my->Root, msg);
+    IPTR rc = DoMethod(my->Root, WBWM_ForSelected, wbamf->wbamf_Msg);
 
     // Broadcast to all child windows.
     while ((owin = NextObject(&ostate)) != NULL) {
-        rc += DoMethod(owin, WBWM_ForSelected, msg);
+        IPTR count;
+        count = DoMethod(owin, WBWM_ForSelected, wbamf->wbamf_Msg);
+        rc += count;
     }
 
     return rc;
@@ -250,15 +252,34 @@ static IPTR wbAppForSelectedA(Class *cl, Object *obj, Msg msg)
 
 #ifdef __AROS__
 #define wbAppForSelected(cl, obj, ...) ({ \
-    IPTR  msg[] = { AROS_PP_VARIADIC_CAST2IPTR(__VA_ARGS__) }; \
-    IPTR rc = wbAppForSelectedA(cl, obj, (Msg)msg);\
+    IPTR  msg[] = { WBAM_ForSelected, AROS_PP_VARIADIC_CAST2IPTR(__VA_ARGS__) }; \
+    IPTR rc = WBApp__WBAM_ForSelected(cl, obj, (APTR)msg);\
     rc; })
 #else
 static IPTR wbAppForSelected(Class *cl, Object *obj, ULONG method, ...)
 {
-    return wbAppForSelectedA(cl, obj, (Msg)&method);
+    struct wbam_ForSelected msg = {
+        .MethodID = WBAM_ForSelected,
+        .wbamf_Msg = (Msg)&method,
+    };
+
+    return WBApp__WBAM_ForSelected(cl, obj, &msg);
 }
 #endif
+
+// Clear all selections.
+//
+static IPTR WBApp__WBAM_ClearSelected(Class *cl, Object *obj, Msg msg)
+{
+    struct TagItem attrlist[] = {
+        { GA_Selected, FALSE },
+        { TAG_END, },
+    };
+    wbAppForSelected(cl, obj, OM_SET, attrlist, NULL);
+
+    return 0;
+}
+
 
 static BOOL wbMenuPick(Class *cl, Object *obj, struct Window *win, UWORD menuNumber)
 {
@@ -337,6 +358,7 @@ static BOOL wbMenuPick(Class *cl, Object *obj, struct Window *win, UWORD menuNum
                 break;
             case WBMENU_ID(WBMENU_IC_OPEN):
                 wbAppForSelected(cl, obj, WBIM_Open);
+                DoMethod(obj, WBAM_ClearSelected);
                 break;
             case WBMENU_ID(WBMENU_IC_COPY):
                 wbAppForSelected(cl, obj, WBIM_Copy);
@@ -516,6 +538,8 @@ static IPTR WBApp_dispatcher(Class *cl, Object *obj, Msg msg)
     METHOD_CASE(WBApp, OM_ADDMEMBER);
     METHOD_CASE(WBApp, OM_REMMEMBER);
     METHOD_CASE(WBApp, WBAM_Workbench);
+    METHOD_CASE(WBApp, WBAM_ForSelected);
+    METHOD_CASE(WBApp, WBAM_ClearSelected);
     default:           rc = DoSuperMethodA(cl, obj, msg); break;
     }
 
