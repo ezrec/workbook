@@ -2,6 +2,9 @@
 
 Copy to SYS:System/Workbook
 
+- Unreleased
+  - Ensure all selected icons are affected by Icon menu commands, not just ones in the current window.
+  - Ensure only icon images, not labels, are in the icon mouse selection area.
 - v1.6
   - Add 'Snapshot' functionality
   - Disable broken 'Information...' menu item for now.
