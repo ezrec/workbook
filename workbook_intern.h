@@ -38,6 +38,8 @@
 #include "workbook_vbcc.h"
 #endif // !__AROS__
 
+#define METHOD_CASE(name, id)   case id: rc = name##__##id(cl, obj, (APTR)msg); break
+
 struct WorkbookBase {
     APTR wb_IntuitionBase;
     APTR wb_DOSBase;

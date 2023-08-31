@@ -118,7 +118,7 @@ static BOOL wbvMoveTo(Class *cl, Object *obj, WORD left, WORD top)
 }
 
 
-static IPTR WBVirtualNew(Class *cl, Object *obj, struct opSet *ops)
+static IPTR WBVirtual__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
 {
     IPTR rc = 0;
 
@@ -133,7 +133,7 @@ static IPTR WBVirtualNew(Class *cl, Object *obj, struct opSet *ops)
 }
 
 // OM_GET
-static IPTR WBVirtualGet(Class *cl, Object *obj, struct opGet *opg)
+static IPTR WBVirtual__OM_GET(Class *cl, Object *obj, struct opGet *opg)
 {
     struct wbVirtual *my = INST_DATA(cl, obj);
     IPTR rc = TRUE;
@@ -163,7 +163,7 @@ static IPTR WBVirtualGet(Class *cl, Object *obj, struct opGet *opg)
 }
 
 // OM_UPDATE/OM_SET
-static IPTR WBVirtualSetUpdate(Class *cl, Object *obj, struct opUpdate *opu)
+static IPTR WBVirtual__OM_SET(Class *cl, Object *obj, struct opUpdate *opu)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbVirtual *my = INST_DATA(cl, obj);
@@ -217,7 +217,7 @@ D(bug("%s: Tag=0x%x, val=%d\n", __func__, tag->ti_Tag, val));
 }
 
 // GM_HITTEST
-static IPTR WBVirtualHitTest(Class *cl, Object *obj, struct gpHitTest *gph)
+static IPTR WBVirtual__GM_HITTEST(Class *cl, Object *obj, struct gpHitTest *gph)
 {
     struct wbVirtual *my = INST_DATA(cl, obj);
     struct gpHitTest subtest = *gph;
@@ -233,7 +233,7 @@ static IPTR WBVirtualHitTest(Class *cl, Object *obj, struct gpHitTest *gph)
 }
 
 // GM_RENDER
-static IPTR WBVirtualRender(Class *cl, Object *obj, struct gpRender *gpr)
+static IPTR WBVirtual__GM_RENDER(Class *cl, Object *obj, struct gpRender *gpr)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbVirtual *my = INST_DATA(cl, obj);
@@ -268,7 +268,7 @@ static IPTR WBVirtualRender(Class *cl, Object *obj, struct gpRender *gpr)
 }
 
 // GM_GOACTIVE
-static IPTR WBVirtualGoActive(Class *cl, Object *obj, struct gpInput *gpi)
+static IPTR WBVirtual__GM_GOACTIVE(Class *cl, Object *obj, struct gpInput *gpi)
 {
     struct wbVirtual *my = INST_DATA(cl, obj);
     struct gpInput m;
@@ -281,7 +281,7 @@ static IPTR WBVirtualGoActive(Class *cl, Object *obj, struct gpInput *gpi)
 }
 
 // GM_GOINACTIVE
-static IPTR WBVirtualGoInactive(Class *cl, Object *obj, struct gpGoInactive *gpgi)
+static IPTR WBVirtual__GM_GOINACTIVE(Class *cl, Object *obj, struct gpGoInactive *gpgi)
 {
     struct wbVirtual *my = INST_DATA(cl, obj);
 
@@ -289,7 +289,7 @@ static IPTR WBVirtualGoInactive(Class *cl, Object *obj, struct gpGoInactive *gpg
 }
 
 // GM_HANDLEINPUT
-static IPTR WBVirtualHandleInput(Class *cl, Object *obj, struct gpInput *gpi)
+static IPTR WBVirtual__GM_HANDLEINPUT(Class *cl, Object *obj, struct gpInput *gpi)
 {
     struct wbVirtual *my = INST_DATA(cl, obj);
     struct gpInput m;
@@ -301,20 +301,20 @@ static IPTR WBVirtualHandleInput(Class *cl, Object *obj, struct gpInput *gpi)
     return DoMethodA(my->Gadget, (Msg)&m);
 }
 
-static IPTR dispatcher(Class *cl, Object *obj, Msg msg)
+static IPTR WBVirtual_dispatcher(Class *cl, Object *obj, Msg msg)
 {
     IPTR rc = 0;
 
     switch (msg->MethodID) {
-    case OM_NEW:     rc = WBVirtualNew(cl, obj, (APTR)msg); break;
-    case OM_GET:     rc = WBVirtualGet(cl, obj, (APTR)msg); break;
-    case OM_SET:     // fallthrough
-    case OM_UPDATE:  rc = WBVirtualSetUpdate(cl, obj, (APTR)msg); break;
-    case GM_RENDER:  rc = WBVirtualRender(cl, obj, (APTR)msg); break;
-    case GM_HITTEST: rc = WBVirtualHitTest(cl, obj, (APTR)msg); break;
-    case GM_GOACTIVE: rc = WBVirtualGoActive(cl, obj, (APTR)msg); break;
-    case GM_GOINACTIVE: rc = WBVirtualGoInactive(cl, obj, (APTR)msg); break;
-    case GM_HANDLEINPUT: rc = WBVirtualHandleInput(cl, obj, (APTR)msg); break;
+    METHOD_CASE(WBVirtual, OM_NEW);
+    METHOD_CASE(WBVirtual, OM_GET);
+    case OM_UPDATE:     // fallthrough
+    METHOD_CASE(WBVirtual, OM_SET);
+    METHOD_CASE(WBVirtual, GM_RENDER);
+    METHOD_CASE(WBVirtual, GM_HITTEST);
+    METHOD_CASE(WBVirtual, GM_GOACTIVE);
+    METHOD_CASE(WBVirtual, GM_GOINACTIVE);
+    METHOD_CASE(WBVirtual, GM_HANDLEINPUT);
     default:        rc = DoSuperMethodA(cl, obj, msg); break;
     }
 
@@ -330,7 +330,7 @@ Class *WBVirtual_MakeClass(struct WorkbookBase *wb)
                     0);
     if (cl != NULL) {
         cl->cl_Dispatcher.h_Entry = HookEntry;
-        cl->cl_Dispatcher.h_SubEntry = dispatcher;
+        cl->cl_Dispatcher.h_SubEntry = WBVirtual_dispatcher;
         cl->cl_Dispatcher.h_Data = NULL;
         cl->cl_UserData = (IPTR)wb;
     }

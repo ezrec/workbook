@@ -21,7 +21,7 @@
 
 /* Methods */
 #define WBAM_Dummy               (TAG_USER | 0x40400100)
-#define WBAM_WORKBENCH           (WBAM_Dummy+1)
+#define WBAM_Workbench           (WBAM_Dummy+1)
 
 Class *WBApp_MakeClass(struct WorkbookBase *wb);
 
@@ -51,12 +51,12 @@ Class *WBApp_MakeClass(struct WorkbookBase *wb);
 
 /* Methods */
 #define WBWM_Dummy               (TAG_USER | 0x40410100)
-#define WBWM_NEWSIZE             (WBWM_Dummy+1)  /* N/A */
-#define WBWM_MENUPICK            (WBWM_Dummy+2)  /* struct wbwm_MenuPick {} */
-#define WBWM_INTUITICK           (WBWM_Dummy+3)  /* N/A */
-#define WBWM_HIDE                (WBWM_Dummy+4)  /* N/A */
-#define WBWM_SHOW                (WBWM_Dummy+5)  /* N/A */
-#define WBWM_REFRESH             (WBWM_Dummy+6)  /* N/A */
+#define WBWM_NewSize             (WBWM_Dummy+1)  /* N/A */
+#define WBWM_MenuPick            (WBWM_Dummy+2)  /* struct wbwm_MenuPick {} */
+#define WBWM_IntuiTick           (WBWM_Dummy+3)  /* N/A */
+#define WBWM_Hide                (WBWM_Dummy+4)  /* N/A */
+#define WBWM_Show                (WBWM_Dummy+5)  /* N/A */
+#define WBWM_Refresh             (WBWM_Dummy+6)  /* N/A */
 
 struct wbwm_MenuPick {
     STACKED ULONG             MethodID;
@@ -103,8 +103,8 @@ Class *WBVirtual_MakeClass(struct WorkbookBase *wb);
 
 /* Methods */
 #define WBSM_Dummy               (TAG_USER | 0x40430100)
-#define WBSM_SELECT              (WBSM_Dummy + 1)
-#define WBSM_CLEAN_UP            (WBSM_Dummy + 2)
+#define WBSM_Select              (WBSM_Dummy + 1)
+#define WBSM_Clean_Up            (WBSM_Dummy + 2)
 
 struct wbsm_Select {
     STACKED ULONG MethodID;

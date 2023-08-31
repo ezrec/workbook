@@ -53,7 +53,7 @@ static void wbOpenDrawer(Class *cl, Object *obj, CONST_STRPTR path)
 }
 
 // OM_NEW
-static IPTR WBAppNew(Class *cl, Object *obj, struct opSet *ops)
+static IPTR WBApp__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbApp *my;
@@ -104,7 +104,7 @@ static IPTR WBAppNew(Class *cl, Object *obj, struct opSet *ops)
 }
 
 // OM_DISPOSE
-static IPTR WBAppDispose(Class *cl, Object *obj, Msg msg)
+static IPTR WBApp__OM_DISPOSE(Class *cl, Object *obj, Msg msg)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbApp *my = INST_DATA(cl, obj);
@@ -129,7 +129,7 @@ static IPTR WBAppDispose(Class *cl, Object *obj, Msg msg)
 }
 
 // OM_ADDMEMBER
-static IPTR WBAppAddMember(Class *cl, Object *obj, struct opMember *opm)
+static IPTR WBApp__OM_ADDMEMBER(Class *cl, Object *obj, struct opMember *opm)
 {
     struct wbApp *my = INST_DATA(cl, obj);
 
@@ -137,7 +137,7 @@ static IPTR WBAppAddMember(Class *cl, Object *obj, struct opMember *opm)
 }
 
 // OM_REMMEMBER
-static IPTR WBAppRemMember(Class *cl, Object *obj, struct opMember *opm)
+static IPTR WBApp__OM_REMMEMBER(Class *cl, Object *obj, struct opMember *opm)
 {
     return DoMethod(opm->opam_Object, OM_REMOVE);
 }
@@ -172,7 +172,7 @@ static void wbRefreshWindow(Class *cl, Object *obj, struct Window *win)
 
     if ((owin = wbLookupWindow(cl, obj, win))) {
         STACKED ULONG wbrefmethodID;
-        wbrefmethodID = WBWM_REFRESH;
+        wbrefmethodID = WBWM_Refresh;
         DoMethodA(owin, (Msg)&wbrefmethodID);
     }
 }
@@ -183,7 +183,7 @@ static void wbNewSizeWindow(Class *cl, Object *obj, struct Window *win)
 
     if ((owin = wbLookupWindow(cl, obj, win))) {
         STACKED ULONG wbnewsmethodID;
-        wbnewsmethodID = WBWM_NEWSIZE;
+        wbnewsmethodID = WBWM_NewSize;
         DoMethodA(owin, (Msg)&wbnewsmethodID);
     }
 }
@@ -247,7 +247,7 @@ static BOOL wbMenuPick(Class *cl, Object *obj, struct Window *win, UWORD menuNum
         if (owin)
         {
             struct wbwm_MenuPick wbmpmsg;
-            wbmpmsg.MethodID = WBWM_MENUPICK;
+            wbmpmsg.MethodID = WBWM_MenuPick;
             wbmpmsg.wbwmp_MenuItem = item;
             wbmpmsg.wbwmp_MenuNumber = menuNumber;
             handled = DoMethodA(owin, (Msg)&wbmpmsg);
@@ -317,7 +317,7 @@ static void wbIntuiTick(Class *cl, Object *obj, struct Window *win)
 
     if ((owin = wbLookupWindow(cl, obj, win))) {
         STACKED ULONG wbintuitmethodID;
-        wbintuitmethodID = WBWM_INTUITICK;
+        wbintuitmethodID = WBWM_IntuiTick;
         DoMethodA(owin, (Msg)&wbintuitmethodID);
     }
 }
@@ -330,7 +330,7 @@ static void wbHideAllWindows(Class *cl, Object *obj)
     Object *owin;
 
     while ((owin = NextObject(&ostate))) {
-        DoMethod(owin, WBWM_HIDE);
+        DoMethod(owin, WBWM_Hide);
     }
 }
 
@@ -342,7 +342,7 @@ static void wbShowAllWindows(Class *cl, Object *obj)
     Object *owin;
 
     while ((owin = NextObject(&ostate))) {
-        DoMethod(owin, WBWM_SHOW);
+        DoMethod(owin, WBWM_Show);
     }
 }
 
@@ -359,8 +359,8 @@ static void wbCloseAllWindows(Class *cl, Object *obj)
     }
 }
 
-// WBAM_WORKBENCH - Register and handle all workbench events
-static IPTR WBAppWorkbench(Class *cl, Object *obj, Msg msg)
+// WBAM_Workbench - Register and handle all workbench events
+static IPTR WBApp__WBAM_Workbench(Class *cl, Object *obj, Msg msg)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbApp *my = INST_DATA(cl, obj);
@@ -409,11 +409,11 @@ static IPTR WBAppWorkbench(Class *cl, Object *obj, Msg msg)
                     wbCloseWindow(cl, obj, im->IDCMPWindow);
                     break;
                 case IDCMP_REFRESHWINDOW:
-                    /* call WBWM_REFRESH on the window */
+                    /* call WBWM_Refresh on the window */
                     wbRefreshWindow(cl, obj, im->IDCMPWindow);
                     break;
                 case IDCMP_NEWSIZE:
-                    /* call WBWM_NEWSIZE on the window */
+                    /* call WBWM_NewSize on the window */
                     wbNewSizeWindow(cl, obj, im->IDCMPWindow);
                     break;
                 case IDCMP_MENUPICK:
@@ -439,16 +439,16 @@ static IPTR WBAppWorkbench(Class *cl, Object *obj, Msg msg)
     return FALSE;
 }
 
-static IPTR dispatcher(Class *cl, Object *obj, Msg msg)
+static IPTR WBApp_dispatcher(Class *cl, Object *obj, Msg msg)
 {
     IPTR rc = 0;
 
     switch (msg->MethodID) {
-    case OM_NEW:       rc = WBAppNew(cl, obj, (APTR)msg); break;
-    case OM_DISPOSE:   rc = WBAppDispose(cl, obj, (APTR)msg); break;
-    case OM_ADDMEMBER: rc = WBAppAddMember(cl, obj, (APTR)msg); break;
-    case OM_REMMEMBER: rc = WBAppRemMember(cl, obj, (APTR)msg); break;
-    case WBAM_WORKBENCH:rc = WBAppWorkbench(cl, obj, (APTR)msg); break;
+    METHOD_CASE(WBApp, OM_NEW);
+    METHOD_CASE(WBApp, OM_DISPOSE);
+    METHOD_CASE(WBApp, OM_ADDMEMBER);
+    METHOD_CASE(WBApp, OM_REMMEMBER);
+    METHOD_CASE(WBApp, WBAM_Workbench);
     default:           rc = DoSuperMethodA(cl, obj, msg); break;
     }
 
@@ -464,7 +464,7 @@ Class *WBApp_MakeClass(struct WorkbookBase *wb)
                     0);
     if (cl != NULL) {
         cl->cl_Dispatcher.h_Entry = HookEntry;
-        cl->cl_Dispatcher.h_SubEntry = dispatcher;
+        cl->cl_Dispatcher.h_SubEntry = WBApp_dispatcher;
         cl->cl_Dispatcher.h_Data = NULL;
         cl->cl_UserData = (IPTR)wb;
     }

@@ -448,7 +448,7 @@ static void wbFixBorders(struct Window *win)
 }
 
 // OM_NEW
-static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
+static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbWindow *my;
@@ -599,7 +599,7 @@ static IPTR WBWindowNew(Class *cl, Object *obj, struct opSet *ops)
                 TAG_END)), 0);
 
     /* Send first intuitick */
-    DoMethod(obj, WBWM_INTUITICK);
+    DoMethod(obj, WBWM_IntuiTick);
 
     my->Menu = CreateMenusA((struct NewMenu *)WBWindow_menu, NULL);
     if (my->Menu == NULL) {
@@ -702,7 +702,7 @@ error:
     return 0;
 }
 
-static IPTR WBWindowDispose(Class *cl, Object *obj, Msg msg)
+static IPTR WBWindow__OM_DISPOSE(Class *cl, Object *obj, Msg msg)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbWindow *my = INST_DATA(cl, obj);
@@ -759,7 +759,7 @@ static IPTR WBWindowDispose(Class *cl, Object *obj, Msg msg)
 }
 
 // OM_GET
-static IPTR WBWindowGet(Class *cl, Object *obj, struct opGet *opg)
+static IPTR WBWindow__OM_GET(Class *cl, Object *obj, struct opGet *opg)
 {
     struct wbWindow *my = INST_DATA(cl, obj);
     IPTR rc = TRUE;
@@ -780,7 +780,7 @@ static IPTR WBWindowGet(Class *cl, Object *obj, struct opGet *opg)
 }
 
 // OM_UPDATE
-static IPTR WBWindowUpdate(Class *cl, Object *obj, struct opUpdate *opu)
+static IPTR WBWindow__OM_UPDATE(Class *cl, Object *obj, struct opUpdate *opu)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbWindow *my = INST_DATA(cl, obj);
@@ -820,8 +820,8 @@ static IPTR WBWindowUpdate(Class *cl, Object *obj, struct opUpdate *opu)
     return rc;
 }
 
-// WBWM_NEWSIZE
-static IPTR WBWindowNewSize(Class *cl, Object *obj, Msg msg)
+// WBWM_NewSize
+static IPTR WBWindow__WBWM_NewSize(Class *cl, Object *obj, Msg msg)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbWindow *my = INST_DATA(cl, obj);
@@ -836,7 +836,7 @@ static IPTR WBWindowNewSize(Class *cl, Object *obj, Msg msg)
     return 0;
 }
 
-static IPTR WBWindowRefresh(Class *cl, Object *obj, Msg msg)
+static IPTR WBWindow__WBWM_Refresh(Class *cl, Object *obj, Msg msg)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbWindow *my = INST_DATA(cl, obj);
@@ -863,7 +863,7 @@ static void NewCLI(Class *cl, Object *obj)
     SetWindowPointer(my->Window, WA_BusyPointer, FALSE, TAG_END);
 }
 
-static IPTR WBWindowSnapshot(Class *cl, Object *obj, BOOL all)
+static IPTR wbWindowSnapshot(Class *cl, Object *obj, BOOL all)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbWindow *my = INST_DATA(cl, obj);
@@ -899,7 +899,7 @@ static IPTR WBWindowSnapshot(Class *cl, Object *obj, BOOL all)
     return 0;
 }
 
-static IPTR WBWindowForSelectedIcons(Class *cl, Object *obj, IPTR MethodID)
+static IPTR wbWindowForSelectedIcons(Class *cl, Object *obj, IPTR MethodID)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbWindow *my = INST_DATA(cl, obj);
@@ -918,8 +918,8 @@ static IPTR WBWindowForSelectedIcons(Class *cl, Object *obj, IPTR MethodID)
     return rc;
 }
 
-// WBWM_MENUPICK
-static IPTR WBWindowMenuPick(Class *cl, Object *obj, struct wbwm_MenuPick *wbwmp)
+// WBWM_MenuPick
+static IPTR WBWindow__WBWM_MenuPick(Class *cl, Object *obj, struct wbwm_MenuPick *wbwmp)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbWindow *my = INST_DATA(cl, obj);
@@ -938,21 +938,21 @@ static IPTR WBWindowMenuPick(Class *cl, Object *obj, struct wbwm_MenuPick *wbwmp
         }
         break;
     case WBMENU_ID(WBMENU_WN_SELECT_CONTENTS):
-        DoGadgetMethod((struct Gadget *)my->Set, my->Window, NULL, (IPTR)WBSM_SELECT, NULL, (IPTR)TRUE);
+        DoGadgetMethod((struct Gadget *)my->Set, my->Window, NULL, (IPTR)WBSM_Select, NULL, (IPTR)TRUE);
         rc = 0;
         break;
     case WBMENU_ID(WBMENU_WN_CLEAN_UP):
-        DoGadgetMethod((struct Gadget *)my->Set, my->Window, NULL, (IPTR)WBSM_CLEAN_UP, NULL);
+        DoGadgetMethod((struct Gadget *)my->Set, my->Window, NULL, (IPTR)WBSM_Clean_Up, NULL);
         rc = 0;
         break;
     case WBMENU_ID(WBMENU_WN_UPDATE):
         rc = WBIM_REFRESH;
         break;
     case WBMENU_ID(WBMENU_WN__SNAP_WINDOW):
-        rc = WBWindowSnapshot(cl, obj, FALSE);
+        rc = wbWindowSnapshot(cl, obj, FALSE);
         break;
     case WBMENU_ID(WBMENU_WN__SNAP_ALL):
-        rc = WBWindowSnapshot(cl, obj, TRUE);
+        rc = wbWindowSnapshot(cl, obj, TRUE);
         break;
     case WBMENU_ID(WBMENU_WN__SHOW_ICONS):
         my->dd_Flags = DDFLAGS_SHOWICONS;
@@ -966,37 +966,37 @@ static IPTR WBWindowMenuPick(Class *cl, Object *obj, struct wbwm_MenuPick *wbwmp
         NewCLI(cl, obj);
         break;
     case WBMENU_ID(WBMENU_IC_OPEN):
-        rc = WBWindowForSelectedIcons(cl, obj, WBIM_Open);
+        rc = wbWindowForSelectedIcons(cl, obj, WBIM_Open);
         break;
     case WBMENU_ID(WBMENU_IC_COPY):
-        rc = WBWindowForSelectedIcons(cl, obj, WBIM_Copy);
+        rc = wbWindowForSelectedIcons(cl, obj, WBIM_Copy);
         break;
     case WBMENU_ID(WBMENU_IC_RENAME):
-        rc = WBWindowForSelectedIcons(cl, obj, WBIM_Rename);
+        rc = wbWindowForSelectedIcons(cl, obj, WBIM_Rename);
         break;
     case WBMENU_ID(WBMENU_IC_INFO):
-        rc = WBWindowForSelectedIcons(cl, obj, WBIM_Info);
+        rc = wbWindowForSelectedIcons(cl, obj, WBIM_Info);
         break;
     case WBMENU_ID(WBMENU_IC_SNAPSHOT):
-        rc = WBWindowForSelectedIcons(cl, obj, WBIM_Snapshot);
+        rc = wbWindowForSelectedIcons(cl, obj, WBIM_Snapshot);
         break;
     case WBMENU_ID(WBMENU_IC_UNSNAPSHOT):
-        rc = WBWindowForSelectedIcons(cl, obj, WBIM_Unsnapshot);
+        rc = wbWindowForSelectedIcons(cl, obj, WBIM_Unsnapshot);
         break;
     case WBMENU_ID(WBMENU_IC_LEAVE_OUT):
-        rc = WBWindowForSelectedIcons(cl, obj, WBIM_Leave_Out);
+        rc = wbWindowForSelectedIcons(cl, obj, WBIM_Leave_Out);
         break;
     case WBMENU_ID(WBMENU_IC_PUT_AWAY):
-        rc = WBWindowForSelectedIcons(cl, obj, WBIM_Put_Away);
+        rc = wbWindowForSelectedIcons(cl, obj, WBIM_Put_Away);
         break;
     case WBMENU_ID(WBMENU_IC_DELETE):
-        rc = WBWindowForSelectedIcons(cl, obj, WBIM_Delete);
+        rc = wbWindowForSelectedIcons(cl, obj, WBIM_Delete);
         break;
     case WBMENU_ID(WBMENU_IC_FORMAT):
-        rc = WBWindowForSelectedIcons(cl, obj, WBIM_Format);
+        rc = wbWindowForSelectedIcons(cl, obj, WBIM_Format);
         break;
     case WBMENU_ID(WBMENU_IC_EMPTY_TRASH):
-        rc = WBWindowForSelectedIcons(cl, obj, WBIM_Empty_Trash);
+        rc = wbWindowForSelectedIcons(cl, obj, WBIM_Empty_Trash);
         break;
     default:
         rc = 0;
@@ -1010,8 +1010,8 @@ static IPTR WBWindowMenuPick(Class *cl, Object *obj, struct wbwm_MenuPick *wbwmp
     return rc;
 }
 
-// WBWM_INTUITICK
-static IPTR WBWindowIntuiTick(Class *cl, Object *obj, Msg msg)
+// WBWM_IntuiTick
+static IPTR WBWindow__WBWM_IntuiTick(Class *cl, Object *obj, Msg msg)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbWindow *my = INST_DATA(cl, obj);
@@ -1056,19 +1056,19 @@ static IPTR WBWindowIntuiTick(Class *cl, Object *obj, Msg msg)
     return rc;
 }
 
-static IPTR dispatcher(Class *cl, Object *obj, Msg msg)
+static IPTR WBWindow_dispatcher(Class *cl, Object *obj, Msg msg)
 {
     IPTR rc = 0;
 
     switch (msg->MethodID) {
-    case OM_NEW:         rc = WBWindowNew(cl, obj, (APTR)msg); break;
-    case OM_DISPOSE:     rc = WBWindowDispose(cl, obj, (APTR)msg); break;
-    case OM_GET:         rc = WBWindowGet(cl, obj, (APTR)msg); break;
-    case OM_UPDATE:      rc = WBWindowUpdate(cl, obj, (APTR)msg); break;
-    case WBWM_NEWSIZE:   rc = WBWindowNewSize(cl, obj, (APTR)msg); break;
-    case WBWM_MENUPICK:  rc = WBWindowMenuPick(cl, obj, (APTR)msg); break;
-    case WBWM_INTUITICK: rc = WBWindowIntuiTick(cl, obj, (APTR)msg); break;
-    case WBWM_REFRESH:   rc = WBWindowRefresh(cl, obj, (APTR)msg); break;
+    METHOD_CASE(WBWindow, OM_NEW);
+    METHOD_CASE(WBWindow, OM_DISPOSE);
+    METHOD_CASE(WBWindow, OM_GET);
+    METHOD_CASE(WBWindow, OM_UPDATE);
+    METHOD_CASE(WBWindow, WBWM_NewSize);
+    METHOD_CASE(WBWindow, WBWM_MenuPick);
+    METHOD_CASE(WBWindow, WBWM_IntuiTick);
+    METHOD_CASE(WBWindow, WBWM_Refresh);
     default:             rc = DoSuperMethodA(cl, obj, msg); break;
     }
 
@@ -1084,7 +1084,7 @@ Class *WBWindow_MakeClass(struct WorkbookBase *wb)
                     0);
     if (cl != NULL) {
         cl->cl_Dispatcher.h_Entry = HookEntry;
-        cl->cl_Dispatcher.h_SubEntry = dispatcher;
+        cl->cl_Dispatcher.h_SubEntry = WBWindow_dispatcher;
         cl->cl_Dispatcher.h_Data = NULL;
         cl->cl_UserData = (IPTR)wb;
     }

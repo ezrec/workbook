@@ -126,7 +126,7 @@ static void wbIcon_Update(Class *cl, Object *obj)
 }
 
 // OM_NEW
-static IPTR wbIconNew(Class *cl, Object *obj, struct opSet *ops)
+static IPTR WBIcon__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my;
@@ -184,7 +184,7 @@ error:
 }
 
 // OM_DISPOSE
-static IPTR wbIconDispose(Class *cl, Object *obj, Msg msg)
+static IPTR WBIcon__OM_DISPOSE(Class *cl, Object *obj, Msg msg)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
@@ -214,7 +214,7 @@ static IPTR wbIconDispose(Class *cl, Object *obj, Msg msg)
 }
 
 // OM_GET
-static IPTR wbIconGet(Class *cl, Object *obj, struct opGet *opg)
+static IPTR WBIcon__OM_GET(Class *cl, Object *obj, struct opGet *opg)
 {
     struct wbIcon *my = INST_DATA(cl, obj);
     IPTR rc = TRUE;
@@ -244,7 +244,7 @@ static void wbGABox(Object *obj, struct IBox *box)
 }
 
 // OM_SET
-static IPTR wbIconSet(Class *cl, Object *obj, struct opSet *ops)
+static IPTR WBIcon__OM_SET(Class *cl, Object *obj, struct opSet *ops)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
@@ -271,7 +271,7 @@ static IPTR wbIconSet(Class *cl, Object *obj, struct opSet *ops)
 }
 
 // GM_RENDER
-static IPTR wbIconRender(Class *cl, Object *obj, struct gpRender *gpr)
+static IPTR WBIcon__GM_RENDER(Class *cl, Object *obj, struct gpRender *gpr)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
@@ -380,7 +380,7 @@ static void wbIconToggleSelected(Class *cl, Object *obj, struct GadgetInfo *gi, 
         SetAttrs(obj, GA_Selected, FALSE, TAG_END);
 
         if (my->Set) {
-            DoMethod(my->Set, WBSM_SELECT, gi, (IPTR)FALSE);
+            DoMethod(my->Set, WBSM_Select, gi, (IPTR)FALSE);
         }
     }
 
@@ -395,7 +395,7 @@ static void wbIconToggleSelected(Class *cl, Object *obj, struct GadgetInfo *gi, 
 }
 
 // GM_HITTEST
-static IPTR wbIconHitTest(Class *cl, Object *obj, struct gpHitTest *gpht) {
+static IPTR WBIcon__GM_HITTEST(Class *cl, Object *obj, struct gpHitTest *gpht) {
     struct wbIcon *my = INST_DATA(cl, obj);
 
     IPTR rc = 0;
@@ -409,7 +409,7 @@ static IPTR wbIconHitTest(Class *cl, Object *obj, struct gpHitTest *gpht) {
 }
 
 // GM_GOACTIVE
-static IPTR wbIconGoActive(Class *cl, Object *obj, struct gpInput *gpi)
+static IPTR WBIcon__GM_GOACTIVE(Class *cl, Object *obj, struct gpInput *gpi)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
@@ -429,7 +429,7 @@ static IPTR wbIconGoActive(Class *cl, Object *obj, struct gpInput *gpi)
 }
 
 // GM_HANDLEINPUT
-static IPTR wbIconHandleInput(Class *cl, Object *obj, struct gpInput *gpi)
+static IPTR WBIcon__GM_HANDLEINPUT(Class *cl, Object *obj, struct gpInput *gpi)
 {
     struct wbIcon *my = INST_DATA(cl, obj);
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
@@ -499,7 +499,7 @@ static IPTR wbIconHandleInput(Class *cl, Object *obj, struct gpInput *gpi)
 }
 
 // WBIM_Open
-static IPTR wbIconOpen(Class *cl, Object *obj, Msg msg)
+static IPTR WBIcon__WBIM_Open(Class *cl, Object *obj, Msg msg)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
@@ -517,7 +517,7 @@ static IPTR wbIconOpen(Class *cl, Object *obj, Msg msg)
 }
 
 // WBIM_Copy
-static IPTR wbIconCopy(Class *cl, Object *obj, Msg msg)
+static IPTR WBIcon__WBIM_Copy(Class *cl, Object *obj, Msg msg)
 {
     return 0;
 }
@@ -589,7 +589,7 @@ static IPTR rename_action(struct WorkbookBase *wb, CONST_STRPTR input, APTR arg)
 }
 
 // WBIM_Rename
-static IPTR wbIconRename(Class *cl, Object *obj, Msg msg)
+static IPTR WBIcon__WBIM_Rename(Class *cl, Object *obj, Msg msg)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
@@ -612,7 +612,7 @@ static IPTR wbIconRename(Class *cl, Object *obj, Msg msg)
 }
 
 // WBIM_Info
-static IPTR wbIconInfo(Class *cl, Object *obj, Msg msg)
+static IPTR WBIcon__WBIM_Info(Class *cl, Object *obj, Msg msg)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
@@ -632,7 +632,7 @@ static IPTR wbIconInfo(Class *cl, Object *obj, Msg msg)
 }
 
 // WBIM_Snapshot
-static IPTR wbIconSnapshot(Class *cl, Object *obj, Msg msg)
+static IPTR WBIcon__WBIM_Snapshot(Class *cl, Object *obj, Msg msg)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
@@ -648,7 +648,7 @@ static IPTR wbIconSnapshot(Class *cl, Object *obj, Msg msg)
 }
 
 // WBIM_Unsnapshot
-static IPTR wbIconUnsnapshot(Class *cl, Object *obj, Msg msg)
+static IPTR WBIcon__WBIM_Unsnapshot(Class *cl, Object *obj, Msg msg)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
@@ -662,25 +662,25 @@ static IPTR wbIconUnsnapshot(Class *cl, Object *obj, Msg msg)
 }
 
 // WBIM_Leave_Out
-static IPTR wbIconLeaveOut(Class *cl, Object *obj, Msg msg)
+static IPTR WBIcon__WBIM_Leave_Out(Class *cl, Object *obj, Msg msg)
 {
     return 0;
 }
 
 // WBIM_Put_Away
-static IPTR wbIconPutAway(Class *cl, Object *obj, Msg msg)
+static IPTR WBIcon__WBIM_Put_Away(Class *cl, Object *obj, Msg msg)
 {
     return 0;
 }
 
 // WBIM_Delete
-static IPTR wbIconDelete(Class *cl, Object *obj, Msg msg)
+static IPTR WBIcon__WBIM_Delete(Class *cl, Object *obj, Msg msg)
 {
     return 0;
 }
 
 // WBwbwiAppendIM_Format
-static IPTR wbIconFormat(Class *cl, Object *obj, Msg msg)
+static IPTR WBIcon__WBIM_Format(Class *cl, Object *obj, Msg msg)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
@@ -705,36 +705,36 @@ static IPTR wbIconFormat(Class *cl, Object *obj, Msg msg)
 }
 
 // WBIM_Empty_Trash
-static IPTR wbIconEmptyTrash(Class *cl, Object *obj, Msg msg)
+static IPTR WBIcon__WBIM_Empty_Trash(Class *cl, Object *obj, Msg msg)
 {
     return 0;
 }
 
-static IPTR dispatcher(Class *cl, Object *obj, Msg msg)
+static IPTR WBIcon_dispatcher(Class *cl, Object *obj, Msg msg)
 {
     IPTR rc = 0;
 
     _D(bug("WBIcon: dispatch 0x%lx\n", msg->MethodID));
     switch (msg->MethodID) {
-    case OM_NEW:           rc = wbIconNew(cl, obj, (APTR)msg); break;
-    case OM_DISPOSE:       rc = wbIconDispose(cl, obj, (APTR)msg); break;
-    case OM_GET:           rc = wbIconGet(cl, obj, (APTR)msg); break;
-    case OM_SET:           rc = wbIconSet(cl, obj, (APTR)msg); break;
-    case GM_RENDER:        rc = wbIconRender(cl, obj, (APTR)msg); break;
-    case GM_HITTEST:       rc = wbIconHitTest(cl, obj, (APTR)msg); break;
-    case GM_GOACTIVE:      rc = wbIconGoActive(cl, obj, (APTR)msg); break;
-    case GM_HANDLEINPUT:   rc = wbIconHandleInput(cl, obj, (APTR)msg); break;
-    case WBIM_Open:        rc = wbIconOpen(cl, obj, msg); break;
-    case WBIM_Copy:        rc = wbIconCopy(cl, obj, msg); break;
-    case WBIM_Rename:      rc = wbIconRename(cl, obj, msg); break;
-    case WBIM_Info:        rc = wbIconInfo(cl, obj, msg); break;
-    case WBIM_Snapshot:    rc = wbIconSnapshot(cl, obj, msg); break;
-    case WBIM_Unsnapshot:  rc = wbIconUnsnapshot(cl, obj, msg); break;
-    case WBIM_Leave_Out:   rc = wbIconLeaveOut(cl, obj, msg); break;
-    case WBIM_Put_Away:    rc = wbIconPutAway(cl, obj, msg); break;
-    case WBIM_Delete:      rc = wbIconDelete(cl, obj, msg); break;
-    case WBIM_Format:      rc = wbIconFormat(cl, obj, msg); break;
-    case WBIM_Empty_Trash: rc = wbIconEmptyTrash(cl, obj, msg); break;
+    METHOD_CASE(WBIcon, OM_NEW);
+    METHOD_CASE(WBIcon, OM_DISPOSE);
+    METHOD_CASE(WBIcon, OM_GET);
+    METHOD_CASE(WBIcon, OM_SET);
+    METHOD_CASE(WBIcon, GM_RENDER);
+    METHOD_CASE(WBIcon, GM_HITTEST);
+    METHOD_CASE(WBIcon, GM_GOACTIVE);
+    METHOD_CASE(WBIcon, GM_HANDLEINPUT);
+    METHOD_CASE(WBIcon, WBIM_Open);
+    METHOD_CASE(WBIcon, WBIM_Copy);
+    METHOD_CASE(WBIcon, WBIM_Rename);
+    METHOD_CASE(WBIcon, WBIM_Info);
+    METHOD_CASE(WBIcon, WBIM_Snapshot);
+    METHOD_CASE(WBIcon, WBIM_Unsnapshot);
+    METHOD_CASE(WBIcon, WBIM_Leave_Out);
+    METHOD_CASE(WBIcon, WBIM_Put_Away);
+    METHOD_CASE(WBIcon, WBIM_Delete);
+    METHOD_CASE(WBIcon, WBIM_Format);
+    METHOD_CASE(WBIcon, WBIM_Empty_Trash);
     default:               rc = DoSuperMethodA(cl, obj, msg); break;
     }
 
@@ -750,7 +750,7 @@ Class *WBIcon_MakeClass(struct WorkbookBase *wb)
                     0);
     if (cl != NULL) {
         cl->cl_Dispatcher.h_Entry = HookEntry;
-        cl->cl_Dispatcher.h_SubEntry = dispatcher;
+        cl->cl_Dispatcher.h_SubEntry = WBIcon_dispatcher;
         cl->cl_Dispatcher.h_Data = NULL;
         cl->cl_UserData = (IPTR)wb;
     }
