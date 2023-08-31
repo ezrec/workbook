@@ -442,58 +442,59 @@ static IPTR WBApp__WBAM_Workbench(Class *cl, Object *obj, Msg msg)
 
             if (mask & my->AppMask) {
                 struct WBHandlerMessage *wbhm;
-                wbhm = (APTR)GetMsg(my->AppPort);
+                while ((wbhm = (APTR)GetMsg(my->AppPort)) != NULL) {
+                    switch (wbhm->wbhm_Type) {
+                    case WBHM_TYPE_SHOW:
+                        /* Show all windows */
+                        wbShowAllWindows(cl, obj);
+                        break;
+                    case WBHM_TYPE_HIDE:
+                        /* Hide all windows */
+                        wbHideAllWindows(cl, obj);
+                        break;
+                    case WBHM_TYPE_OPEN:
+                        /* Open a drawer */
+                        wbOpenDrawer(cl, obj, wbhm->wbhm_Data.Open.Name);
+                        break;
+                    case WBHM_TYPE_UPDATE:
+                        /* Refresh an open window/object */
+                        break;
+                    }
 
-                switch (wbhm->wbhm_Type) {
-                case WBHM_TYPE_SHOW:
-                    /* Show all windows */
-                    wbShowAllWindows(cl, obj);
-                    break;
-                case WBHM_TYPE_HIDE:
-                    /* Hide all windows */
-                    wbHideAllWindows(cl, obj);
-                    break;
-                case WBHM_TYPE_OPEN:
-                    /* Open a drawer */
-                    wbOpenDrawer(cl, obj, wbhm->wbhm_Data.Open.Name);
-                    break;
-                case WBHM_TYPE_UPDATE:
-                    /* Refresh an open window/object */
-                    break;
+                    ReplyMsg((APTR)wbhm);
                 }
-
-                ReplyMsg((APTR)wbhm);
             }
 
             if (mask & my->WinMask) {
                 struct IntuiMessage *im;
 
-                im = GT_GetIMsg(my->WinPort);
-                switch (im->Class) {
-                case IDCMP_CLOSEWINDOW:
-                    /* Dispose the window */
-                    wbCloseWindow(cl, obj, im->IDCMPWindow);
-                    break;
-                case IDCMP_REFRESHWINDOW:
-                    /* call WBWM_Refresh on the window */
-                    wbRefreshWindow(cl, obj, im->IDCMPWindow);
-                    break;
-                case IDCMP_NEWSIZE:
-                    /* call WBWM_NewSize on the window */
-                    wbNewSizeWindow(cl, obj, im->IDCMPWindow);
-                    break;
-                case IDCMP_MENUPICK:
-                    done = wbMenuPick(cl, obj, im->IDCMPWindow, im->Code);
-                    break;
-                case IDCMP_INTUITICKS:
-                    wbIntuiTick(cl, obj, im->IDCMPWindow);
-                    break;
-                default:
-                    D(bug("im=%p, Class=%ld, Code=%ld\n", im, im->Class, im->Code));
-                    break;
-                }
+                while ((im = GT_GetIMsg(my->WinPort)) != NULL) {
+                    switch (im->Class) {
+                    case IDCMP_CLOSEWINDOW:
+                        /* Dispose the window */
+                        wbCloseWindow(cl, obj, im->IDCMPWindow);
+                        break;
+                    case IDCMP_REFRESHWINDOW:
+                        /* call WBWM_Refresh on the window */
+                        wbRefreshWindow(cl, obj, im->IDCMPWindow);
+                        break;
+                    case IDCMP_NEWSIZE:
+                        /* call WBWM_NewSize on the window */
+                        wbNewSizeWindow(cl, obj, im->IDCMPWindow);
+                        break;
+                    case IDCMP_MENUPICK:
+                        done = wbMenuPick(cl, obj, im->IDCMPWindow, im->Code);
+                        break;
+                    case IDCMP_INTUITICKS:
+                        wbIntuiTick(cl, obj, im->IDCMPWindow);
+                        break;
+                    default:
+                        D(bug("im=%p, Class=%ld, Code=%ld\n", im, im->Class, im->Code));
+                        break;
+                    }
 
-                GT_ReplyIMsg(im);
+                    GT_ReplyIMsg(im);
+                }
             }
         }
 
