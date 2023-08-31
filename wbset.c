@@ -45,7 +45,7 @@ static void wbGABox(Object *obj, struct IBox *box)
 }
 
 // OM_ADDMEMBER
-static IPTR WBSetAddMember(Class *cl, Object *obj, struct opMember *opm)
+static IPTR WBSet__OM_ADDMEMBER(Class *cl, Object *obj, struct opMember *opm)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     Object *iobj = opm->opam_Object;
@@ -71,7 +71,7 @@ static IPTR WBSetAddMember(Class *cl, Object *obj, struct opMember *opm)
     return DoSuperMethodA(cl, obj, (Msg)opm);
 }
 
-static IPTR WBSetRemMember(Class *cl, Object *obj, struct opMember *opm)
+static IPTR WBSet__OM_REMMEMBER(Class *cl, Object *obj, struct opMember *opm)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     Object *iobj = opm->opam_Object;
@@ -97,7 +97,7 @@ static IPTR WBSetRemMember(Class *cl, Object *obj, struct opMember *opm)
 }
 
 // OM_NEW
-static IPTR WBSetNew(Class *cl, Object *obj, struct opSet *ops)
+static IPTR WBSet__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbSet *my;
@@ -116,7 +116,7 @@ static IPTR WBSetNew(Class *cl, Object *obj, struct opSet *ops)
     return rc;
 }
 
-static ULONG WBSetSelectedCount(struct WorkbookBase *wb, struct wbSet *my)
+static ULONG wbSetSelectedCount(struct WorkbookBase *wb, struct wbSet *my)
 {
     struct wbSetNode *node, *next;
     ULONG count = 0;
@@ -132,7 +132,7 @@ static ULONG WBSetSelectedCount(struct WorkbookBase *wb, struct wbSet *my)
     return count;
  }
 
-static IPTR WBSetGet(Class *cl, Object *obj, struct opGet *opg)
+static IPTR WBSet__OM_GET(Class *cl, Object *obj, struct opGet *opg)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbSet *my = INST_DATA(cl, obj);
@@ -143,7 +143,7 @@ static IPTR WBSetGet(Class *cl, Object *obj, struct opGet *opg)
         *(opg->opg_Storage) = (IPTR)my->MemberCount;
         break;
     case WBSA_SelectedCount:
-        *(opg->opg_Storage) = (IPTR)WBSetSelectedCount(wb, my);
+        *(opg->opg_Storage) = (IPTR)wbSetSelectedCount(wb, my);
         break;
     default:
         rc = DoSuperMethodA(cl, obj, (Msg)opg);
@@ -154,7 +154,7 @@ static IPTR WBSetGet(Class *cl, Object *obj, struct opGet *opg)
 }
 
 // OM_DISPOSE
-static IPTR WBSetDispose(Class *cl, Object *obj, Msg msg)
+static IPTR WBSet__OM_DISPOSE(Class *cl, Object *obj, Msg msg)
 {
     struct wbSet *my = INST_DATA(cl, obj);
     struct wbSetNode *node, *next;
@@ -168,8 +168,8 @@ static IPTR WBSetDispose(Class *cl, Object *obj, Msg msg)
     return DoSuperMethodA(cl, obj, msg);
 }
 
-// WBSM_SELECT
-static IPTR WBSetSelect(Class *cl, Object *obj, struct wbsm_Select *wbss)
+// WBSM_Select
+static IPTR WBSet__WBSM_Select(Class *cl, Object *obj, struct wbsm_Select *wbss)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbSet *my = INST_DATA(cl, obj);
@@ -188,8 +188,8 @@ static IPTR WBSetSelect(Class *cl, Object *obj, struct wbsm_Select *wbss)
     return 0;
 }
 
-// WBSM_CLEAN_UP
-static IPTR WBSetCleanUp(Class *cl, Object *obj, struct wbsm_CleanUp *wbscu)
+// WBSM_Clean_Up
+static IPTR WBSet__WBSM_Clean_Up(Class *cl, Object *obj, struct wbsm_CleanUp *wbscu)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbSet *my = INST_DATA(cl, obj);
@@ -203,7 +203,7 @@ static IPTR WBSetCleanUp(Class *cl, Object *obj, struct wbsm_CleanUp *wbscu)
     return DoMethod(obj, GM_RENDER, wbscu->wbscu_GInfo, NULL, (IPTR)GREDRAW_REDRAW);
 }
 
-static IPTR WBSetRender(Class *cl, Object *obj, struct gpRender *gpr)
+static IPTR WBSet__GM_RENDER(Class *cl, Object *obj, struct gpRender *gpr)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbSet *my = INST_DATA(cl, obj);
@@ -299,7 +299,7 @@ static IPTR WBSetRender(Class *cl, Object *obj, struct gpRender *gpr)
 
 
 
-static IPTR dispatcher(Class *cl, Object *obj, Msg msg)
+static IPTR WBSet_dispatcher(Class *cl, Object *obj, Msg msg)
 {
     IPTR rc = 0;
 
@@ -308,14 +308,14 @@ static IPTR dispatcher(Class *cl, Object *obj, Msg msg)
     }
 
     switch (msg->MethodID) {
-    case OM_NEW:        rc = WBSetNew(cl, obj, (APTR)msg); break;
-    case OM_DISPOSE:    rc = WBSetDispose(cl, obj, (APTR)msg); break;
-    case OM_GET:        rc = WBSetGet(cl, obj, (APTR)msg); break;
-    case OM_ADDMEMBER:  rc = WBSetAddMember(cl, obj, (APTR)msg); break;
-    case OM_REMMEMBER:  rc = WBSetRemMember(cl, obj, (APTR)msg); break;
-    case GM_RENDER:     rc = WBSetRender(cl, obj, (APTR)msg); break;
-    case WBSM_SELECT:   rc = WBSetSelect(cl, obj, (APTR)msg); break;
-    case WBSM_CLEAN_UP: rc = WBSetCleanUp(cl, obj, (APTR)msg); break;
+    METHOD_CASE(WBSet, OM_NEW);
+    METHOD_CASE(WBSet, OM_DISPOSE);
+    METHOD_CASE(WBSet, OM_GET);
+    METHOD_CASE(WBSet, OM_ADDMEMBER);
+    METHOD_CASE(WBSet, OM_REMMEMBER);
+    METHOD_CASE(WBSet, GM_RENDER);
+    METHOD_CASE(WBSet, WBSM_Select);
+    METHOD_CASE(WBSet, WBSM_Clean_Up);
     default:            rc = DoSuperMethodA(cl, obj, msg); break;
     }
 
@@ -331,7 +331,7 @@ Class *WBSet_MakeClass(struct WorkbookBase *wb)
                     0);
     if (cl != NULL) {
         cl->cl_Dispatcher.h_Entry = HookEntry;
-        cl->cl_Dispatcher.h_SubEntry = dispatcher;
+        cl->cl_Dispatcher.h_SubEntry = WBSet_dispatcher;
         cl->cl_Dispatcher.h_Data = NULL;
         cl->cl_UserData = (IPTR)wb;
     }

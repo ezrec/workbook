@@ -42,7 +42,7 @@ static int WB_Main(struct WorkbookBase *wb)
     wb->wb_App = NewObject(WBApp, NULL, TAG_END);
     if (wb->wb_App) {
         STACKED ULONG wbmethodID;
-        wbmethodID = WBAM_WORKBENCH;
+        wbmethodID = WBAM_Workbench;
         DoMethodA(wb->wb_App, (Msg)&wbmethodID);
         DisposeObject(wb->wb_App);
         rc = 0;
