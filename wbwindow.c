@@ -491,9 +491,11 @@ static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
                 TAG_END);
 
     idcmp = IDCMP_MENUPICK | IDCMP_INTUITICKS;
+    struct MsgPort *userport = (struct MsgPort *)GetTagData(WBWA_UserPort, (IPTR)NULL, ops->ops_AttrList);
+
     if (my->Path == NULL) {
         my->Window = OpenWindowTags(NULL,
-                        WA_IDCMP, 0,
+                        WA_IDCMP, userport ? 0 : idcmp,
                         WA_Backdrop,    TRUE,
                         WA_WBenchWindow, TRUE,
                         WA_Borderless,  TRUE,
@@ -530,7 +532,7 @@ static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
 
         idcmp |= IDCMP_NEWSIZE | IDCMP_CLOSEWINDOW;
         my->Window = OpenWindowTags(nwin,
-                        WA_IDCMP, 0,
+                        WA_IDCMP, userport ? 0 : idcmp,
                         WA_MinWidth, 100,
                         WA_MinHeight, 100,
                         WA_MaxWidth, ~0,
@@ -563,8 +565,10 @@ static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
         goto error;
 
     /* If we want a shared port, do it. */
-    my->Window->UserPort = (struct MsgPort *)GetTagData(WBWA_UserPort, (IPTR)NULL, ops->ops_AttrList);
-    ModifyIDCMP(my->Window, idcmp);
+    if (userport && idcmp) {
+        my->Window->UserPort = userport;
+        ModifyIDCMP(my->Window, idcmp);
+    }
 
     /* The gadgets' layout will be performed during wbRedimension
      */
