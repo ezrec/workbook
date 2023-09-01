@@ -5,3 +5,4 @@ tags
 *.o
 *.i
 release.zip
+*.swp
