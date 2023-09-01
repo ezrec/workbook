@@ -2,7 +2,7 @@
 
 Copy to SYS:System/Workbook
 
-- Unreleased
+- v1.7
   - Reduce rendering done when selecting/deselecting icons.
   - Fix issue where only one drawer icon opened when multiple are selected.
   - Ensure all selected icons are affected by Icon menu commands, not just ones in the current window.
