@@ -95,5 +95,7 @@ VOID wbPopupIoErr(struct WorkbookBase *wb, CONST_STRPTR title, LONG ioerr, CONST
 struct Region *wbClipWindow(struct WorkbookBase *wb, struct Window *win);
 void wbUnclipWindow(struct WorkbookBase *wb, struct Window *win, struct Region *clip);
 ULONG WorkbookMain(void);
+void wbDebugReportSelected_(struct WorkbookBase *wb, CONST_STRPTR caller);
+#define wbDebugReportSelected(wb) wbDebugReportSelected_(wb, __func__)
 
 #endif /* WORKBOOK_H */

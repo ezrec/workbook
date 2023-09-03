@@ -329,6 +329,62 @@ static IPTR WBApp__WBAM_ClearSelected(Class *cl, Object *obj, Msg msg)
     return 0;
 }
 
+// Report selections (as a WBOPENA_* tag list)
+static IPTR WBApp__WBAM_ReportSelected(Class *cl, Object *obj, struct wbam_ReportSelected *wbamr)
+{
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbApp *my = INST_DATA(cl, obj);
+
+    ULONG total_tags = 0;
+
+    Object *ostate;
+    Object *owin;
+
+    // Count all children
+    ostate = (Object *)my->Windows.mlh_Head;
+    while ((owin = NextObject(&ostate)) != NULL) {
+        IPTR rc = DoMethod(owin, WBWM_ReportSelected, NULL);
+        D(bug("%s: %lx => %ld tags\n", __func__, owin, rc));
+        // Account for the TAG_END at the end of the report.
+        total_tags += rc - 1;
+    }
+    total_tags++;
+
+    D(bug("%s: %ld total tags\n", __func__, total_tags));
+
+    // Did they just want to know how big the report was?
+    if (wbamr->wbamr_ReportTags == NULL) {
+        return total_tags;
+    }
+
+    // Allocate the data to send back.
+    struct TagItem *ti = AllocateTagItems(total_tags);
+
+    ULONG index = 0;
+    // Add all children
+    ostate = (Object *)my->Windows.mlh_Head;
+    while ((owin = NextObject(&ostate)) != NULL) {
+        struct TagItem *ti_ptr = NULL;
+        IPTR rc = DoMethod(owin, WBWM_ReportSelected, &ti_ptr);
+        D(bug("%s: %lx => %ld tags\n", __func__, owin, rc));
+        for (IPTR n = 0; n < rc; n++, index++) {
+            ti[index] = ti_ptr[n];
+        }
+        // Account for the TAG_END at the end of the report.
+        index--;
+        FreeVec(ti_ptr);
+    }
+
+    ti[index++].ti_Tag = TAG_END;
+
+    D(bug("%s: %ld reported tags\n", __func__, index));
+
+    D(if (index != total_tags) bug("%s: Expected %ld tags, got %ld tags!!!!\n", __func__, total_tags, index));
+
+    *(wbamr->wbamr_ReportTags) = ti;
+
+    return total_tags;
+}
 
 static BOOL wbMenuPick(Class *cl, Object *obj, struct Window *win, UWORD menuNumber)
 {
@@ -607,6 +663,7 @@ static IPTR WBApp_dispatcher(Class *cl, Object *obj, Msg msg)
     METHOD_CASE(WBApp, WBAM_Workbench);
     METHOD_CASE(WBApp, WBAM_ForSelected);
     METHOD_CASE(WBApp, WBAM_ClearSelected);
+    METHOD_CASE(WBApp, WBAM_ReportSelected);
     default:           rc = DoSuperMethodA(cl, obj, msg); break;
     }
 

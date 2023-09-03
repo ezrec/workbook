@@ -11,11 +11,13 @@
 #include <proto/graphics.h>
 #include <proto/intuition.h>
 #include <proto/layers.h>
+#include <proto/utility.h>
 
 #include <libraries/gadtools.h>
 #include <intuition/sghooks.h>
 
 #include "workbook_intern.h"
+#include "classes.h"
 
 struct Region *wbClipWindow(struct WorkbookBase *wb, struct Window *win)
 {
@@ -323,3 +325,44 @@ VOID wbPopupIoErr(struct WorkbookBase *wb, CONST_STRPTR title, LONG ioerr, CONST
     EasyRequest(0, &es, 0, buff);
 }
 
+// Report all currently selected items.
+void wbDebugReportSelected_(struct WorkbookBase *wb, CONST_STRPTR caller)
+{
+    struct TagItem *args = NULL;
+    STRPTR path = AllocVec(PATH_MAX, MEMF_ANY);
+
+    ULONG arg_count = DoMethod(wb->wb_App, WBAM_ReportSelected, (IPTR)&args);
+
+    if (arg_count == 0) {
+        D(bug("%s: Failure to get selected items.\n", caller));
+        return;
+    }
+
+    struct TagItem *ti, *tlist = args;
+    ULONG index = 0;
+    while ((ti = NextTagItem(&tlist)) != NULL) {
+        switch (ti->ti_Tag) {
+        case WBOPENA_ArgLock:
+            if ((BPTR)ti->ti_Data == BNULL) {
+                D(bug("%s: [%ld] { WBOPENA_ArgLock, [BPTR](BNULL) },\n", caller, index));
+            } else if (NameFromLock((BPTR)ti->ti_Data, path, PATH_MAX)) {
+                D(bug("%s: [%ld] { WBOPENA_ArgLock, [BPTR]\"%s\" },\n", caller, index, path));
+            } else {
+                D(bug("%s: [%ld] { WBOPENA_ArgLock, [BPTR](%lx) },\n", caller, index, (BPTR)ti->ti_Data));
+            }
+            break;
+        case WBOPENA_ArgName:
+            D(bug("%s: [%ld] { WBOPENA_ArgName, \"%s\"  },\n", caller, index, (CONST_STRPTR)ti->ti_Data));
+            break;
+        default:
+            D(bug("%s: [%ld] { 0x%lx, 0x%lx  },\n", caller, index, ti->ti_Tag, ti->ti_Data));
+            break;
+        }
+	index++;
+    }
+    D(bug("%s: [%ld] { TAG_END },\n", caller, index));
+
+    FreeTagItems(args);
+
+    FreeVec(path);
+}

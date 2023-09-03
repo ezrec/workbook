@@ -981,6 +981,63 @@ static IPTR WBWindow__WBWM_ForSelected(Class *cl, Object *obj, struct wbwm_ForSe
     return count;
 }
 
+static IPTR WBWindow__WBWM_ReportSelected(Class *cl, Object *obj, struct wbwm_ReportSelected *wbwmr)
+{
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbWindow *my = INST_DATA(cl, obj);
+    struct wbWindow_Icon *wbwi;
+
+    ULONG count = 0;
+
+    ForeachNode(&my->IconList, wbwi) {
+        IPTR selected = FALSE;
+        GetAttr(GA_Selected, wbwi->wbwiObject, &selected);
+        if (selected) {
+            count++;
+        }
+    }
+
+    ULONG total_tags = 0;
+
+    if (count == 0) {
+        total_tags = 1;  // TAG_END only
+    } else {
+        total_tags = 1 /* WBOPENA_ArgLock */ + count /* WBOPENA_ArgName */ + 1 /* TAG_END */;
+    }
+
+    D(bug("%s: %ld total tags\n", __func__, total_tags));
+
+    if (wbwmr->wbwmr_ReportTags == NULL) {
+        return total_tags;
+    }
+
+    struct TagItem *ti = AllocateTagItems(total_tags);
+    if (ti == NULL) {
+        return 0;
+    }
+
+    ULONG index = 0;
+    if (count > 0) {
+        ti[index++] = (struct TagItem){ WBOPENA_ArgLock, (IPTR)my->Lock };
+        ForeachNode(&my->IconList, wbwi) {
+            IPTR selected = FALSE;
+            GetAttr(GA_Selected, wbwi->wbwiObject, &selected);
+            if (selected) {
+                CONST_STRPTR file;
+                GetAttr(WBIA_File, wbwi->wbwiObject, (IPTR *)&file);
+                ti[index++] = (struct TagItem){ WBOPENA_ArgName, (IPTR)file };
+            }
+        }
+    }
+    ti[index++] = (struct TagItem){ TAG_END };
+
+    D(bug("%s: %ld reported tags\n", __func__, index));
+    D(if (index != total_tags) bug("%s: FATAL: %ld expected, but got %ld items!\n", __func__, total_tags, index));
+
+    *(wbwmr->wbwmr_ReportTags) = ti;
+
+    return total_tags;
+}
 
 // WBWM_MenuPick
 static IPTR WBWindow__WBWM_MenuPick(Class *cl, Object *obj, struct wbwm_MenuPick *wbwmp)
@@ -1113,6 +1170,7 @@ static IPTR WBWindow_dispatcher(Class *cl, Object *obj, Msg msg)
     METHOD_CASE(WBWindow, WBWM_ForSelected);
     METHOD_CASE(WBWindow, WBWM_InvalidateContents);
     METHOD_CASE(WBWindow, WBWM_CacheContents);
+    METHOD_CASE(WBWindow, WBWM_ReportSelected);
     default:             rc = DoSuperMethodA(cl, obj, msg); break;
     }
 
