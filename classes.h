@@ -25,10 +25,20 @@
 #define WBAM_Workbench           (WBAM_Dummy+0)
 #define WBAM_ForSelected         (WBAM_Dummy+1)         // Coerce message for all selected items, in Task context.
 #define WBAM_ClearSelected       (WBAM_Dummy+2)         // Clear all selections.
+#define WBAM_ReportSelected      (WBAM_Dummy+3)         // Get a report of selected items, using WBOPENA_* tags
 
 struct wbam_ForSelected {
     STACKED ULONG             MethodID;
     STACKED Msg               wbamf_Msg;   // Message to send to all selected icons
+};
+
+struct wbam_ReportSelected {
+    STACKED ULONG   MethodID;
+    STACKED struct TagItem **wbamr_ReportTags;  // Referenced pointer will set to a list of WBOPENA_* tags.
+                                                // Set this to a pointer to (struct TagItem *) NULL to start.
+                                                // NOTE: This memory must be freed by FreeTagItems()
+                                                //       *BEFORE* any changes to the icon selection states!
+                                                // The list will contain WBOPENA_ArgLock and WBOPENA_ArgName sets.
 };
 
 Class *WBApp_MakeClass(struct WorkbookBase *wb);
@@ -66,6 +76,7 @@ Class *WBApp_MakeClass(struct WorkbookBase *wb);
 #define WBWM_ForSelected         (WBWM_Dummy+6)  /* Msg */
 #define WBWM_InvalidateContents  (WBWM_Dummy+7)  /* N/A */
 #define WBWM_CacheContents       (WBWM_Dummy+8)  /* N/A */
+#define WBWM_ReportSelected      (WBWM_Dummy+9)  /* struct wbwm_ReportSelected */
 
 struct wbwm_MenuPick {
     STACKED ULONG             MethodID;
@@ -76,6 +87,11 @@ struct wbwm_MenuPick {
 struct wbwm_ForSelected {
     STACKED ULONG             MethodID;
     STACKED Msg               wbwmf_Msg;    // Msg to send to all selected icons in the window.
+};
+
+struct wbwm_ReportSelected {
+    STACKED ULONG             MethodID;
+    STACKED struct TagItem  **wbwmr_ReportTags; // Must be freed with FreeTagItems() after success
 };
 
 Class *WBWindow_MakeClass(struct WorkbookBase *wb);
