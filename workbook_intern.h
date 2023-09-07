@@ -11,7 +11,7 @@
 #define WB_NAME     Workbook
 #endif
 #ifndef WB_ABOUT
-#define WB_ABOUT     Copyright © 2023 The AROS Project
+#define WB_ABOUT     Copyright © 2023 The Aros Project
 #endif
 #ifndef WB_VERSION
 #define WB_VERSION      1
@@ -34,9 +34,11 @@
 #include <intuition/classes.h>
 #include <intuition/intuition.h>
 
-#ifndef __AROS__
+#ifdef __AROS__
+#include "workbook_aros.h"
+#else
 #include "workbook_vbcc.h"
-#endif // !__AROS__
+#endif
 
 #define METHOD_CASE(name, id)   case id: rc = name##__##id(cl, obj, (APTR)msg); break
 

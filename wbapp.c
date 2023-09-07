@@ -214,7 +214,16 @@ static void wbAbout(Class *cl, Object *obj, struct Window *win)
        .es_GadgetFormat = "Ok",
     };
 
-    EasyRequest(0, &es, 0, WB_VERSION, WB_REVISION, (IPTR)AS_STRING(WB_ABOUT));
+    struct {
+	    ULONG version;
+	    ULONG revision;
+	    CONST_STRPTR about;
+    } args = {
+	    WB_VERSION,
+	    WB_REVISION,
+	    AS_STRING(WB_ABOUT),
+    };
+    EasyRequestArgs(0, &es, 0, (RAWARG)&args);
 }
 
 static IPTR execute_command(struct WorkbookBase *wb, CONST_STRPTR command, APTR dummy) {
@@ -252,8 +261,12 @@ static IPTR WBApp__WBAM_ForSelected(Class *cl, Object *obj, struct wbam_ForSelec
 
 #ifdef __AROS__
 #define wbAppForSelected(cl, obj, ...) ({ \
-    IPTR  msg[] = { WBAM_ForSelected, AROS_PP_VARIADIC_CAST2IPTR(__VA_ARGS__) }; \
-    IPTR rc = WBApp__WBAM_ForSelected(cl, obj, (APTR)msg);\
+    IPTR  msg[] = { AROS_PP_VARIADIC_CAST2IPTR(__VA_ARGS__) }; \
+    struct wbam_ForSelected wbamf = { \
+        .MethodID = WBAM_ForSelected, \
+	.wbamf_Msg = (Msg)msg, \
+	}; \
+    IPTR rc = WBApp__WBAM_ForSelected(cl, obj, &wbamf);\
     rc; })
 #else
 static IPTR wbAppForSelected(Class *cl, Object *obj, ULONG method, ...)

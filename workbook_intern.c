@@ -7,9 +7,10 @@
  */
 
 #include <proto/dos.h>
-#include <proto/graphics.h>
-#include <proto/layers.h>
 #include <proto/gadtools.h>
+#include <proto/graphics.h>
+#include <proto/intuition.h>
+#include <proto/layers.h>
 
 #include <libraries/gadtools.h>
 #include <intuition/sghooks.h>
@@ -49,7 +50,7 @@ void wbUnclipWindow(struct WorkbookBase *wb, struct Window *win, struct Region *
 static ULONG _wbPopupActionHook(struct Hook *hook, struct SGWork *sgw, ULONG *msg)
 {
     CONST_STRPTR forbidden = (CONST_STRPTR)hook->h_Data;
-    ULONG rc = ~0UL;
+    ULONG rc = ~(ULONG)0;
 
     D(bug("msg: 0x%lx, op: 0x%lx, code: %lc\n", *msg, sgw->EditOp, sgw->Code));
     switch (*msg) {
@@ -147,7 +148,7 @@ IPTR wbPopupAction(struct WorkbookBase *wb,
     struct Hook input_hook = {
         .h_Entry = HookEntry,
         .h_SubEntry = _wbPopupActionHook,
-        .h_Data = forbidden,
+        .h_Data = (void *)forbidden,
     };
 
     // Create an input field for the command

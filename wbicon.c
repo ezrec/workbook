@@ -224,20 +224,10 @@ static IPTR WBIcon__OM_GET(Class *cl, Object *obj, struct opGet *opg)
     return rc;
 }
 
-static void wbGABox(Object *obj, struct IBox *box)
-{
-    struct Gadget *gadget = (struct Gadget *)obj;
-    box->Top = gadget->TopEdge;
-    box->Left = gadget->LeftEdge;
-    box->Width = gadget->Width;
-    box->Height = gadget->Height;
-}
-
 // OM_SET
 static IPTR WBIcon__OM_SET(Class *cl, Object *obj, struct opSet *ops)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
-    struct wbIcon *my = INST_DATA(cl, obj);
     struct TagItem *tags = ops->ops_AttrList;
     struct TagItem *ti;
 
@@ -298,7 +288,6 @@ static IPTR WBIcon__GM_RENDER(Class *cl, Object *obj, struct gpRender *gpr)
 static BOOL wbIconToggleSelected(Class *cl, Object *obj, struct GadgetInfo *gi, UWORD qualifier)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
-    struct wbIcon *my = INST_DATA(cl, obj);
     IPTR count = 0;
 
     // Toggle selection
@@ -395,9 +384,7 @@ static IPTR WBIcon__GM_GOACTIVE(Class *cl, Object *obj, struct gpInput *gpi)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
-    struct Gadget *gadget = (struct Gadget *)obj;
     IPTR rc = GMR_NOREUSE;
-
 
     /* On a double-click, don't go 'active', just
      * do the action.
@@ -435,10 +422,7 @@ static IPTR WBIcon__GM_GOACTIVE(Class *cl, Object *obj, struct gpInput *gpi)
 // GM_HANDLEINPUT
 static IPTR WBIcon__GM_HANDLEINPUT(Class *cl, Object *obj, struct gpInput *gpi)
 {
-    struct wbIcon *my = INST_DATA(cl, obj);
-    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct InputEvent *iev = gpi->gpi_IEvent;
-    struct Gadget *gadget = (struct Gadget *)obj;
 
     IPTR rc = GMR_MEACTIVE;
 
@@ -466,14 +450,13 @@ static IPTR WBIcon__WBIM_Open(Class *cl, Object *obj, Msg msg)
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
 
-    struct Process *proc;
-    proc = CreateNewProcTags(
+    CreateNewProcTags(
             NP_Name, (IPTR)my->File,
             NP_Seglist, (IPTR)wb->wb_OpenerSegList,
             NP_Arguments,   (IPTR)my->File,
             NP_FreeSeglist, (IPTR)FALSE,
             TAG_END);
-    D(bug("WBIcon.Open: %s (0x%lx)\n", my->File, (IPTR)proc));
+    D(bug("WBIcon.Open: %s\n", my->File));
 
     return 0;
 }
@@ -544,7 +527,7 @@ static IPTR rename_action(struct WorkbookBase *wb, CONST_STRPTR input, APTR arg)
     }
 
     if (!ok) {
-        wbPopupIoErr(wb, "Rename", IoErr(), my->File);
+        wbPopupIoErr(wb, title, IoErr(), my->File);
     }
 
     return ok;
@@ -651,7 +634,7 @@ static IPTR WBIcon__WBIM_Format(Class *cl, Object *obj, Msg msg)
     BOOL ok = FALSE;
     if (OpenWorkbenchObject("SYS:System/Format",
                 WBOPENA_ArgLock, lock,
-                WBOPENA_ArgName, (lock != BNULL) ? "" : my->File,
+                WBOPENA_ArgName, (lock != BNULL) ? (CONST_STRPTR)"" : (CONST_STRPTR)my->File,
                 TAG_END)) {
         ok = TRUE;
     } else {
