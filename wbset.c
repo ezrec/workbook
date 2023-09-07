@@ -47,7 +47,6 @@ static void wbGABox(Object *obj, struct IBox *box)
 // OM_ADDMEMBER
 static IPTR WBSet__OM_ADDMEMBER(Class *cl, Object *obj, struct opMember *opm)
 {
-    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     Object *iobj = opm->opam_Object;
     struct IBox ibox;
     struct wbSet *my = INST_DATA(cl, obj);
@@ -70,7 +69,6 @@ static IPTR WBSet__OM_ADDMEMBER(Class *cl, Object *obj, struct opMember *opm)
 
 static IPTR WBSet__OM_REMMEMBER(Class *cl, Object *obj, struct opMember *opm)
 {
-    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     Object *iobj = opm->opam_Object;
     struct wbSet *my = INST_DATA(cl, obj);
     struct wbSetNode *node, *next;
@@ -93,7 +91,6 @@ static IPTR WBSet__OM_REMMEMBER(Class *cl, Object *obj, struct opMember *opm)
 // OM_NEW
 static IPTR WBSet__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
 {
-    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbSet *my;
     IPTR rc;
 
@@ -185,7 +182,6 @@ static IPTR WBSet__WBSM_Select(Class *cl, Object *obj, struct wbsm_Select *wbss)
 // WBSM_Clean_Up
 static IPTR WBSet__WBSM_Clean_Up(Class *cl, Object *obj, struct wbsm_CleanUp *wbscu)
 {
-    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbSet *my = INST_DATA(cl, obj);
     struct wbSetNode *node, *next;
 
@@ -218,9 +214,6 @@ static IPTR WBSet__GM_RENDER(Class *cl, Object *obj, struct gpRender *gpr)
 
     // Re-arrange anything that needs to be.
     WORD CurrRight, CurrBottom;
-    /* First, remove all autoobjects from the superclass */
-    BOOL render = FALSE;
-    struct MinList floating;
 
     // Remove members that are not fixed nor arranged.
     ForeachNode(&my->SetObjects, node) {
