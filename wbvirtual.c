@@ -32,7 +32,6 @@ struct wbVirtual {
 
 static BOOL wbvRedimension(Class *cl, Object *obj, struct GadgetInfo *gi, WORD vwidth, WORD vheight)
 {
-    D(struct WorkbookBase *wb = (APTR)cl->cl_UserData);
     struct wbVirtual *my = INST_DATA(cl, obj);
     struct Gadget *gadget = (struct Gadget *)obj;
     BOOL rc = FALSE;

@@ -3,8 +3,10 @@
 
 #pragma once
 
+#include <limits.h>
 #include <aros/debug.h>
 #include <intuition/cghooks.h>
+#include <clib/alib_protos.h>
 #include <clib/arossupport_protos.h>
 
 static inline LONG STRLEN(CONST_STRPTR s)

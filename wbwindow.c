@@ -23,6 +23,7 @@
 #include <proto/layers.h>
 #include <proto/icon.h>
 
+#include <dos/dostags.h>
 #include <intuition/classusr.h>
 #include <libraries/gadtools.h>
 
@@ -210,7 +211,7 @@ static void wbwiAppend(Class *cl, Object *obj, Object *iobj)
         /* Insert in Alpha order */
         ForeachNode(&my->IconList, tmp) {
             if (wbwiIconCmp(cl, obj, tmp->wbwiObject, wbwi->wbwiObject) == 0) {
-                D(bug("%s: Duplicated icon in '%s'\n", my->Path));
+                D(bug("%s: Duplicated icon in '%s'\n", __func__, my->Path));
                 DisposeObject(iobj);
                 return;
             }

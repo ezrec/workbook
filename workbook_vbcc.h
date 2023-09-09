@@ -10,6 +10,7 @@
 #include <clib/alib_protos.h>
 #include <clib/debug_protos.h>
 
+#include <exec/alerts.h>
 #include <exec/execbase.h>
 
 #define PATH_MAX 1024
