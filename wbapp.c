@@ -112,6 +112,8 @@ static IPTR WBApp__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
         return 0;
     }
 
+    DoMethod(my->Root, OM_ADDTAIL, &my->Windows);
+
     return rc;
 }
 
@@ -131,8 +133,6 @@ static IPTR WBApp__OM_DISPOSE(Class *cl, Object *obj, Msg msg)
         DisposeObject(obj);
     }
 
-    /* Get rid of the main window */
-    DisposeObject(my->Root);
 
     DeleteMsgPort(my->AppPort);
     DeleteMsgPort(my->WinPort);
@@ -155,6 +155,7 @@ static IPTR WBApp__OM_REMMEMBER(Class *cl, Object *obj, struct opMember *opm)
 }
 
 
+// Find WBWindow object, given a Window pointer.
 static Object *wbLookupWindow(Class *cl, Object *obj, struct Window *win)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
@@ -164,15 +165,12 @@ static Object *wbLookupWindow(Class *cl, Object *obj, struct Window *win)
     struct Window *match = NULL;
 
     /* Is it the root window? */
-    GetAttr(WBWA_Window, my->Root, (IPTR *)&match);
-    if (match == win)
-        return my->Root;
-
     while ((owin = NextObject(&ostate))) {
         match = NULL;
         GetAttr(WBWA_Window, owin, (IPTR *)&match);
-        if (match == win)
+        if (match == win) {
             return owin;
+        }
     }
 
     return NULL;
@@ -258,15 +256,24 @@ static IPTR WBApp__WBAM_ForSelected(Class *cl, Object *obj, struct wbam_ForSelec
     Object *ostate = (Object *)my->Windows.mlh_Head;
     Object *owin;
 
-    // Broadcast to Root window
-    IPTR rc = DoMethod(my->Root, WBWM_ForSelected, wbamf->wbamf_Msg);
+    D(bug("%s: MethodID: 0x%08lx\n", __func__, wbamf->wbamf_Msg->MethodID));
 
     // Broadcast to all child windows.
+    IPTR rc = 0;
     while ((owin = NextObject(&ostate)) != NULL) {
         IPTR count;
         count = DoMethod(owin, WBWM_ForSelected, wbamf->wbamf_Msg);
+        D(
+                IPTR path;
+                GetAttr(WBWA_Path, owin, &path);
+                bug("%s: selected: %s(%ld)\n", __func__, (CONST_STRPTR)path, (IPTR)count);
+        );
+        if (count) {
+            DoMethod(owin, WBWM_Refresh);
+        }
         rc += count;
     }
+    D(bug("\n"));
 
     return rc;
 }
@@ -316,7 +323,7 @@ static BOOL wbMenuPick(Class *cl, Object *obj, struct Window *win, UWORD menuNum
 
     owin = wbLookupWindow(cl, obj, win);
 
-    D(bug("Menu: %lx\n", menuNumber));
+    D(bug("Menu: %lx\n", (IPTR)menuNumber));
     while (menuNumber != MENUNULL) {
         ULONG handled = FALSE;
 
@@ -490,6 +497,7 @@ static IPTR WBApp__WBAM_Workbench(Class *cl, Object *obj, Msg msg)
             if (mask & my->AppMask) {
                 struct WBHandlerMessage *wbhm;
                 while ((wbhm = (APTR)GetMsg(my->AppPort)) != NULL) {
+                    D(bug("%s: AppPort Msg %lx\n", __func__, (IPTR)wbhm->wbhm_Type));
                     switch (wbhm->wbhm_Type) {
                     case WBHM_TYPE_SHOW:
                         /* Show all windows */
@@ -536,7 +544,7 @@ static IPTR WBApp__WBAM_Workbench(Class *cl, Object *obj, Msg msg)
                         wbIntuiTick(cl, obj, im->IDCMPWindow);
                         break;
                     default:
-                        D(bug("im=%p, Class=%ld, Code=%ld\n", im, im->Class, im->Code));
+                        D(bug("im=%lx, Class=%ld, Code=%ld\n", (IPTR)im, (IPTR)im->Class, (IPTR)im->Code));
                         break;
                     }
 
