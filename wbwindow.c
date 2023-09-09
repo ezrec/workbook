@@ -295,25 +295,6 @@ static void wbAddVolumeIcons(Class *cl, Object *obj)
     }
 }
 
-static void wbAddAppIcons(Class *cl, Object *obj)
-{
-    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
-    struct wbWindow *my = INST_DATA(cl, obj);
-    struct DiskObject *icon;
-    char text[FILENAME_MAX];
-
-    /* Add all the AppIcons */
-    icon = NULL;
-    while ((icon = GetNextAppIcon(icon, &text[0]))) {
-        Object *iobj = NewObject(WBIcon, NULL,
-                              WBIA_Icon, icon,
-                              WBIA_Screen, my->Window->WScreen,
-                              TAG_END);
-        if (iobj != NULL)
-            wbwiAppend(cl, obj, iobj);
-    }
-}
-
 static void wbRedimension(Class *cl, Object *obj)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
@@ -403,7 +384,6 @@ static void wbRescan(Class *cl, Object *obj)
     if (my->Lock == BNULL) {
         /* Root window */
         wbAddVolumeIcons(cl, obj);
-        wbAddAppIcons(cl, obj);
     } else {
         /* Directory window */
         wbAddFiles(cl, obj);
