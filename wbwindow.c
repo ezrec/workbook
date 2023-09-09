@@ -918,13 +918,15 @@ static IPTR WBWindow__WBWM_ForSelected(Class *cl, Object *obj, struct wbwm_ForSe
     IPTR count = 0;
     BOOL rescan = FALSE;
 
-    D(bug("%s: send MethodID %lx\n", __func__, wbwmf->wbwmf_Msg->MethodID));
     ForeachNode(&my->IconList, wbwi) {
         IPTR selected = FALSE;
         GetAttr(GA_Selected, wbwi->wbwiObject, &selected);
         if (selected) {
             IPTR rc = DoMethodA(wbwi->wbwiObject, wbwmf->wbwmf_Msg);
-            if (wbwmf->wbwmf_Msg->MethodID == WBIM_Rename && rc == WBIM_REFRESH) {
+            if ((wbwmf->wbwmf_Msg->MethodID == WBIM_Rename ||
+                 wbwmf->wbwmf_Msg->MethodID == WBIM_Copy   ||
+                 wbwmf->wbwmf_Msg->MethodID == WBIM_Delete )
+                && rc == WBIF_REFRESH) {
                 rescan |= TRUE;
             }
             GetAttr(GA_Selected, wbwi->wbwiObject, &selected);
@@ -974,7 +976,7 @@ static IPTR WBWindow__WBWM_MenuPick(Class *cl, Object *obj, struct wbwm_MenuPick
         rc = 0;
         break;
     case WBMENU_ID(WBMENU_WN_UPDATE):
-        rc = WBIM_REFRESH;
+        rc = WBIF_REFRESH;
         break;
     case WBMENU_ID(WBMENU_WN__SNAP_WINDOW):
         rc = wbWindowSnapshot(cl, obj, FALSE);
@@ -984,11 +986,11 @@ static IPTR WBWindow__WBWM_MenuPick(Class *cl, Object *obj, struct wbwm_MenuPick
         break;
     case WBMENU_ID(WBMENU_WN__SHOW_ICONS):
         my->dd_Flags = DDFLAGS_SHOWICONS;
-        rc = WBIM_REFRESH;
+        rc = WBIF_REFRESH;
         break;
     case WBMENU_ID(WBMENU_WN__SHOW_ALL):
         my->dd_Flags = DDFLAGS_SHOWALL;
-        rc = WBIM_REFRESH;
+        rc = WBIF_REFRESH;
         break;
     case WBMENU_ID(WBMENU_WB_SHELL):
         NewCLI(cl, obj);
@@ -998,7 +1000,7 @@ static IPTR WBWindow__WBWM_MenuPick(Class *cl, Object *obj, struct wbwm_MenuPick
         break;
     }
 
-    if (rc & WBIM_REFRESH) {
+    if (rc & WBIF_REFRESH) {
         wbRescan(cl, obj);
     }
 
