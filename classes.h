@@ -18,6 +18,7 @@
 
 /* Attributes */
 #define WBAA_Dummy               (TAG_USER | 0x40400000)
+#define WBAA_Screen              (WBAA_Dummy+0)         // (struct Screen *)
 
 /* Methods */
 #define WBAM_Dummy               (TAG_USER | 0x40400100)
@@ -48,9 +49,10 @@ Class *WBApp_MakeClass(struct WorkbookBase *wb);
 
 /* Attributes (also takes all WA_* tags) */
 #define WBWA_Dummy               (TAG_USER | 0x40410000)
-#define WBWA_Path                (WBWA_Dummy+1)  // (CONST_STRPTR) [OM_NEW, OM_GET]
-#define WBWA_UserPort            (WBWA_Dummy+2)  // (struct MsgPort *) [OM_NEW]
-#define WBWA_Window              (WBWA_Dummy+3)  // (struct Window *) [OM_NEW]
+#define WBWA_Path                (WBWA_Dummy+0)  // (CONST_STRPTR) [OM_NEW, OM_GET]
+#define WBWA_UserPort            (WBWA_Dummy+1)  // (struct MsgPort *) [OM_NEW]
+#define WBWA_Window              (WBWA_Dummy+2)  // (struct Window *) [OM_GET]
+#define WBWA_Screen              (WBWA_Dummy+3)  // (struct Screen *) [OM_NEW]
 
 /* Internal Attributes */
 #define WBWA_ActiveIconID        (WBWA_Dummy+128)

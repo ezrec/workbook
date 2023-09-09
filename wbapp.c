@@ -24,6 +24,7 @@
 #include "classes.h"
 
 struct wbApp {
+    struct Screen  *Screen;
     struct MsgPort *WinPort;
     ULONG           WinMask;   /* Mask of our port(s) */
     struct MsgPort *AppPort;
@@ -44,6 +45,7 @@ static void wbOpenDrawer(Class *cl, Object *obj, CONST_STRPTR path)
     win = NewObject(WBWindow, NULL,
                         WBWA_UserPort, my->WinPort,
                         WBWA_Path, path,
+                        WBWA_Screen, my->Screen,
                         TAG_END);
 
     if (win)
@@ -59,6 +61,12 @@ static IPTR WBApp__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
     struct wbApp *my;
     IPTR rc;
 
+    // Required attributes
+    struct Screen *screen = (struct Screen *)GetTagData(WBAA_Screen, (IPTR)NULL, ops->ops_AttrList);
+    if (screen == NULL) {
+        return 0;
+    }
+
     rc = DoSuperMethodA(cl, obj, (Msg)ops);
     if (rc == 0)
         return 0;
@@ -66,6 +74,9 @@ static IPTR WBApp__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
     my = INST_DATA(cl, rc);
 
     NEWLIST(&my->Windows);
+
+    // Set our screen.
+    my->Screen = screen;
 
     /* Create our Workbench message port */
     my->AppPort = CreatePort(NULL, 0);
@@ -90,6 +101,7 @@ static IPTR WBApp__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
     /* Create our root window */
     my->Root = NewObject(WBWindow, NULL,
                          WBWA_Path, NULL,
+                         WBWA_Screen, my->Screen,
                          WBWA_UserPort, my->WinPort,
                          TAG_END);
 

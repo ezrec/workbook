@@ -39,13 +39,17 @@ static int WB_Main(struct WorkbookBase *wb)
     if (!wb->wb_WBIcon)
         goto exit;
 
-    wb->wb_App = NewObject(WBApp, NULL, TAG_END);
-    if (wb->wb_App) {
-        STACKED ULONG wbmethodID;
-        wbmethodID = WBAM_Workbench;
-        DoMethodA(wb->wb_App, (Msg)&wbmethodID);
-        DisposeObject(wb->wb_App);
-        rc = 0;
+    struct Screen *screen = LockPubScreen(NULL);
+    if (screen) {
+        wb->wb_App = NewObject(WBApp, NULL, WBAA_Screen, screen, TAG_END);
+        if (wb->wb_App) {
+            STACKED ULONG wbmethodID;
+            wbmethodID = WBAM_Workbench;
+            DoMethodA(wb->wb_App, (Msg)&wbmethodID);
+            DisposeObject(wb->wb_App);
+            rc = 0;
+        }
+        UnlockPubScreen(NULL, screen);
     }
 
 exit:
