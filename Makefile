@@ -26,7 +26,7 @@ CFLAGS=+$(VBCC_CONFIG) -g -O0 -DDEBUG=$(DEBUG) \
 LINKOPTS=-L$(AMIGA_NDK)/Include/linker_libs -ldebug -lamigas
 
 HDRS=$(wildcard *.h)
-SRCS=main.c  wbapp.c  wbicon.c  wbset.c  wbvirtual.c  wbwindow.c  workbook.c  workbook_intern.c
+SRCS=main.c  wbapp.c  wbicon.c  wbset.c  wbvirtual.c  wbwindow.c wbcurrent.c workbook.c  workbook_intern.c
 OBJS=$(patsubst %.c,%.o,$(SRCS))
 
 all: Workbook

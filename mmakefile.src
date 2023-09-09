@@ -6,7 +6,7 @@ USER_CPPFLAGS := \
 	       -Wall -Werror \
 	       -D__NOLIBBASE__
 
-FILES := workbook workbook_intern \
+FILES := workbook workbook_intern wbcurrent \
 	 wbapp \
 	 wbwindow \
 	 wbvirtual \
