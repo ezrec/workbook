@@ -36,7 +36,17 @@ static inline VOID bug(CONST_STRPTR format, ...) {
     CONST_STRPTR *args = &format;
     RawDoFmt(format, args + 1, RAWFMTFUNC_SERIAL, NULL);
 }
+#define ASSERT(x) do { \
+    if (!(x)) { bug("%s: assertion (%s) == FALSE", __func__, #x); Alert(AN_Workbench); } \
+} while (0)
+#define ASSERT_VALID_PTR(x) do { ASSERT((IPTR)(x) > 1024); ASSERT(TypeOfMem((APTR)(x)) != 0); } while (0)
+#define ASSERT_VALID_PROCESS(p) do { \
+    ASSERT_VALID_PTR(p); ASSERT(((struct Node *)(p))->ln_Type == NT_PROCESS); \
+} while (0)
 #else
+#define ASSERT(x) while (0) { x; }
+#define ASSERT_VALID_PTR(x) while (0) { (void)(x); }
+#define ASSERT_VALID_PROCESS(x) while (0) { (void)(x); }
 #define D(x)
 #define bug(x,...)
 #endif

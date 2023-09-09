@@ -12,6 +12,7 @@
 #include <proto/icon.h>
 
 #include "workbook_intern.h"
+#include "wbcurrent.h"
 #include "classes.h"
 
 /* Allocate classes and run the main app */
@@ -72,19 +73,36 @@ exit:
 
 /* This wrapper is needed, so that we can start
  * workbench items from an Input handler
+ *
+ * NOTE: The 'ln_Name' is the file to open, assuming pr_CurrentDir is valid.
  */
-static AROS_PROCH(wbOpener, argstr, argsize, SysBase)
+AROS_PROCH(wbOpener, argstr, argsize, SysBase)
 {
     AROS_PROCFUNC_INIT
 
-    APTR WorkbenchBase = OpenLibrary("workbench.library", 0);
-    if (WorkbenchBase) {
-        /* 'argstr' is already an absolute path */
-        D(bug("%s: OpenWorkbenchObject(%s)\n", __func__, argstr));
-        OpenWorkbenchObject(argstr, TAG_END);
-        CloseLibrary(WorkbenchBase);
+    struct Process *proc = (struct Process *)FindTask(NULL);
+    CONST_STRPTR file = proc->pr_Task.tc_Node.ln_Name;
+
+    // Duplicate lock for CurrentDir (as our parent didn't)
+    CurrentDir(DupLock(CurrentDir(BNULL)));
+
+    APTR DOSBase = OpenLibrary("dos.library", 0);
+    if (DOSBase) {
+        // Determine the absolute path for the thing to open.
+        STRPTR abspath = wbAbspathCurrent(DOSBase, file);
+        if (abspath != NULL) {
+            APTR WorkbenchBase = OpenLibrary("workbench.library", 0);
+            if (WorkbenchBase) {
+                /* 'argstr' is already an absolute path */
+                D(bug("%s: OpenWorkbenchObject(%s)\n", __func__, abspath));
+                OpenWorkbenchObject(abspath, TAG_END);
+                CloseLibrary(WorkbenchBase);
+            }
+            D(bug("%s: Close\n", __func__));
+            FreeVec(abspath);
+        }
+        CloseLibrary(DOSBase);
     }
-    D(bug("%s: Close\n", __func__));
 
     return 0;
 
@@ -141,10 +159,6 @@ ULONG WorkbookMain(void)
     if (wb->wb_LayersBase == NULL)
         goto error;
 
-    wb->wb_OpenerSegList = CreateSegList((APTR)wbOpener);
-    if (wb->wb_OpenerSegList == BNULL)
-        goto error;
-
     // Set process and task name to "Workbench", for old AmigaOS tools
     SetProgramName("Workbench");
     struct Task *task = FindTask(NULL);
@@ -156,8 +170,6 @@ ULONG WorkbookMain(void)
 
     // Restore (possibly allocated) task name.
     task->tc_Node.ln_Name = oldName;
-
-    UnLoadSeg(wb->wb_OpenerSegList);
 
 error:
     if (wb) {

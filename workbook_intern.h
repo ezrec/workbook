@@ -59,11 +59,6 @@ struct WorkbookBase {
     Class  *wb_WBSet;
 
     Object *wb_App;
-
-    /* Create a new task that simply OpenWorkbenchObject()'s
-     * it's argment.
-     */
-    BPTR wb_OpenerSegList;
 };
 
 /* FIXME: Remove these #define xxxBase hacks
@@ -82,6 +77,8 @@ extern struct ExecBase *SysBase;
 
 #include <string.h>
 #include <proto/exec.h>
+
+AROS_UFH2(SIPTR, wbOpener, AROS_UFHA(STRPTR, _argptr, A0), AROS_UFHA(ULONG,  _argsize, D0));
 
 typedef IPTR (*wbPopupActionFunc)(struct WorkbookBase *wb, CONST_STRPTR input, APTR arg);
 
