@@ -506,14 +506,16 @@ static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
             goto error;
 
         if (icon->do_DrawerData) {
-            // If we have dd_NewWindow data, don't override the window placement via extra[]
+            // If we have dd_NewWindow data, override the window placement via extra[]
             nwin = &icon->do_DrawerData->dd_NewWindow;
-            D(bug("%s: NewWindow %p\n", __func__, nwin));
-            extra[0].ti_Tag = ops->ops_AttrList == NULL ? TAG_END : TAG_MORE;
-            extra[0].ti_Data = (IPTR)ops->ops_AttrList;
-            extra[1].ti_Tag = TAG_IGNORE;
-            extra[2].ti_Tag = TAG_IGNORE;
-            extra[3].ti_Tag = TAG_IGNORE;
+            if (nwin->Width > 32 && nwin->Height > 32) {
+                D(bug("%s: NewWindow %p\n", __func__, nwin));
+                extra[0].ti_Tag = ops->ops_AttrList == NULL ? TAG_END : TAG_MORE;
+                extra[0].ti_Data = (IPTR)ops->ops_AttrList;
+                extra[1].ti_Tag = TAG_IGNORE;
+                extra[2].ti_Tag = TAG_IGNORE;
+                extra[3].ti_Tag = TAG_IGNORE;
+            }
         }
 
         idcmp |= IDCMP_NEWSIZE | IDCMP_CLOSEWINDOW;
