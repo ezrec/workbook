@@ -23,7 +23,6 @@
 #define AS_STRING(x) _AS_STRING(x)
 
 #ifdef __AROS__
-#include <dos/bptr.h>
 #include <exec/rawfmt.h>
 #include <proto/workbench.h>
 #include <workbench/handler.h>
@@ -31,6 +30,7 @@
 #include <proto/wb.h>
 #include <workbench/icon.h>
 #endif
+#include <proto/dos.h>
 #include <intuition/classes.h>
 #include <intuition/intuition.h>
 

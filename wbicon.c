@@ -398,7 +398,7 @@ static IPTR WBIcon__GM_GOACTIVE(Class *cl, Object *obj, struct gpInput *gpi)
 
     if (dclicked)
     {
-        D(bug("%s: Double-clicked => %lx\n", __func__, wb->wb_App));
+        D(bug("%s: Double-clicked => %lx\n", __func__, (IPTR)wb->wb_App));
 
         // Open all.
         SetAttrs(obj, GA_Selected, TRUE, TAG_END);
