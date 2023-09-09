@@ -532,6 +532,7 @@ static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
                         WA_CloseGadget, TRUE,
                         WA_Activate, TRUE,
                         WA_NewLookMenus, TRUE,
+                        WA_SmartRefresh, TRUE,
                         WA_AutoAdjust, TRUE,
                         WA_PubScreen, NULL,
                         TAG_MORE, (IPTR)&extra[0] );
