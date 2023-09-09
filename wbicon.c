@@ -450,13 +450,12 @@ static IPTR WBIcon__WBIM_Open(Class *cl, Object *obj, Msg msg)
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
 
-    CreateNewProcTags(
+    struct Process *proc = CreateNewProcTags(
             NP_Name, (IPTR)my->File,
-            NP_Seglist, (IPTR)wb->wb_OpenerSegList,
-            NP_Arguments,   (IPTR)my->File,
-            NP_FreeSeglist, (IPTR)FALSE,
+            NP_Entry, (IPTR)wbOpener,
+            NP_CurrentDir, (IPTR)my->ParentLock,
             TAG_END);
-    D(bug("WBIcon.Open: %s\n", my->File));
+    D(bug("WBIcon.Open: %s via %lx\n", my->File, proc));
 
     return 0;
 }
