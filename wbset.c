@@ -31,7 +31,6 @@ struct wbSetNode {
 };
 
 struct wbSet {
-    ULONG MemberCount;
     struct MinList SetObjects;
 };
 
@@ -62,8 +61,6 @@ static IPTR WBSet__OM_ADDMEMBER(Class *cl, Object *obj, struct opMember *opm)
     node->sn_Fixed = (ibox.Left != ~0) && (ibox.Top != ~0 );
     AddTailMinList(&my->SetObjects, &node->sn_Node);
 
-    my->MemberCount++;
-
     return DoSuperMethodA(cl, obj, (Msg)opm);
 }
 
@@ -83,8 +80,6 @@ static IPTR WBSet__OM_REMMEMBER(Class *cl, Object *obj, struct opMember *opm)
         }
     }
 
-    my->MemberCount--;
-
     return rc;
 }
 
@@ -100,46 +95,7 @@ static IPTR WBSet__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
 
     my = INST_DATA(cl, rc);
 
-    my->MemberCount = 0;
-
     NewMinList(&my->SetObjects);
-
-    return rc;
-}
-
-static ULONG wbSetSelectedCount(struct WorkbookBase *wb, struct wbSet *my)
-{
-    struct wbSetNode *node, *next;
-    ULONG count = 0;
-
-    ForeachNodeSafe(&my->SetObjects, node, next) {
-        IPTR selected = FALSE;
-        GetAttr(GA_Selected, node->sn_Object, &selected);
-        if (selected) {
-            count++;
-        }
-    }
-
-    return count;
- }
-
-static IPTR WBSet__OM_GET(Class *cl, Object *obj, struct opGet *opg)
-{
-    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
-    struct wbSet *my = INST_DATA(cl, obj);
-    IPTR rc = TRUE;
-
-    switch (opg->opg_AttrID) {
-    case WBSA_MemberCount:
-        *(opg->opg_Storage) = (IPTR)my->MemberCount;
-        break;
-    case WBSA_SelectedCount:
-        *(opg->opg_Storage) = (IPTR)wbSetSelectedCount(wb, my);
-        break;
-    default:
-        rc = DoSuperMethodA(cl, obj, (Msg)opg);
-        break;
-    }
 
     return rc;
 }
@@ -170,7 +126,7 @@ static IPTR WBSet__WBSM_Select(Class *cl, Object *obj, struct wbsm_Select *wbss)
         IPTR selected = FALSE;
         GetAttr(GA_Selected, node->sn_Object, &selected);
         if (!!selected != !!wbss->wbss_All) {
-            D(bug("%s: %lx - (de)select %lx\n", __func__, obj, node->sn_Object));
+            D(bug("%s: %lx - (de)select %lx\n", __func__, (IPTR)obj, (IPTR)node->sn_Object));
             SetAttrs(node->sn_Object, GA_Selected, !!wbss->wbss_All, TAG_END);
             DoMethod(node->sn_Object, GM_RENDER, wbss->wbss_GInfo, NULL, GREDRAW_TOGGLE);
         }
@@ -209,7 +165,7 @@ static IPTR WBSet__GM_RENDER(Class *cl, Object *obj, struct gpRender *gpr)
 
     // Erase surrounding box.
     wbGABox(obj, &sbox);
-    D(bug("%s: Erase box @(%ld,%ld) %ldx%ld\n", __func__, sbox.Left, sbox.Top, sbox.Width, sbox.Height));
+    D(bug("%s: Erase box @(%ld,%ld) %ldx%ld\n", __func__, (IPTR)sbox.Left, (IPTR)sbox.Top, (IPTR)sbox.Width, (IPTR)sbox.Height));
     EraseRect(rp, sbox.Left, sbox.Top, sbox.Left+sbox.Width, sbox.Top+sbox.Height);
 
     // Re-arrange anything that needs to be.
@@ -218,14 +174,14 @@ static IPTR WBSet__GM_RENDER(Class *cl, Object *obj, struct gpRender *gpr)
     // Remove members that are not fixed nor arranged.
     ForeachNode(&my->SetObjects, node) {
         if (!node->sn_Fixed && !node->sn_Arranged) {
-            D(bug("%s: %lx - Fixed=FALSE and Arranged=FALSE\n", __func__, node));
+            D(bug("%s: %lx - Fixed=FALSE and Arranged=FALSE\n", __func__, (IPTR)node));
             DoSuperMethod(cl, obj, OM_REMMEMBER, node->sn_Object);
         }
     }
 
     /* Find the set size with just the fixed and arranged objects */
     wbGABox(obj, &sbox);
-    D(bug("%s: Prearrange box @(%ld,%ld) %ldx%ld\n", __func__, sbox.Left, sbox.Top, sbox.Width, sbox.Height));
+    D(bug("%s: Prearrange box @(%ld,%ld) %ldx%ld\n", __func__, (IPTR)sbox.Left, (IPTR)sbox.Top, (IPTR)sbox.Width, (IPTR)sbox.Height));
 
     /* Set the start of the auto area to be
      * immediately below the current objects.
@@ -246,20 +202,20 @@ static IPTR WBSet__GM_RENDER(Class *cl, Object *obj, struct gpRender *gpr)
 
         if ((CurrRight + ibox.Width) < gpr->gpr_GInfo->gi_Domain.Width) {
             ibox.Left = CurrRight;
-            D(bug("%s: %lx add to right @(%ld,%ld)\n", __func__, node, CurrRight, CurrBottom));
+            D(bug("%s: %lx add to right @(%ld,%ld)\n", __func__, (IPTR)node, (IPTR)CurrRight, (IPTR)CurrBottom));
         } else {
             wbGABox(obj, &sbox);
             ibox.Left = sbox.Left;
             CurrRight = sbox.Left;
             CurrBottom = sbox.Top + sbox.Height + WBICON_ROW_MARGIN;
-            D(bug("%s: %lx start new line @(%ld,%ld)\n", __func__, node, CurrRight, CurrBottom));
+            D(bug("%s: %lx start new line @(%ld,%ld)\n", __func__, (IPTR)node, (IPTR)CurrRight, (IPTR)CurrBottom));
         }
         ibox.Top  = CurrBottom;
         CurrRight += ibox.Width + WBICON_COL_MARGIN;
-        D(bug("%s: %lx next: @%ld,%ld\n", __func__, node, CurrRight, CurrBottom));
+        D(bug("%s: %lx next: @%ld,%ld\n", __func__, (IPTR)node, (IPTR)CurrRight, (IPTR)CurrBottom));
 
         // Mark as arranged
-        D(bug("%s: %lx arranged position: @%ld,%ld\n", __func__, node, ibox.Left, ibox.Top));
+        D(bug("%s: %lx arranged position: @%ld,%ld\n", __func__, (IPTR)node, (IPTR)ibox.Left, (IPTR)ibox.Top));
 
         // Adjust gadget location _without_ re-rendering.
         SetAttrs(iobj, GA_Top, ibox.Top, GA_Left, ibox.Left, TAG_END);
@@ -270,7 +226,7 @@ static IPTR WBSet__GM_RENDER(Class *cl, Object *obj, struct gpRender *gpr)
     }
 
     wbGABox(obj, &sbox);
-    D(bug("%s: Arranged box @(%ld,%ld) %ldx%ld\n", __func__, sbox.Left, sbox.Top, sbox.Width, sbox.Height));
+    D(bug("%s: Arranged box @(%ld,%ld) %ldx%ld\n", __func__, (IPTR)sbox.Left, (IPTR)sbox.Top, (IPTR)sbox.Width, (IPTR)sbox.Height));
 
     // Call supermethod to render the new arrangement.
     IPTR rc = DoSuperMethod(cl, obj, GM_RENDER, gpr->gpr_GInfo, rp, GREDRAW_UPDATE);
@@ -284,20 +240,13 @@ static IPTR WBSet__GM_RENDER(Class *cl, Object *obj, struct gpRender *gpr)
     return rc;
 }
 
-
-
 static IPTR WBSet_dispatcher(Class *cl, Object *obj, Msg msg)
 {
     IPTR rc = 0;
 
-    if (msg->MethodID != GM_HANDLEINPUT) {
-        D(bug("WBSet: dispatch 0x%lx\n", msg->MethodID));
-    }
-
     switch (msg->MethodID) {
     METHOD_CASE(WBSet, OM_NEW);
     METHOD_CASE(WBSet, OM_DISPOSE);
-    METHOD_CASE(WBSet, OM_GET);
     METHOD_CASE(WBSet, OM_ADDMEMBER);
     METHOD_CASE(WBSet, OM_REMMEMBER);
     METHOD_CASE(WBSet, GM_RENDER);
