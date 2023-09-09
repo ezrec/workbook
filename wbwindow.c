@@ -459,6 +459,11 @@ static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
     APTR vis;
     struct wbWindow_Icon *wbwi;
 
+    struct Screen *screen = (struct Screen *)GetTagData(WBWA_Screen, (IPTR)NULL, ops->ops_AttrList);
+    if (screen == NULL) {
+        return 0;
+    }
+
     rc = DoSuperMethodA(cl, obj, (Msg)ops);
     if (rc == 0)
         return rc;
@@ -502,7 +507,7 @@ static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
                         WA_Borderless,  TRUE,
                         WA_Activate,    TRUE,
                         WA_NewLookMenus, TRUE,
-                        WA_PubScreen, NULL,
+                        WA_PubScreen, screen,
                         ops->ops_AttrList == NULL ? TAG_END : TAG_MORE, ops->ops_AttrList );
         my->Window->BorderTop = my->Window->WScreen->BarHeight+1;
     } else {
