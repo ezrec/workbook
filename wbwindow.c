@@ -295,7 +295,7 @@ static void wbAddVolumeIcons(Class *cl, Object *obj)
     }
 }
 
-static void wbRedimension(Class *cl, Object *obj)
+static void wbWindowRedimension(Class *cl, Object *obj)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbWindow *my = INST_DATA(cl, obj);
@@ -308,9 +308,9 @@ static void wbRedimension(Class *cl, Object *obj)
     real.Width = win->Width - (win->BorderLeft + win->BorderRight);
     real.Height= win->Height- (win->BorderTop  + win->BorderBottom);
 
-    D(bug("%s: Real   (%d,%d) %dx%d\n", __func__,
+    D(bug("%s: Real   (%ld,%ld) %ldx%ld\n", __func__,
                 real.Left, real.Top, real.Width, real.Height));
-    D(bug("%s: Border (%d,%d) %dx%d\n", __func__,
+    D(bug("%s: Border (%ld,%ld) %ldx%ld\n", __func__,
                 my->Window->BorderLeft, my->Window->BorderTop,
                 my->Window->BorderRight, my->Window->BorderBottom));
 
@@ -399,7 +399,7 @@ static void wbRescan(Class *cl, Object *obj)
     DoGadgetMethod((struct Gadget *)my->Set, my->Window, NULL, GM_RENDER, NULL, NULL, GREDRAW_REDRAW);
 
     /* Adjust the scrolling regions */
-    wbRedimension(cl, obj);
+    wbWindowRedimension(cl, obj);
 
     /* Return the point back to normal */
     SetWindowPointer(my->Window, WA_BusyPointer, FALSE, TAG_END);
@@ -556,7 +556,7 @@ static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
         ModifyIDCMP(my->Window, idcmp);
     }
 
-    /* The gadgets' layout will be performed during wbRedimension
+    /* The gadgets' layout will be performed during wbWindowRedimension
      */
     AddGadget(my->Window, (struct Gadget *)(my->Area = NewObject(WBVirtual, NULL,
                 WBVA_Gadget, (IPTR)my->Set,
@@ -820,7 +820,7 @@ static IPTR WBWindow__WBWM_NewSize(Class *cl, Object *obj, Msg msg)
 
     /* Clip to the window for drawing */
     clip = wbClipWindow(wb, win);
-    wbRedimension(cl, obj);
+    wbWindowRedimension(cl, obj);
     wbUnclipWindow(wb, win, clip);
 
     return 0;
@@ -839,17 +839,16 @@ static IPTR WBWindow__WBWM_Refresh(Class *cl, Object *obj, Msg msg)
     return 0;
 }
 
-static void NewCLI(Class *cl, Object *obj)
+static void wbWindowNewCLI(Class *cl, Object *obj)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbWindow *my = INST_DATA(cl, obj);
 
-    BPTR dir;
 
     SetWindowPointer(my->Window, WA_BusyPointer, TRUE, TAG_END);
-    dir = CurrentDir(my->Lock);
+    BPTR old = CurrentDir(my->Lock);
     Execute("", BNULL, BNULL);
-    CurrentDir(dir);
+    CurrentDir(old);
     SetWindowPointer(my->Window, WA_BusyPointer, FALSE, TAG_END);
 }
 
@@ -973,7 +972,7 @@ static IPTR WBWindow__WBWM_MenuPick(Class *cl, Object *obj, struct wbwm_MenuPick
         rc = WBIF_REFRESH;
         break;
     case WBMENU_ID(WBMENU_WB_SHELL):
-        NewCLI(cl, obj);
+        wbWindowNewCLI(cl, obj);
         break;
     default:
         rc = 0;
