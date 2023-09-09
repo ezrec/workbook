@@ -23,7 +23,7 @@
 /* Methods */
 #define WBAM_Dummy               (TAG_USER | 0x40400100)
 #define WBAM_Workbench           (WBAM_Dummy+0)
-#define WBAM_ForSelected         (WBAM_Dummy+1)         // Coerce message for all selected items.
+#define WBAM_ForSelected         (WBAM_Dummy+1)         // Coerce message for all selected items, in Task context.
 #define WBAM_ClearSelected       (WBAM_Dummy+2)         // Clear all selections.
 
 struct wbam_ForSelected {
@@ -41,7 +41,7 @@ Class *WBApp_MakeClass(struct WorkbookBase *wb);
  * own struct Window.
  *
  * Use a WBWA_Path of NULL to generate the background
- * window of AppIcons. 
+ * window of AppIcons.
  *
  * NOTE: The caller must have already added the DOS
  *       devices to the Workbench AppIcon list!
@@ -54,18 +54,15 @@ Class *WBApp_MakeClass(struct WorkbookBase *wb);
 #define WBWA_Window              (WBWA_Dummy+2)  // (struct Window *) [OM_GET]
 #define WBWA_Screen              (WBWA_Dummy+3)  // (struct Screen *) [OM_NEW]
 
-/* Internal Attributes */
-#define WBWA_ActiveIconID        (WBWA_Dummy+128)
-
 /* Methods */
 #define WBWM_Dummy               (TAG_USER | 0x40410100)
-#define WBWM_NewSize             (WBWM_Dummy+1)  /* N/A */
-#define WBWM_MenuPick            (WBWM_Dummy+2)  /* struct wbwm_MenuPick {} */
-#define WBWM_IntuiTick           (WBWM_Dummy+3)  /* N/A */
-#define WBWM_Hide                (WBWM_Dummy+4)  /* N/A */
-#define WBWM_Show                (WBWM_Dummy+5)  /* N/A */
-#define WBWM_Refresh             (WBWM_Dummy+6)  /* N/A */
-#define WBWM_ForSelected         (WBWM_Dummy+7)  /* Msg */
+#define WBWM_NewSize             (WBWM_Dummy+0)  /* N/A */
+#define WBWM_MenuPick            (WBWM_Dummy+1)  /* struct wbwm_MenuPick {} */
+#define WBWM_IntuiTick           (WBWM_Dummy+2)  /* N/A */
+#define WBWM_Hide                (WBWM_Dummy+3)  /* N/A */
+#define WBWM_Show                (WBWM_Dummy+4)  /* N/A */
+#define WBWM_Refresh             (WBWM_Dummy+5)  /* N/A */
+#define WBWM_ForSelected         (WBWM_Dummy+6)  /* Msg */
 
 struct wbwm_MenuPick {
     STACKED ULONG             MethodID;
@@ -90,11 +87,11 @@ Class *WBWindow_MakeClass(struct WorkbookBase *wb);
 
 /* Attributes */
 #define WBVA_Dummy               (TAG_USER | 0x40420000)
-#define WBVA_Gadget              (WBVA_Dummy+1)  /* Object * */
-#define WBVA_VirtLeft            (WBVA_Dummy+2)  /* WORD */
-#define WBVA_VirtTop             (WBVA_Dummy+3)  /* WORD */
-#define WBVA_VirtWidth           (WBVA_Dummy+4)  /* WORD */
-#define WBVA_VirtHeight          (WBVA_Dummy+5)  /* WORD */
+#define WBVA_Gadget              (WBVA_Dummy+0)  /* Object * */
+#define WBVA_VirtLeft            (WBVA_Dummy+1)  /* WORD */
+#define WBVA_VirtTop             (WBVA_Dummy+2)  /* WORD */
+#define WBVA_VirtWidth           (WBVA_Dummy+3)  /* WORD */
+#define WBVA_VirtHeight          (WBVA_Dummy+4)  /* WORD */
 
 /* Methods */
 #define WBVM_Dummy               (TAG_USER | 0x40420100)
@@ -117,8 +114,8 @@ Class *WBVirtual_MakeClass(struct WorkbookBase *wb);
 
 /* Methods */
 #define WBSM_Dummy               (TAG_USER | 0x40430100)
-#define WBSM_Select              (WBSM_Dummy + 1)
-#define WBSM_Clean_Up            (WBSM_Dummy + 2)
+#define WBSM_Select              (WBSM_Dummy + 0)
+#define WBSM_Clean_Up            (WBSM_Dummy + 1)
 
 struct wbsm_Select {
     STACKED ULONG MethodID;
@@ -148,27 +145,28 @@ Class *WBSet_MakeClass(struct WorkbookBase *wb);
 
 /* Attributes */
 #define WBIA_Dummy               (TAG_USER | 0x40440000)
-#define WBIA_File                (WBIA_Dummy+1)        /* CONST_STRPTR */
-#define WBIA_Icon                (WBIA_Dummy+2)        /* struct DiskObject * */
+#define WBIA_File                (WBIA_Dummy+0)        // (CONST_STRPTR) 'VOLNAME:' or FilePart()
+#define WBIA_Label               (WBIA_Dummy+1)        // (CONST_STRPTR) Visible label, overriding WBIA_File [optional]
 #define WBIA_Label               (WBIA_Dummy+3)        /* CONST_STRPTR */
 #define WBIA_Screen              (WBIA_Dummy+4)        /* struct Screen * */
 
 /* Methods */
 #define WBIM_Dummy               (TAG_USER | 0x40440100)
-#define WBIM_Open                (WBIM_Dummy + 1)        /* N/A */
-#define WBIM_Copy                (WBIM_Dummy + 2)        /* N/A */
-#define WBIM_Rename              (WBIM_Dummy + 3)        /* N/A */
-#define WBIM_Info                (WBIM_Dummy + 4)        /* N/A */
-#define WBIM_Snapshot            (WBIM_Dummy + 5)        /* N/A */
-#define WBIM_Unsnapshot          (WBIM_Dummy + 6)        /* N/A */
-#define WBIM_Leave_Out           (WBIM_Dummy + 7)        /* N/A */
-#define WBIM_Put_Away            (WBIM_Dummy + 8)        /* N/A */
-#define WBIM_Delete              (WBIM_Dummy + 9)        /* N/A */
-#define WBIM_Format              (WBIM_Dummy + 10)        /* N/A */
-#define WBIM_Empty_Trash         (WBIM_Dummy + 11)        /* N/A */
+#define WBIM_Open                (WBIM_Dummy + 0)        // NA
+#define WBIM_Copy                (WBIM_Dummy + 1)        // NA
+#define WBIM_Rename              (WBIM_Dummy + 2)        // NA
+#define WBIM_Info                (WBIM_Dummy + 3)        // NA
+#define WBIM_Snapshot            (WBIM_Dummy + 4)        // NA
+#define WBIM_Unsnapshot          (WBIM_Dummy + 5)        // NA
+#define WBIM_Leave_Out           (WBIM_Dummy + 6)        // NA
+#define WBIM_Put_Away            (WBIM_Dummy + 7)        // NA
+#define WBIM_Delete              (WBIM_Dummy + 8)        // NA
+#define WBIM_Format              (WBIM_Dummy + 9)        // NA
+#define WBIM_Empty_Trash         (WBIM_Dummy + 10)       // NA
 
-/* Return flags for WBIM_ methods */
-#define WBIM_REFRESH            (1 << 0)    /* Refresh of containing window requested */
+/* Return flags for all WBIM_ methods */
+#define WBIF_OK                 (0)         // Window imagery unchanged.
+#define WBIF_REFRESH            (1 << 0)    // Refresh of containing window requested
 
 Class *WBIcon_MakeClass(struct WorkbookBase *wb);
 
