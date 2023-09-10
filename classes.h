@@ -134,19 +134,26 @@ Class *WBSet_MakeClass(struct WorkbookBase *wb);
 
 /* WBIcon class
  *
- * This class represents a single icon, and takes
- * care of all of its drawing.
+ * This class represents a single icon, and takes care of all of its drawing.
  *
- * You can create from a WBIA_File, or a 
- * WBIA_Icon. Do not use both!
+ * You can create from:
+ *
+ * Filesystem:
+ *    WBIA_File         (CONST_STRPTR) 'VOLUME:' name.
+ *    WBIA_Label        (CONST_STRPTR) label to display
+ *    WBIA_ParentLock   (BPTR) BNULL
+ * Drawer/Tool/Project:
+ *    WBIA_File         (CONST_STRPTR) FilePart() of filename
+ *    WBIA_Label        (CONST_STRPTR) label to display [optional]
+ *    WBIA_ParentLock   (BPTR) lock to containing drawer/volume
  */
 
 /* Attributes */
 #define WBIA_Dummy               (TAG_USER | 0x40440000)
 #define WBIA_File                (WBIA_Dummy+0)        // (CONST_STRPTR) 'VOLNAME:' or FilePart()
 #define WBIA_Label               (WBIA_Dummy+1)        // (CONST_STRPTR) Visible label, overriding WBIA_File [optional]
-#define WBIA_Label               (WBIA_Dummy+3)        /* CONST_STRPTR */
-#define WBIA_Screen              (WBIA_Dummy+4)        /* struct Screen * */
+#define WBIA_ParentLock          (WBIA_Dummy+2)        // (BPTR) to containing drawer/volume
+#define WBIA_Screen              (WBIA_Dummy+3)        // (struct Screen) to reference for layout and drawing.
 
 /* Methods */
 #define WBIM_Dummy               (TAG_USER | 0x40440100)

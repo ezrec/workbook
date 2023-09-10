@@ -52,14 +52,13 @@ static ULONG _wbPopupActionHook(struct Hook *hook, struct SGWork *sgw, ULONG *ms
     CONST_STRPTR forbidden = (CONST_STRPTR)hook->h_Data;
     ULONG rc = ~(ULONG)0;
 
-    D(bug("msg: 0x%lx, op: 0x%lx, code: %lc\n", *msg, sgw->EditOp, sgw->Code));
+    D(bug("msg: 0x%lx, op: 0x%lx, code: %ld\n", (IPTR)*msg, (IPTR)sgw->EditOp, (IPTR)sgw->Code));
     switch (*msg) {
     case SGH_KEY:
         if ((sgw->EditOp == EO_REPLACECHAR) || (sgw->EditOp == EO_INSERTCHAR)) {
             BOOL ok = TRUE;
             for (; ok && forbidden != NULL && *forbidden != 0; forbidden++) {
                 if (*forbidden == sgw->Code) {
-                    D(bug("Forbidden: '%lc'\n", sgw->Code));
                     ok = FALSE;
                 }
             }
@@ -250,7 +249,7 @@ IPTR wbPopupAction(struct WorkbookBase *wb,
                     done = TRUE;
                     break;
                 case IDCMP_VANILLAKEY:
-                    D(bug("msgCode: %ld\n", msgCode));
+                    D(bug("msgCode: %ld\n", (IPTR)msgCode));
                     switch (msgCode) {
                     case '\r':
                         // fallthrough

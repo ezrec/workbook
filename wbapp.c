@@ -482,6 +482,8 @@ static void wbCloseAllWindows(Class *cl, Object *obj)
 // WBAM_Workbench - Register and handle all workbench events
 static IPTR WBApp__WBAM_Workbench(Class *cl, Object *obj, Msg msg)
 {
+    ASSERT_VALID_PROCESS(FindTask(NULL));
+
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbApp *my = INST_DATA(cl, obj);
     ULONG done = FALSE;
