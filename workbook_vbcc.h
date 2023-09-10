@@ -30,12 +30,13 @@ typedef void (*VOID_FUNC)(void);
 #define RAWFMTFUNC_SERIAL (VOID_FUNC)1 // Output to debug log (usually serial port)
 #define RAWFMTFUNC_COUNT  (VOID_FUNC)2 // Just count characters, PutChData is a pointer to the counter (ULONG *)
 
-#if DEBUG
-#define D(x) x
 static inline VOID bug(CONST_STRPTR format, ...) {
     CONST_STRPTR *args = &format;
     RawDoFmt(format, args + 1, RAWFMTFUNC_SERIAL, NULL);
 }
+
+#if DEBUG
+#define D(x) x
 #define ASSERT(x) do { \
     if (!(x)) { bug("%s: assertion (%s) == FALSE", __func__, #x); Alert(AN_Workbench); } \
 } while (0)
@@ -44,11 +45,10 @@ static inline VOID bug(CONST_STRPTR format, ...) {
     ASSERT_VALID_PTR(p); ASSERT(((struct Node *)(p))->ln_Type == NT_PROCESS); \
 } while (0)
 #else
-#define ASSERT(x) while (0) { x; }
-#define ASSERT_VALID_PTR(x) while (0) { (void)(x); }
-#define ASSERT_VALID_PROCESS(x) while (0) { (void)(x); }
+#define ASSERT(x) do { if (0) { (void)(x); } } while (0)
+#define ASSERT_VALID_PTR(x) do { if (0) { (void)(x); } } while (0)
+#define ASSERT_VALID_PROCESS(x) do { if (0) { (void)(x); } } while (0)
 #define D(x)
-#define bug(x,...)
 #endif
 
 

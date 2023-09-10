@@ -68,6 +68,21 @@ exit:
     return rc;
 }
 
+static const ULONG mem_types[] = { MEMF_CHIP, MEMF_FAST };
+#define TEST_MEMAVAIL() do { \
+    D(ULONG mem_start[sizeof(mem_types)/sizeof(mem_types)[0]]); \
+    D(for (int type = 0; type < sizeof(mem_types)/sizeof(mem_types[0]); type++) mem_start[type]=AvailMem(mem_types[type]));
+
+#define TEST_MEMUSED() \
+    D(bug("Memory Information: (NOTE: 32k used by icon.library cache is acceptable)\n")); \
+    D(for (int type = 0; type < sizeof(mem_types)/sizeof(mem_types[0]); type++) bug(" Type 0x%04lx: %ld\n", mem_types[type], mem_start[type] - AvailMem(mem_types[type]))); \
+} while (0)
+
+static void wbUnitTests(struct WorkbookBase *wb) {
+#include "workbook_test.inc"
+}
+
+
 #undef WorkbenchBase
 #undef DOSBase
 
@@ -115,7 +130,7 @@ ULONG WorkbookMain(void)
     APTR DOSBase;
     int rc = RETURN_ERROR;
 
-    D(bug("%s: Starting up...\n", AS_STRING(WB_NAME)));
+    TEST_MEMAVAIL();
 
     wb = NULL;
 
@@ -159,6 +174,8 @@ ULONG WorkbookMain(void)
     if (wb->wb_LayersBase == NULL)
         goto error;
 
+    D(wbUnitTests(wb));
+
     // Set process and task name to "Workbench", for old AmigaOS tools
     SetProgramName("Workbench");
     struct Task *task = FindTask(NULL);
@@ -196,6 +213,8 @@ error:
 
         FreeVec(wb);
     }
+
+    TEST_MEMUSED();
 
     return rc;
 }
