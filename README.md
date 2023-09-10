@@ -2,6 +2,9 @@
 
 Copy to SYS:System/Workbook
 
+- v1.8
+  - Add Copy menu item functionality.
+  - Add Delete menu item functionality.
 - v1.7
   - Reduce rendering done when selecting/deselecting icons.
   - Fix issue where only one drawer icon opened when multiple are selected.
