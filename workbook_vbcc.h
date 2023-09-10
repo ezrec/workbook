@@ -184,6 +184,7 @@ struct WBHandlerMessage
 #define AROS_UFH3(type, func, arg1, arg2, arg3) type func(arg1, arg2, arg3)
 #define AROS_USERFUNC_INIT
 #define AROS_USERFUNC_EXIT
+#define AROS_PROCP(n) AROS_UFH2(SIPTR, n, AROS_UFHA(STRPTR, _argptr, A0), AROS_UFHA(ULONG,  _argsize, D0))
 #define AROS_PROCH(n, _argptr, _argsize, _SysBase) \
     AROS_UFH2(SIPTR, n,                           \
         AROS_UFHA(STRPTR, _argptr, A0),           \

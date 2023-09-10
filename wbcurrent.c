@@ -24,7 +24,13 @@
 #include <proto/icon.h>
 #include <proto/utility.h>
 
+#ifdef __AROS__
+#include <exec/rawfmt.h>
+#endif
+
 #include "wbcurrent.h"
+
+extern struct ExecBase *SysBase;
 
 // Return the absolute path of a lock.
 // Caller must FreeVec() the result.
@@ -72,7 +78,7 @@ static BOOL wbDeleteThisCurrent(struct Library *DOSBase, CONST_STRPTR file, stru
 // NOTE: 'fib' must _already_ have been Examine(dir, fib)'d !!!
 static BOOL wbDeleteInto(struct Library *DOSBase, BPTR dir, struct FileInfoBlock *fib)
 {
-    ASSERT_VALID_PROCESS(FindTask(NULL));
+    ASSERT_VALID_PROCESS((struct Process *)FindTask(NULL));
 
     BPTR olddir = CurrentDir(dir);
     BOOL ok = TRUE;
@@ -108,7 +114,7 @@ static BOOL wbDeleteInto(struct Library *DOSBase, BPTR dir, struct FileInfoBlock
 // Delete a single file or directory.
 static BOOL wbDeleteThisCurrent(struct Library *DOSBase, CONST_STRPTR file, struct FileInfoBlock *fib)
 {
-    ASSERT_VALID_PROCESS(FindTask(NULL));
+    ASSERT_VALID_PROCESS((struct Process *)FindTask(NULL));
 
     BOOL ok;
     LONG err = 0;
@@ -142,7 +148,7 @@ static BOOL wbDeleteThisCurrent(struct Library *DOSBase, CONST_STRPTR file, stru
 // Delete a file, a directory, or just the contents of a directory.
 BOOL _wbDeleteFromCurrent(struct Library *DOSBase, struct Library *IconBase, CONST_STRPTR file, BOOL only_contents)
 {
-    ASSERT_VALID_PROCESS(FindTask(NULL));
+    ASSERT_VALID_PROCESS((struct Process *)FindTask(NULL));
 
     struct FileInfoBlock *fib = AllocDosObjectTags(DOS_FIB, TAG_END);
     if (!fib) {
@@ -197,7 +203,7 @@ BOOL _wbDeleteFromCurrent(struct Library *DOSBase, struct Library *IconBase, CON
 // Enhanced version of 'icon.library/BumpRevision' that can handle input names up to FILENAME_MAX - 19 in length.
 static BOOL wbBumpRevisionCurrent(struct Library *DOSBase, CONST_STRPTR oldname, STRPTR newname)
 {
-    ASSERT_VALID_PROCESS(FindTask(NULL));
+    ASSERT_VALID_PROCESS((struct Process *)FindTask(NULL));
 
     // Determine the current index.
     ULONG index = 0;
@@ -297,7 +303,7 @@ static inline CONST_STRPTR _sLOCKNAME(struct Library *DOSBase, BPTR lock) {
 // NOTE: This routine _eats_ src_lock!
 static BOOL wbCopyLockCurrent(struct Library *DOSBase, CONST_STRPTR dst_file, BPTR src_lock)
 {
-    ASSERT_VALID_PROCESS(FindTask(NULL));
+    ASSERT_VALID_PROCESS((struct Process *)FindTask(NULL));
 
     const size_t buff_size = 4096;
     BOOL ok = FALSE;
@@ -426,7 +432,7 @@ static BOOL wbCopyLockCurrent(struct Library *DOSBase, CONST_STRPTR dst_file, BP
 // Copy into the same directory, bumping the 'Copy_of_...' prefix as needed.
 BOOL _wbCopyBumpCurrent(struct Library *DOSBase, struct Library *IconBase, CONST_STRPTR src_file)
 {
-    ASSERT_VALID_PROCESS(FindTask(NULL));
+    ASSERT_VALID_PROCESS((struct Process *)FindTask(NULL));
 
     BOOL ok = TRUE;
     LONG err = 0;
@@ -478,7 +484,7 @@ BOOL _wbCopyBumpCurrent(struct Library *DOSBase, struct Library *IconBase, CONST
 // Copy into this directory, respecting icons
 BOOL _wbCopyIntoCurrentAt(struct Library *DOSBase, struct Library *IconBase, BPTR src_dir, CONST_STRPTR src_file, LONG targetX, LONG targetY)
 {
-    ASSERT_VALID_PROCESS(FindTask(NULL));
+    ASSERT_VALID_PROCESS((struct Process *)FindTask(NULL));
 
     BOOL ok = FALSE;
 
@@ -520,7 +526,7 @@ BOOL _wbCopyIntoCurrentAt(struct Library *DOSBase, struct Library *IconBase, BPT
 // Move (rename) into this directory, respecting icons.
 BOOL _wbMoveIntoCurrentAt(struct Library *DOSBase, struct Library *IconBase, BPTR src_dir, CONST_STRPTR src_file, LONG targetX, LONG targetY)
 {
-    ASSERT_VALID_PROCESS(FindTask(NULL));
+    ASSERT_VALID_PROCESS((struct Process *)FindTask(NULL));
 
     BOOL ok = FALSE;
 
@@ -548,7 +554,7 @@ BOOL _wbMoveIntoCurrentAt(struct Library *DOSBase, struct Library *IconBase, BPT
                 if (ok) {
                     // Remove the old disk object.
                     BPTR pwd = CurrentDir(src_dir);
-                    ok = DeleteDiskObject(src_file);
+                    ok = DeleteDiskObject((STRPTR)src_file);
                     err = IoErr();
                     CurrentDir(pwd);
                 }
