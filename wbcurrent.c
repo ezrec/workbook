@@ -22,12 +22,13 @@
 #include <proto/dos.h>
 #include <proto/exec.h>
 #include <proto/icon.h>
+#include <proto/utility.h>
 
 #include "wbcurrent.h"
 
 // Return the absolute path of CurrentDir() and a file.
-// Caller must free the result.
-STRPTR wbAbspathCurrent(struct Library *DOSBase, CONST_STRPTR file)
+// Caller must FreeVec() the result.
+STRPTR _wbAbspathCurrent(struct Library *DOSBase, CONST_STRPTR file)
 {
     STRPTR buff;
     STRPTR path = NULL;
@@ -73,6 +74,7 @@ static BOOL wbDeleteInto(struct Library *DOSBase, BPTR dir, struct FileInfoBlock
         }
 
         // Re-Examine the directory, as we may have disturbed the directory's ExNext() chains.
+        D(bug("%s: Examine %ld\n", __func__, (IPTR)BADDR(dir)));
         ok = Examine(dir, fib);
         if (!ok) {
             break;
@@ -95,11 +97,12 @@ static BOOL wbDeleteThisCurrent(struct Library *DOSBase, CONST_STRPTR file, stru
     LONG err = 0;
 
     // Determine if directory or file.
-    BPTR lock = Lock(file, EXCLUSIVE_LOCK);
+    BPTR lock = Lock(file, SHARED_LOCK);
     if (lock == BNULL) {
         err = IoErr();
         ok = FALSE;
     } else {
+        D(bug("%s: Examine %ld\n", __func__, (IPTR)BADDR(lock)));
         ok = Examine(lock, fib);
         if (ok) {
             if (fib->fib_DirEntryType >= 0) {
@@ -121,7 +124,7 @@ static BOOL wbDeleteThisCurrent(struct Library *DOSBase, CONST_STRPTR file, stru
 }
 
 // Delete a file, a directory, or just the contents of a directory.
-BOOL wbDeleteFromCurrent(struct Library *DOSBase, struct Library *IconBase, CONST_STRPTR file, BOOL only_contents)
+BOOL _wbDeleteFromCurrent(struct Library *DOSBase, struct Library *IconBase, CONST_STRPTR file, BOOL only_contents)
 {
     ASSERT_VALID_PROCESS(FindTask(NULL));
 
@@ -134,8 +137,9 @@ BOOL wbDeleteFromCurrent(struct Library *DOSBase, struct Library *IconBase, CONS
     LONG err = 0;
 
     if (only_contents) {
-        BPTR lock = Lock(file, EXCLUSIVE_LOCK);
+        BPTR lock = Lock(file, SHARED_LOCK);
         if (lock != BNULL) {
+            D(bug("%s: Examine %ld\n", __func__, (IPTR)BADDR(lock)));
             ok = Examine(lock, fib);
             if (fib->fib_DirEntryType < 0) {
                 // We can't "delete only contents" a file.
@@ -228,21 +232,20 @@ static BOOL wbBumpRevisionCurrent(struct Library *DOSBase, CONST_STRPTR oldname,
     }
 
     for (index++; index != 0; index++) {
-       IPTR val[] = {(IPTR)index };
-       const char *template = "Copy_%ld_of_";
+       IPTR val[] = {(IPTR)index, (IPTR)oldname };
+       int vindex = 0;
+       const char *template = "Copy_%ld_of_%s";
        if (index == 1) {
-           template = "Copy_of_";
+           template = "Copy_of_%s";
+           vindex = 1;
        }
-       RawDoFmt(template, (RAWARG)val, RAWFMTFUNC_STRING, newname);
-
-       // Copy-and-truncate oldname onto newname.
-       ULONG oldlen = STRLEN(oldname);
-       ULONG prefix = STRLEN(newname);
-       if (prefix + oldlen > (FILENAME_MAX-1)) {
-           oldlen = (FILENAME_MAX - 1) - prefix;
+       ULONG count = 0;
+       RawDoFmt(template, (RAWARG)&val[vindex], RAWFMTFUNC_COUNT, &count);
+       if (count >= FILENAME_MAX) {
+           index = 0;
+           break;
        }
-       CopyMem(oldname, &newname[prefix], oldlen);
-       newname[prefix + oldlen] = 0;
+       RawDoFmt(template, (RAWARG)&val[vindex], RAWFMTFUNC_STRING, newname);
 
        BPTR lock = Lock(newname, SHARED_LOCK);
        if (lock == BNULL) {
@@ -290,7 +293,10 @@ static BOOL wbCopyLockCurrent(struct Library *DOSBase, CONST_STRPTR dst_file, BP
         return FALSE;
     }
 
+    D(bug("%s: %s => %s/%s\n", __func__, sLOCKNAME(src_lock), sCURRDIR(), dst_file));
+
     // Examine the lock to see what it is.
+    D(bug("%s: Examine %ld\n", __func__, (IPTR)BADDR(src_lock)));
     ok = Examine(src_lock, fib);
     if (ok) {
         // Cache attributes we may need later.
@@ -313,7 +319,7 @@ static BOOL wbCopyLockCurrent(struct Library *DOSBase, CONST_STRPTR dst_file, BP
                     this_lock = Lock(fib->fib_FileName, SHARED_LOCK);
                     err = IoErr();
                     CurrentDir(dst_lock);
-                    if (this_lock) {
+                    if (this_lock != BNULL) {
                         ok = wbCopyLockCurrent(DOSBase, fib->fib_FileName, this_lock);
                         UnLock(this_lock);
                         err = IoErr();
@@ -333,9 +339,13 @@ static BOOL wbCopyLockCurrent(struct Library *DOSBase, CONST_STRPTR dst_file, BP
                 err = ERROR_NO_FREE_STORE;
                 ok = FALSE;
             } else {
-                BPTR srcfh = OpenFromLock(src_lock);
+                BPTR flock = DupLock(src_lock);
+                BPTR srcfh = OpenFromLock(flock);
                 err = IoErr();
-                D(if (srcfh == BNULL) bug("%s: OpenFromLock: %ld\n", __func__, IoErr()));
+                if (srcfh == BNULL) {
+                    UnLock(flock);
+                }
+                D(if (srcfh == BNULL) bug("%s: OpenFromLock(%s): %ld\n", __func__, sLOCKNAME(src_lock), IoErr()));
                 if (srcfh != BNULL) {
                     BPTR dst_lock = Lock(dst_file, SHARED_LOCK);
                     if (dst_lock != BNULL) {
@@ -347,8 +357,9 @@ static BOOL wbCopyLockCurrent(struct Library *DOSBase, CONST_STRPTR dst_file, BP
                     } else {
                         BPTR dstfh = Open(dst_file, MODE_NEWFILE);
                         err = IoErr();
-                        D(if (dstfh == BNULL) bug("%s: Open: %ld\n", __func__, IoErr()));
-                        if (dstfh != BNULL) {
+                        ok = (dstfh != BNULL);
+                        D(if (!ok) bug("%s: Open: %ld\n", __func__, IoErr()));
+                        if (ok) {
                             LONG bytes;
                             while ((bytes = Read(srcfh, buff, buff_size)) > 0) {
                                 LONG copied = Write(dstfh, buff, buff_size);
@@ -385,13 +396,13 @@ static BOOL wbCopyLockCurrent(struct Library *DOSBase, CONST_STRPTR dst_file, BP
 
     SetIoErr(err);
 
-    D(if (!ok) bug("%s: %s %s, exit: %ld\n", __func__, sCURRDIR(), dst_file, err));
+    D(if (!ok) bug("%s: %s %s, exit: %ld\n", __func__, sCURRDIR(), dst_file, (IPTR)err));
 
     return ok;
 }
 
 // Copy into the same directory, bumping the 'Copy_of_...' prefix as needed.
-BOOL wbCopyBumpCurrent(struct Library *DOSBase, struct Library *IconBase, CONST_STRPTR src_file)
+BOOL _wbCopyBumpCurrent(struct Library *DOSBase, struct Library *IconBase, CONST_STRPTR src_file)
 {
     ASSERT_VALID_PROCESS(FindTask(NULL));
 
@@ -403,42 +414,42 @@ BOOL wbCopyBumpCurrent(struct Library *DOSBase, struct Library *IconBase, CONST_
         return FALSE;
     }
 
-    BOOL ok = FALSE;
+    BOOL ok = TRUE;
     LONG err = 0;
 
-    // Copy the old file to the new
-    BPTR src_lock = Lock(src_file, MODE_OLDFILE);
-    err = IoErr();
-    D(if (src_lock == BNULL) bug("%s: Lock('%s', MODE_OLDFILE): %ld\n", __func__, src_file, IoErr()));
-    if (src_lock != BNULL) {
-        ok = wbCopyLockCurrent(DOSBase, dst_file, src_lock);
+    // Is there a DiskObject to copy?
+    // Copy it, but clear it's positioning information.
+    struct DiskObject *diskobject = GetDiskObject(src_file);
+    if (diskobject != NULL) {
+        // Clear positioning information.
+        diskobject->do_CurrentX = (LONG)NO_ICON_POSITION;
+        diskobject->do_CurrentY = (LONG)NO_ICON_POSITION;
+        // Write out the new disk object.
+        ok = PutDiskObject(dst_file, diskobject);
         err = IoErr();
-        D(if (!ok) bug("%s: Top level copy to %s: %s (%ld)\n", __func__, src_file, ok ? "TRUE" : "FALSE", err));
-        UnLock(src_lock);
+        FreeDiskObject(diskobject);
     }
 
     if (ok) {
-        // Is there a DiskObject to copy?
-        // Copy it, but clear it's positioning information.
-        struct DiskObject *diskobject = GetDiskObject(src_file);
-        if (diskobject != NULL) {
-            // Clear positioning information.
-            diskobject->do_CurrentX = (LONG)NO_ICON_POSITION;
-            diskobject->do_CurrentY = (LONG)NO_ICON_POSITION;
-            // Write out the new disk object.
-            ok = PutDiskObject(dst_file, diskobject);
+        // Copy the old file to the new
+        BPTR src_lock = Lock(src_file, SHARED_LOCK);
+        err = IoErr();
+        D(if (src_lock == BNULL) bug("%s: Lock('%s', SHARED_LOCK): %ld\n", __func__, src_file, IoErr()));
+        if (src_lock != BNULL) {
+            ok = wbCopyLockCurrent(DOSBase, dst_file, src_lock);
             err = IoErr();
-            FreeDiskObject(diskobject);
+            D(if (!ok) bug("%s: Top level copy to %s: %s (%ld)\n", __func__, src_file, ok ? "TRUE" : "FALSE", (IPTR)err));
+            UnLock(src_lock);
         }
     }
-
+    
     SetIoErr(err);
 
     return ok;
 }
 
 // Copy into this directory, respecting icons
-BOOL wbCopyIntoCurrent(struct Library *DOSBase, struct Library *IconBase, BPTR src_dir, CONST_STRPTR src_file)
+BOOL _wbCopyIntoCurrentAt(struct Library *DOSBase, struct Library *IconBase, BPTR src_dir, CONST_STRPTR src_file, LONG targetX, LONG targetY)
 {
     ASSERT_VALID_PROCESS(FindTask(NULL));
 
@@ -450,30 +461,27 @@ BOOL wbCopyIntoCurrent(struct Library *DOSBase, struct Library *IconBase, BPTR s
     CurrentDir(pwd);
 
     if (src_lock != BNULL) {
-        ok = wbCopyLockCurrent(DOSBase, src_file, src_lock);
+        // Copy the icon.
+        BPTR pwd = CurrentDir(src_dir);
+        struct DiskObject *diskobject = GetDiskObject(src_file);
+        CurrentDir(pwd);
+        if (diskobject != NULL) {
+            // Set positioning information.
+            diskobject->do_CurrentX = targetX;
+            diskobject->do_CurrentY = targetY;
+            // Write out to the new location.
+            ok = PutDiskObject(src_file, diskobject);
+            err = IoErr();
+            FreeDiskObject(diskobject);
+        }
         if (ok) {
-            // Copy the icon, also. We could just do a Rename() of it, but it's more 'Workbench safe'
-            // to do a GetDiskObject()/PutDiskObject()/DeleteDiskObject()
-            BPTR pwd = CurrentDir(src_dir);
-            struct DiskObject *diskobject = GetDiskObject(src_file);
-            CurrentDir(pwd);
-            if (diskobject != NULL) {
-                // Clear positioning information.
-                diskobject->do_CurrentX = (LONG)NO_ICON_POSITION;
-                diskobject->do_CurrentY = (LONG)NO_ICON_POSITION;
-                // Write out to the new location.
-                ok = PutDiskObject(src_file, diskobject);
-                err = IoErr();
-                FreeDiskObject(diskobject);
-                if (ok) {
-                    // Remove the old disk object.
-                    BPTR pwd = CurrentDir(src_dir);
-                    ok = DeleteDiskObject(src_file);
-                    err = IoErr();
-                    CurrentDir(pwd);
-                }
+            ok = wbCopyLockCurrent(DOSBase, src_file, src_lock);
+            err = IoErr();
+            if (!ok && diskobject != NULL) {
+                DeleteDiskObject((STRPTR)src_file);
             }
         }
+        UnLock(src_lock);
     }
 
     SetIoErr(err);
@@ -482,14 +490,14 @@ BOOL wbCopyIntoCurrent(struct Library *DOSBase, struct Library *IconBase, BPTR s
 }
 
 // Move (rename) into this directory, respecting icons.
-BOOL wbMoveIntoCurrent(struct Library *DOSBase, struct Library *IconBase, BPTR src_dir, CONST_STRPTR src_file)
+BOOL _wbMoveIntoCurrentAt(struct Library *DOSBase, struct Library *IconBase, BPTR src_dir, CONST_STRPTR src_file, LONG targetX, LONG targetY)
 {
     ASSERT_VALID_PROCESS(FindTask(NULL));
 
     BOOL ok = FALSE;
 
     BPTR pwd = CurrentDir(src_dir);
-    char *abspath = wbAbspathCurrent(DOSBase, src_file);
+    char *abspath = wbAbspathCurrent(src_file);
     LONG err = IoErr();
     CurrentDir(pwd);
     if (abspath != NULL) {
@@ -502,9 +510,9 @@ BOOL wbMoveIntoCurrent(struct Library *DOSBase, struct Library *IconBase, BPTR s
             struct DiskObject *diskobject = GetDiskObject(src_file);
             CurrentDir(pwd);
             if (diskobject != NULL) {
-                // Clear positioning information.
-                diskobject->do_CurrentX = (LONG)NO_ICON_POSITION;
-                diskobject->do_CurrentY = (LONG)NO_ICON_POSITION;
+                // Set positioning information.
+                diskobject->do_CurrentX = targetX;
+                diskobject->do_CurrentY = targetY;
                 // Write out to the new location.
                 ok = PutDiskObject(src_file, diskobject);
                 err = IoErr();

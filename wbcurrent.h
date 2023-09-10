@@ -25,14 +25,21 @@
 #include "workbook_vbcc.h"
 #endif
 
-STRPTR wbAbspathCurrent(struct Library *_DOSBase, CONST_STRPTR file);
+STRPTR _wbAbspathCurrent(struct Library *_DOSBase, CONST_STRPTR file);
+#define wbAbspathCurrent(file) _wbAbspathCurrent(DOSBase, file);
 
 // The following functions assume CurrentDir() is the target directory, and handle
 // a '.icon' file correctly.
-BOOL wbDeleteFromCurrent(struct Library *_DOSBase, struct Library *_IconBase, CONST_STRPTR file, BOOL only_contents);
+BOOL _wbDeleteFromCurrent(struct Library *_DOSBase, struct Library *_IconBase, CONST_STRPTR file, BOOL only_contents);
+#define wbDeleteFromCurrent(file, only_contents) _wbDeleteFromCurrent(DOSBase, IconBase, file, only_contents)
 
-BOOL wbCopyBumpCurrent(struct Library *_DOSBase, struct Library *_IconBase, CONST_STRPTR src_file);
-BOOL wbCopyIntoCurrent(struct Library *_DOSBase, struct Library *_IconBase, BPTR src_dir, CONST_STRPTR src_file);
+BOOL _wbCopyBumpCurrent(struct Library *_DOSBase, struct Library *_IconBase, CONST_STRPTR src_file);
+#define wbCopyBumpCurrent(src_file) _wbCopyBumpCurrent(DOSBase, IconBase, src_file)
 
-BOOL wbMoveIntoCurrent(struct Library *_DOSBase, struct Library *_IconBase, BPTR src_dir, CONST_STRPTR src_file);
+BOOL _wbCopyIntoCurrentAt(struct Library *_DOSBase, struct Library *_IconBase, BPTR src_dir, CONST_STRPTR src_file, LONG targetX, LONG targetY);
+#define wbCopyIntoCurrentAt(src_dir, src_file, targetX, targetY) _wbCopyIntoCurrentAt(DOSBase, IconBase, src_dir, src_file, targetX, targetY)
+#define wbCopyIntoCurrent(src_dir, src_file) _wbCopyIntoCurrentAt(DOSBase, IconBase, src_dir, src_file, (LONG)NO_ICON_POSITION, (LONG)NO_ICON_POSITION)
+BOOL _wbMoveIntoCurrentAt(struct Library *_DOSBase, struct Library *_IconBase, BPTR src_dir, CONST_STRPTR src_file, LONG targetX, LONG targetY);
+#define wbMoveIntoCurrentAt(src_dir, src_file, targetX, targetY) _wbMoveIntoCurrentAt(DOSBase, IconBase, src_dir, src_file, targetX, targetY)
+#define wbMoveIntoCurrent(src_dir, src_file) _wbMoveIntoCurrentAt(DOSBase, IconBase, src_dir, src_file, (LONG)NO_ICON_POSITION, (LONG)NO_ICON_POSITION)
 

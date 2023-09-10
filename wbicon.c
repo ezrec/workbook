@@ -494,7 +494,7 @@ static IPTR WBIcon__WBIM_Copy(Class *cl, Object *obj, Msg msg)
 
     if (ok) {
         BPTR pwd = CurrentDir(my->ParentLock);
-        ok = wbCopyBumpCurrent(DOSBase, IconBase, my->File);
+        ok = wbCopyBumpCurrent(my->File);
         if (!ok) {
             wbPopupIoErr(wb, "Copy", IoErr(), my->File);
         }
@@ -701,16 +701,21 @@ static IPTR WBIcon__WBIM_Delete(Class *cl, Object *obj, Msg msg)
 
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
+    BOOL ok = TRUE;
+    LONG err = 0;
 
-    if (my->ParentLock == BNULL) {
-        // Unable to delete volumes.
-        return 0;
+    if (ok && my->ParentLock == BNULL) {
+        // Unable to root window items.
+        ok = FALSE;
+        err = ERROR_OBJECT_WRONG_TYPE;
     }
 
-    BPTR pwd = CurrentDir(my->ParentLock);
-    BOOL ok = wbDeleteFromCurrent(DOSBase, IconBase, my->File, FALSE);
-    LONG err = IoErr();
-    CurrentDir(pwd);
+    if (ok) {
+        BPTR pwd = CurrentDir(my->ParentLock);
+        ok = wbDeleteFromCurrent(my->File, FALSE);
+        err = IoErr();
+        CurrentDir(pwd);
+    }
 
     if (!ok) {
         wbPopupIoErr(wb, "Delete", err, my->File);
