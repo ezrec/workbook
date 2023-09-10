@@ -104,7 +104,7 @@ AROS_PROCH(wbOpener, argstr, argsize, SysBase)
     APTR DOSBase = OpenLibrary("dos.library", 0);
     if (DOSBase) {
         // Determine the absolute path for the thing to open.
-        STRPTR abspath = wbAbspathCurrent(DOSBase, file);
+        STRPTR abspath = wbAbspathCurrent(file);
         if (abspath != NULL) {
             APTR WorkbenchBase = OpenLibrary("workbench.library", 0);
             if (WorkbenchBase) {
