@@ -25,9 +25,11 @@
 #include <dos/dostags.h>
 
 #include "workbook_intern.h"
+#include "wbcurrent.h"
 #include "classes.h"
 
 struct wbIcon {
+    BPTR               ParentLock;
     STRPTR             File;
     struct DiskObject *DiskObject;
     STRPTR             Label;
@@ -110,10 +112,10 @@ static void wbIcon_Update(Class *cl, Object *obj)
     }
 
     D(bug("%s: %ldx%ld @%ld,%ld [hitbox (%ld,%ld)-(%ld,%ld)] (%s)\n",
-                my->File, icon_w, icon_h,
-                my->DiskObject->do_CurrentX, my->DiskObject->do_CurrentY,
-                my->HitBox.MinX, my->HitBox.MinY,
-                my->HitBox.MaxX, my->HitBox.MaxY,
+                my->File, (IPTR)icon_w, (IPTR)icon_h,
+                (IPTR)my->DiskObject->do_CurrentX, (IPTR)my->DiskObject->do_CurrentY,
+                (IPTR)my->HitBox.MinX, (IPTR)my->HitBox.MinY,
+                (IPTR)my->HitBox.MaxX, (IPTR)my->HitBox.MaxY,
                 my->Label));
 
     SetAttrs(obj,
@@ -127,78 +129,75 @@ static void wbIcon_Update(Class *cl, Object *obj)
 // OM_NEW
 static IPTR WBIcon__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
 {
+    ASSERT_VALID_PROCESS(FindTask(NULL));
+
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
-    struct wbIcon *my;
-    CONST_STRPTR file, label = "???";
 
-    obj = (Object *)DoSuperMethodA(cl, obj, (Msg)ops);
-    if (obj == NULL)
+    STRPTR file = (STRPTR)GetTagData(WBIA_File, (IPTR)NULL, ops->ops_AttrList);
+    STRPTR label= (STRPTR)GetTagData(WBIA_Label, (IPTR)NULL, ops->ops_AttrList);
+    BPTR parentlock   = (BPTR)GetTagData(WBIA_ParentLock, (IPTR)BNULL, ops->ops_AttrList);
+    struct Screen *screen = (struct Screen *)GetTagData(WBIA_Screen, (IPTR)NULL, ops->ops_AttrList);
+
+    if (!file) {
         return 0;
-
-    my = INST_DATA(cl, obj);
-
-    my->File = NULL;
-    my->DiskObject = (struct DiskObject *)GetTagData(WBIA_Icon, (IPTR)NULL, ops->ops_AttrList);
-    my->Screen = (struct Screen *)GetTagData(WBIA_Screen, (IPTR)NULL, ops->ops_AttrList);
-    if (my->DiskObject != NULL) {
-        if (my->DiskObject->do_Gadget.GadgetText != NULL &&
-            my->DiskObject->do_Gadget.GadgetText->IText != NULL)
-            label = my->DiskObject->do_Gadget.GadgetText->IText;
-    } else {
-        file = (CONST_STRPTR)GetTagData(WBIA_File, (IPTR)NULL, ops->ops_AttrList);
-        if (file == NULL)
-            goto error;
-
-        my->File = StrDup(file);
-        if (my->File == NULL)
-            goto error;
-
-        strcpy(my->File, file);
-
-        label = FilePart(my->File);
-
-        my->DiskObject = GetIconTags(my->File,
-                               ICONGETA_Screen, my->Screen,
-                               ICONGETA_FailIfUnavailable, FALSE,
-                               TAG_END);
-        if (my->DiskObject == NULL)
-            goto error;
-
     }
 
-    my->Label = StrDup((CONST_STRPTR)GetTagData(WBIA_Label, (IPTR)label, ops->ops_AttrList));
-    if (my->Label == NULL)
-        goto error;
+    struct DiskObject *diskobject = NULL;
+    BPTR old = CurrentDir(parentlock);
+    diskobject = GetIconTags(file,
+                           ICONGETA_Screen, screen,
+                           ICONGETA_FailIfUnavailable, FALSE,
+                           TAG_END);
+    CurrentDir(old);
+    if (diskobject == NULL) {
+        return 0;
+    }
+
+    file = StrDup(file);
+    if (!file) {
+        return 0;
+    }
+
+    if (label == NULL) {
+        label = file;
+    }
+    label = StrDup(label);
+    if (label == NULL) {
+        FreeVec(file);
+        return 0;
+    }
+
+    obj = (Object *)DoSuperMethodA(cl, obj, (Msg)ops);
+    if (obj == NULL) {
+        FreeVec(label);
+        FreeVec(file);
+        return 0;
+    }
+
+    struct wbIcon *my = INST_DATA(cl, obj);
+
+    my->File = file;
+    my->Label = label;
+    my->ParentLock = parentlock;
+    my->DiskObject = diskobject;
+    my->Screen = screen;
 
     wbIcon_Update(cl, obj);
 
     return (IPTR)obj;
-
-error:
-    if (my->File)
-        FreeVec(my->File);
-    DoSuperMethod(cl, obj, OM_DISPOSE);
-    return 0;
 }
 
 // OM_DISPOSE
 static IPTR WBIcon__OM_DISPOSE(Class *cl, Object *obj, Msg msg)
 {
+    ASSERT_VALID_PROCESS(FindTask(NULL));
+
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
 
-    /* If my->File is set, then we allocated it
-     * and my->DiskObject. Otherwise, Icon was passed in
-     * via WBIA_Icon, and its the caller's responsibility.
-     */
-    if (my->File) {
-        FreeVec(my->File);
-        if (my->DiskObject)
-            FreeDiskObject(my->DiskObject);
-    }
-
-    if (my->Label)
-        FreeVec(my->Label);
+    FreeVec(my->Label);
+    FreeVec(my->File);
+    FreeDiskObject(my->DiskObject);
 
     return DoSuperMethodA(cl, obj, msg);
 }
@@ -215,6 +214,9 @@ static IPTR WBIcon__OM_GET(Class *cl, Object *obj, struct opGet *opg)
         break;
     case WBIA_Label:
         *(opg->opg_Storage) = (IPTR)my->Label;
+        break;
+    case WBIA_ParentLock:
+        *(opg->opg_Storage) = (IPTR)my->ParentLock;
         break;
     default:
         rc = DoSuperMethodA(cl, obj, (Msg)opg);
@@ -450,7 +452,7 @@ static IPTR WBIcon__WBIM_Open(Class *cl, Object *obj, Msg msg)
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
 
-    struct Process *proc = CreateNewProcTags(
+    D(struct Process *proc =) CreateNewProcTags(
             NP_Name, (IPTR)my->File,
             NP_Entry, (IPTR)wbOpener,
             NP_CurrentDir, (IPTR)my->ParentLock,
@@ -466,7 +468,10 @@ static IPTR WBIcon__WBIM_Copy(Class *cl, Object *obj, Msg msg)
     return 0;
 }
 
-static BOOL rename_path(struct WorkbookBase *wb, CONST_STRPTR file, CONST_STRPTR input, CONST_STRPTR suffix) {
+static BOOL rename_path(struct WorkbookBase *wb, CONST_STRPTR file, CONST_STRPTR input, CONST_STRPTR suffix)
+{
+    ASSERT_VALID_PROCESS(FindTask(NULL));
+
     BOOL ok;
 
     IPTR suffix_len = STRLEN(suffix);
@@ -487,15 +492,30 @@ static BOOL rename_path(struct WorkbookBase *wb, CONST_STRPTR file, CONST_STRPTR
     AddPart(newname, input, newname_len);
     CopyMem(suffix, &newname[STRLEN(newname)], suffix_len + 1);
 
-    ok = Rename(oldname, newname);
+    // Return ok if we have a suffix, but the oldname doesn't exist.
+    if (suffix[0] != 0) {
+        BPTR lock = Lock(oldname, ACCESS_READ);
+        if (!lock) {
+            ok = TRUE;
+        } else {
+            UnLock(lock);
+            ok = Rename(oldname, newname);
+        }
+    } else {
+        D(bug("%s: Rename '%s' => '%s'\n", __func__, oldname, newname));
+        ok = Rename(oldname, newname);
+    }
+
     FreeVec(oldname);
 
     return ok;
 }
 
-static IPTR rename_action(struct WorkbookBase *wb, CONST_STRPTR input, APTR arg){
+static IPTR rename_action(struct WorkbookBase *wb, CONST_STRPTR input, APTR arg)
+{
+    ASSERT_VALID_PROCESS(FindTask(NULL));
+
     struct wbIcon *my = arg;
-    CONST_STRPTR title = "Rename";
     BOOL ok;
 
     LONG len = STRLEN(my->File);
@@ -513,20 +533,24 @@ static IPTR rename_action(struct WorkbookBase *wb, CONST_STRPTR input, APTR arg)
                 UnLock(lock);
                 ok = Relabel(buff, input);
                 if (!ok) {
-                    D(bug("%s: Can't relabel %s -> %s\n", buff, input));
+                    wbPopupIoErr(wb, "Relabel", IoErr(), my->File);
                 }
             }
         }
-        title = "Relabel";
     } else {
+        BPTR oldLock = CurrentDir(my->ParentLock);
         ok = rename_path(wb, my->File, input, "");
         if (ok) {
             ok = rename_path(wb, my->File, input, ".info");
+            if (!ok) {
+                // Revert the underlying file's rename.
+                rename_path(wb, input, my->File, "");
+                wbPopupIoErr(wb, "Relabel (.info)", IoErr(), my->File);
+            }
+        } else {
+            wbPopupIoErr(wb, "Relabel", IoErr(), my->File);
         }
-    }
-
-    if (!ok) {
-        wbPopupIoErr(wb, title, IoErr(), my->File);
+        CurrentDir(oldLock);
     }
 
     return ok;
@@ -535,6 +559,8 @@ static IPTR rename_action(struct WorkbookBase *wb, CONST_STRPTR input, APTR arg)
 // WBIM_Rename
 static IPTR WBIcon__WBIM_Rename(Class *cl, Object *obj, Msg msg)
 {
+    ASSERT_VALID_PROCESS(FindTask(NULL));
+
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
 
@@ -543,25 +569,24 @@ static IPTR WBIcon__WBIM_Rename(Class *cl, Object *obj, Msg msg)
 
     if (len > 0 && my->File[len-1] == ':') {
         // Volume rename
-        STRPTR name = AllocVec(FILENAME_MAX, MEMF_ANY);
-        CopyMem(my->File, name, len);
-        name[len - 1] = 0;
-        ok = wbPopupAction(wb, "Relabel", "Enter a new volume name.", "New Name:", name, 0, ":/", rename_action, my);
-        FreeVec(name);
+        ok = wbPopupAction(wb, "Relabel", "Enter a new volume name.", "New Name:", my->Label, 0, ":/", rename_action, my);
     } else {
-        ok = wbPopupAction(wb, "Rename", "Enter a new file name.", "New Name:", FilePart(my->File), 0, ":/", rename_action, my);
+        ok = wbPopupAction(wb, "Rename", "Enter a new file name.", "New Name:", my->File, 0, ":/", rename_action, my);
     }
 
-    return ok ? WBIM_REFRESH : 0;
+    return ok ? WBIF_REFRESH : 0;
 }
 
 // WBIM_Info
 static IPTR WBIcon__WBIM_Info(Class *cl, Object *obj, Msg msg)
 {
+    ASSERT_VALID_PROCESS(FindTask(NULL));
+
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
     BPTR lock;
 
+    BPTR oldLock = CurrentDir(my->ParentLock);
     lock = Lock(my->File, SHARED_LOCK);
     if (lock == BNULL) {
         wbPopupIoErr(wb, "Info", IoErr(), my->File);
@@ -571,6 +596,7 @@ static IPTR WBIcon__WBIM_Info(Class *cl, Object *obj, Msg msg)
         WBInfo(lock, my->File, my->Screen);
         UnLock(lock);
     }
+    CurrentDir(oldLock);
 
     return 0;
 }
@@ -578,15 +604,20 @@ static IPTR WBIcon__WBIM_Info(Class *cl, Object *obj, Msg msg)
 // WBIM_Snapshot
 static IPTR WBIcon__WBIM_Snapshot(Class *cl, Object *obj, Msg msg)
 {
+    ASSERT_VALID_PROCESS(FindTask(NULL));
+
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
     struct Gadget *gadget = (struct Gadget *)obj;
 
-    D(bug("%s: %s\n", my->File));
+    D(bug("%s: %s\n", __func__, my->File));
 
     my->DiskObject->do_CurrentX = gadget->LeftEdge;
     my->DiskObject->do_CurrentY = gadget->TopEdge;
+
+    BPTR oldLock = CurrentDir(my->ParentLock);
     PutIconTags(my->File, my->DiskObject, ICONPUTA_OnlyUpdatePosition, TRUE, TAG_END);
+    CurrentDir(oldLock);
 
     return 0;
 }
@@ -594,38 +625,64 @@ static IPTR WBIcon__WBIM_Snapshot(Class *cl, Object *obj, Msg msg)
 // WBIM_Unsnapshot
 static IPTR WBIcon__WBIM_Unsnapshot(Class *cl, Object *obj, Msg msg)
 {
+    ASSERT_VALID_PROCESS(FindTask(NULL));
+
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
 
-    D(bug("%s: %s\n", my->File));
+    D(bug("%s: %s\n", __func__, my->File));
 
     my->DiskObject->do_CurrentX = (LONG)NO_ICON_POSITION;
     my->DiskObject->do_CurrentY = (LONG)NO_ICON_POSITION;
+
+    BPTR oldLock = CurrentDir(my->ParentLock);
     PutIconTags(my->File, my->DiskObject, ICONPUTA_OnlyUpdatePosition, TRUE, TAG_END);
+    CurrentDir(oldLock);
+
     return 0;
 }
 
 // WBIM_Leave_Out
 static IPTR WBIcon__WBIM_Leave_Out(Class *cl, Object *obj, Msg msg)
 {
+    ASSERT_VALID_PROCESS(FindTask(NULL));
+
     return 0;
 }
 
 // WBIM_Put_Away
 static IPTR WBIcon__WBIM_Put_Away(Class *cl, Object *obj, Msg msg)
 {
+    ASSERT_VALID_PROCESS(FindTask(NULL));
+
     return 0;
 }
 
 // WBIM_Delete
 static IPTR WBIcon__WBIM_Delete(Class *cl, Object *obj, Msg msg)
 {
-    return 0;
+    ASSERT_VALID_PROCESS(FindTask(NULL));
+
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbIcon *my = INST_DATA(cl, obj);
+
+    if (my->ParentLock == BNULL) {
+        // Unable to delete volumes.
+        return 0;
+    }
+
+    BPTR pwd = CurrentDir(my->ParentLock);
+    BOOL ok = wbDeleteFromCurrent(DOSBase, IconBase, my->File, FALSE);
+    CurrentDir(pwd);
+
+    return ok ? WBIF_REFRESH : 0;
 }
 
 // WBwbwiAppendIM_Format
 static IPTR WBIcon__WBIM_Format(Class *cl, Object *obj, Msg msg)
 {
+    ASSERT_VALID_PROCESS(FindTask(NULL));
+
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
 
@@ -651,6 +708,8 @@ static IPTR WBIcon__WBIM_Format(Class *cl, Object *obj, Msg msg)
 // WBIM_Empty_Trash
 static IPTR WBIcon__WBIM_Empty_Trash(Class *cl, Object *obj, Msg msg)
 {
+    ASSERT_VALID_PROCESS(FindTask(NULL));
+
     return 0;
 }
 
@@ -658,7 +717,6 @@ static IPTR WBIcon_dispatcher(Class *cl, Object *obj, Msg msg)
 {
     IPTR rc = 0;
 
-    _D(bug("WBIcon: dispatch 0x%lx\n", msg->MethodID));
     switch (msg->MethodID) {
     METHOD_CASE(WBIcon, OM_NEW);
     METHOD_CASE(WBIcon, OM_DISPOSE);

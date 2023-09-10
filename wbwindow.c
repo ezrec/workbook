@@ -238,12 +238,9 @@ static void wbAddFiles(Class *cl, Object *obj)
         } else {
             while (ExNext(my->Lock, fib)) {
                 if (wbFilterFileInfoBlock(my, fib)) {
-                    char abspath[1024];
-                    strcpy(abspath, my->Path);
-                    AddPart(abspath, fib->fib_FileName, sizeof(abspath));
                     Object *iobj = NewObject(WBIcon, NULL,
-                            WBIA_File, abspath,
-                            WBIA_Label, fib->fib_FileName,
+                            WBIA_ParentLock, my->Lock,
+                            WBIA_File, fib->fib_FileName,
                             WBIA_Screen, my->Window->WScreen,
                             TAG_END);
                     if (iobj != NULL) {
@@ -278,18 +275,20 @@ static void wbAddVolumeIcons(Class *cl, Object *obj)
         tdl = dl;
         while ((tdl = NextDosEntry(tdl, LDF_VOLUMES))) {
             Object *iobj;
-           
+
             CopyMem(AROS_BSTR_ADDR(tdl->dol_Name), text, AROS_BSTR_strlen(tdl->dol_Name));
             CopyMem(":",&text[AROS_BSTR_strlen(tdl->dol_Name)],2);
-            
+
             iobj = NewObject(WBIcon, NULL,
                     WBIA_File, text,
                     WBIA_Label, AROS_BSTR_ADDR(tdl->dol_Name),
+                    WBIA_ParentLock, BNULL,
                     WBIA_Screen, my->Window->WScreen,
                     TAG_END);
             D(bug("Volume: %s => %p\n", text, iobj));
-            if (iobj)
+            if (iobj) {
                 wbwiAppend(cl, obj, iobj);
+            }
         }
         UnLockDosList(LDF_VOLUMES | LDF_READ);
     }
