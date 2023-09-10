@@ -57,6 +57,7 @@ struct WorkbookBase {
     Class  *wb_WBVirtual;
     Class  *wb_WBIcon;
     Class  *wb_WBSet;
+    Class  *wb_WBDragDrop;
 
     Object *wb_App;
 };

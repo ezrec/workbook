@@ -8,6 +8,7 @@ USER_CPPFLAGS := \
 
 FILES := workbook workbook_intern wbcurrent \
 	 wbapp \
+         wbdragdrop \
 	 wbwindow \
 	 wbvirtual \
 	 wbset \

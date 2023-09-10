@@ -240,6 +240,42 @@ static IPTR WBSet__GM_RENDER(Class *cl, Object *obj, struct gpRender *gpr)
     return rc;
 }
 
+static IPTR WBSet__WBxM_DragDropped(Class *cl, Object *obj, struct wbxm_DragDropped *wbxmd)
+{
+    struct wbSet *my = INST_DATA(cl, obj);
+    struct wbSetNode *node, *next;
+    struct Gadget *gadget = (struct Gadget *)obj;
+    IPTR rc = FALSE;
+
+    Object *target = NULL;
+    ULONG gadgetX, gadgetY;
+
+    ForeachNodeSafe(&my->SetObjects, node, next) {
+        struct Gadget *subgad = (struct Gadget *)node->sn_Object;
+        gadgetX = gadget->LeftEdge + wbxmd->wbxmd_MouseX - subgad->LeftEdge;
+        gadgetY = gadget->TopEdge + wbxmd->wbxmd_MouseY - subgad->TopEdge;
+        struct gpHitTest gpht = {
+            .MethodID = GM_HITTEST,
+            .gpht_GInfo = wbxmd->wbxmd_GInfo,
+            .gpht_Mouse = {
+                .X = gadgetX,
+                .Y = gadgetY,
+            },
+        };
+        if (DoMethodA(node->sn_Object, (Msg)&gpht)) {
+            // Hit!
+            target = node->sn_Object;
+        }
+    }
+
+    if (target) {
+        // Send the DragDrop to the target object
+        rc = DoMethod(target, WBxM_DragDropped, NULL, gadgetX, gadgetY);
+    }
+
+    return rc;
+}
+
 static IPTR WBSet_dispatcher(Class *cl, Object *obj, Msg msg)
 {
     IPTR rc = 0;
@@ -252,6 +288,7 @@ static IPTR WBSet_dispatcher(Class *cl, Object *obj, Msg msg)
     METHOD_CASE(WBSet, GM_RENDER);
     METHOD_CASE(WBSet, WBSM_Select);
     METHOD_CASE(WBSet, WBSM_Clean_Up);
+    METHOD_CASE(WBSet, WBxM_DragDropped);
     default:            rc = DoSuperMethodA(cl, obj, msg); break;
     }
 

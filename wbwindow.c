@@ -27,6 +27,7 @@
 #include <intuition/classusr.h>
 #include <libraries/gadtools.h>
 
+#include "wbcurrent.h"
 #include "workbook_intern.h"
 #include "workbook_menu.h"
 #include "classes.h"
@@ -953,7 +954,12 @@ static IPTR WBWindow__WBWM_ForSelected(Class *cl, Object *obj, struct wbwm_ForSe
         IPTR selected = FALSE;
         GetAttr(GA_Selected, wbwi->wbwiObject, &selected);
         if (selected) {
-            IPTR rc = DoMethodA(wbwi->wbwiObject, wbwmf->wbwmf_Msg);
+            IPTR rc;
+            if (wbwmf->wbwmf_Msg->MethodID == WBIM_DragDropAdd) {
+                rc = DoGadgetMethodA((struct Gadget *)wbwi->wbwiObject, my->Window, NULL, wbwmf->wbwmf_Msg);
+            } else {
+                rc = DoMethodA(wbwi->wbwiObject, wbwmf->wbwmf_Msg);
+            }
             if (modifier && (rc & WBIF_REFRESH)) {
                 rescan |= TRUE;
             }
@@ -1154,6 +1160,80 @@ static IPTR WBWindow__WBWM_IntuiTick(Class *cl, Object *obj, Msg msg)
     return rc;
 }
 
+static BOOL wbWindowDragDropAccept(Class *cl, Object *obj, LONG targetX, LONG targetY)
+{
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbWindow *my = INST_DATA(cl, obj);
+
+    struct TagItem *args = NULL;
+    ULONG arg_count = DoMethod(wb->wb_App, WBAM_ReportSelected, (IPTR)&args);
+
+    if (arg_count == 0) {
+        D(bug("%s: Failure to get selected items.\n", __func__));
+        return FALSE;
+    }
+
+    BPTR oldLock = CurrentDir(my->Lock);
+    BOOL ok = wbDropOntoCurrentAt(args, targetX, targetY);
+    LONG err = IoErr();
+    CurrentDir(oldLock);
+
+    FreeTagItems(args);
+
+    if (!ok) {
+        wbPopupIoErr(wb, "Drawer Drag/Drop", err, my->Path);
+    }
+
+    return ok;
+}
+
+static IPTR WBWindow__WBxM_DragDropped(Class *cl, Object *obj, struct wbxm_DragDropped *wbxmd)
+{
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbWindow *my = INST_DATA(cl, obj);
+
+    // Accomodate for the window border
+    LONG areaX = wbxmd->wbxmd_MouseX - my->Window->BorderLeft;
+    LONG areaY = wbxmd->wbxmd_MouseY - my->Window->BorderTop;
+
+    // Accomodate for the location of the Area gadget
+    struct Gadget *area = (struct Gadget *)my->Area;
+    areaX -= area->LeftEdge;
+    areaY -= area->TopEdge;
+
+    // See if we are dropping into the virtual scroll area.
+    if (!(areaX >= 0 && areaY >= 0 && areaX < area->Width && areaY < area->Height)) {
+        // Doesn't even hit the area.
+        return FALSE;
+    }
+
+    // Do the DragDropped on the area.
+    IPTR match = DoGadgetMethod((struct Gadget *)my->Area, my->Window, NULL, WBxM_DragDropped, NULL, areaX, areaY);
+    if (!match) {
+        // Compute the offset into the virtual area
+        IPTR tmp;
+        GetAttr(WBVA_VirtLeft, my->Area, &tmp);
+        WORD virtLeft = (WORD)tmp;
+        GetAttr(WBVA_VirtTop, my->Area, &tmp);
+        WORD virtTop = (WORD)tmp;
+
+        LONG targetX = areaX + virtLeft;
+        LONG targetY = areaY + virtTop;
+
+        // Area didn't have an icon that could accept it, so we will!
+        D(bug("%s: DragDrop accepted by %s, relMouse (%ld, %ld)\n", __func__, my->Path, targetX, targetY));
+        D(wbDebugReportSelected(wb));
+
+        match = wbWindowDragDropAccept(cl, obj, targetX, targetY);
+    }
+
+    if (match) {
+        CoerceMethod(cl, obj, WBWM_InvalidateContents);
+    }
+
+    return match ? TRUE : FALSE;
+}
+
 static IPTR WBWindow_dispatcher(Class *cl, Object *obj, Msg msg)
 {
     IPTR rc = 0;
@@ -1171,6 +1251,7 @@ static IPTR WBWindow_dispatcher(Class *cl, Object *obj, Msg msg)
     METHOD_CASE(WBWindow, WBWM_InvalidateContents);
     METHOD_CASE(WBWindow, WBWM_CacheContents);
     METHOD_CASE(WBWindow, WBWM_ReportSelected);
+    METHOD_CASE(WBWindow, WBxM_DragDropped);
     default:             rc = DoSuperMethodA(cl, obj, msg); break;
     }
 
