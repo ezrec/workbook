@@ -11,7 +11,7 @@ TEST(wbCopyBumpCurrent, copydir) {
         BPTR old = CurrentDir(lock);
         BOOL ok = wbCopyBumpCurrent("sc");
         LONG err = IoErr();
-        bug("%s: 'sc' -> 'Copy_of_sc': %s (%ld)\n", TESTCASE, ok ? "TRUE" : "FALSE", err);
+        bug("%s: 'sc' -> 'Copy_of_sc': %s (%ld)\n", TESTCASE, ok ? "TRUE" : "FALSE", (IPTR)err);
         CurrentDir(old);
         UnLock(lock);
     } else {
@@ -30,7 +30,7 @@ TEST(wbDeleteFromCurrent, existing)
         BPTR old = CurrentDir(lock);
         BOOL ok = wbDeleteFromCurrent("Copy_of_sc", FALSE);
         LONG err = IoErr();
-        bug("%s: 'Copy_of_sc': %s (%ld)\n", TESTCASE, ok ? "TRUE" : "FALSE", err);
+        bug("%s: 'Copy_of_sc': %s (%ld)\n", TESTCASE, ok ? "TRUE" : "FALSE", (IPTR)err);
         CurrentDir(old);
         UnLock(lock);
     } else {

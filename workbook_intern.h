@@ -78,7 +78,7 @@ extern struct ExecBase *SysBase;
 #include <string.h>
 #include <proto/exec.h>
 
-AROS_UFH2(SIPTR, wbOpener, AROS_UFHA(STRPTR, _argptr, A0), AROS_UFHA(ULONG,  _argsize, D0));
+AROS_PROCP(wbOpener);
 
 typedef IPTR (*wbPopupActionFunc)(struct WorkbookBase *wb, CONST_STRPTR input, APTR arg);
 

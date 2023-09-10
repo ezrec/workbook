@@ -129,7 +129,7 @@ static void wbIcon_Update(Class *cl, Object *obj)
 // OM_NEW
 static IPTR WBIcon__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
 {
-    ASSERT_VALID_PROCESS(FindTask(NULL));
+    ASSERT_VALID_PROCESS((struct Process *)FindTask(NULL));
 
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
 
@@ -193,7 +193,7 @@ static IPTR WBIcon__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
 // OM_DISPOSE
 static IPTR WBIcon__OM_DISPOSE(Class *cl, Object *obj, Msg msg)
 {
-    ASSERT_VALID_PROCESS(FindTask(NULL));
+    ASSERT_VALID_PROCESS((struct Process *)FindTask(NULL));
 
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
@@ -473,7 +473,7 @@ static IPTR WBIcon__WBIM_Open(Class *cl, Object *obj, Msg msg)
 // WBIM_Copy
 static IPTR WBIcon__WBIM_Copy(Class *cl, Object *obj, Msg msg)
 {
-    ASSERT_VALID_PROCESS(FindTask(NULL));
+    ASSERT_VALID_PROCESS((struct Process *)FindTask(NULL));
 
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
@@ -514,7 +514,7 @@ static IPTR WBIcon__WBIM_Copy(Class *cl, Object *obj, Msg msg)
 
 static BOOL rename_path(struct WorkbookBase *wb, CONST_STRPTR file, CONST_STRPTR input, CONST_STRPTR suffix)
 {
-    ASSERT_VALID_PROCESS(FindTask(NULL));
+    ASSERT_VALID_PROCESS((struct Process *)FindTask(NULL));
 
     BOOL ok;
 
@@ -557,7 +557,7 @@ static BOOL rename_path(struct WorkbookBase *wb, CONST_STRPTR file, CONST_STRPTR
 
 static IPTR rename_action(struct WorkbookBase *wb, CONST_STRPTR input, APTR arg)
 {
-    ASSERT_VALID_PROCESS(FindTask(NULL));
+    ASSERT_VALID_PROCESS((struct Process *)FindTask(NULL));
 
     struct wbIcon *my = arg;
     BOOL ok;
@@ -603,7 +603,7 @@ static IPTR rename_action(struct WorkbookBase *wb, CONST_STRPTR input, APTR arg)
 // WBIM_Rename
 static IPTR WBIcon__WBIM_Rename(Class *cl, Object *obj, Msg msg)
 {
-    ASSERT_VALID_PROCESS(FindTask(NULL));
+    ASSERT_VALID_PROCESS((struct Process *)FindTask(NULL));
 
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
@@ -624,7 +624,7 @@ static IPTR WBIcon__WBIM_Rename(Class *cl, Object *obj, Msg msg)
 // WBIM_Info
 static IPTR WBIcon__WBIM_Info(Class *cl, Object *obj, Msg msg)
 {
-    ASSERT_VALID_PROCESS(FindTask(NULL));
+    ASSERT_VALID_PROCESS((struct Process *)FindTask(NULL));
 
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
@@ -648,7 +648,7 @@ static IPTR WBIcon__WBIM_Info(Class *cl, Object *obj, Msg msg)
 // WBIM_Snapshot
 static IPTR WBIcon__WBIM_Snapshot(Class *cl, Object *obj, Msg msg)
 {
-    ASSERT_VALID_PROCESS(FindTask(NULL));
+    ASSERT_VALID_PROCESS((struct Process *)FindTask(NULL));
 
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
@@ -669,7 +669,7 @@ static IPTR WBIcon__WBIM_Snapshot(Class *cl, Object *obj, Msg msg)
 // WBIM_Unsnapshot
 static IPTR WBIcon__WBIM_Unsnapshot(Class *cl, Object *obj, Msg msg)
 {
-    ASSERT_VALID_PROCESS(FindTask(NULL));
+    ASSERT_VALID_PROCESS((struct Process *)FindTask(NULL));
 
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
@@ -689,7 +689,7 @@ static IPTR WBIcon__WBIM_Unsnapshot(Class *cl, Object *obj, Msg msg)
 // WBIM_Leave_Out
 static IPTR WBIcon__WBIM_Leave_Out(Class *cl, Object *obj, Msg msg)
 {
-    ASSERT_VALID_PROCESS(FindTask(NULL));
+    ASSERT_VALID_PROCESS((struct Process *)FindTask(NULL));
 
     return 0;
 }
@@ -697,7 +697,7 @@ static IPTR WBIcon__WBIM_Leave_Out(Class *cl, Object *obj, Msg msg)
 // WBIM_Put_Away
 static IPTR WBIcon__WBIM_Put_Away(Class *cl, Object *obj, Msg msg)
 {
-    ASSERT_VALID_PROCESS(FindTask(NULL));
+    ASSERT_VALID_PROCESS((struct Process *)FindTask(NULL));
 
     return 0;
 }
@@ -705,7 +705,7 @@ static IPTR WBIcon__WBIM_Put_Away(Class *cl, Object *obj, Msg msg)
 // WBIM_Delete
 static IPTR WBIcon__WBIM_Delete(Class *cl, Object *obj, Msg msg)
 {
-    ASSERT_VALID_PROCESS(FindTask(NULL));
+    ASSERT_VALID_PROCESS((struct Process *)FindTask(NULL));
 
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
@@ -742,7 +742,7 @@ static IPTR WBIcon__WBIM_Delete(Class *cl, Object *obj, Msg msg)
 
     if (ok) {
         BPTR pwd = CurrentDir(my->ParentLock);
-        ok = wbDeleteFromCurrent(DOSBase, IconBase, my->File, FALSE);
+        ok = wbDeleteFromCurrent(my->File, FALSE);
         err = IoErr();
         CurrentDir(pwd);
     }
@@ -757,7 +757,7 @@ static IPTR WBIcon__WBIM_Delete(Class *cl, Object *obj, Msg msg)
 // WBwbwiAppendIM_Format
 static IPTR WBIcon__WBIM_Format(Class *cl, Object *obj, Msg msg)
 {
-    ASSERT_VALID_PROCESS(FindTask(NULL));
+    ASSERT_VALID_PROCESS((struct Process *)FindTask(NULL));
 
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
@@ -784,7 +784,7 @@ static IPTR WBIcon__WBIM_Format(Class *cl, Object *obj, Msg msg)
 // WBIM_Empty_Trash
 static IPTR WBIcon__WBIM_Empty_Trash(Class *cl, Object *obj, Msg msg)
 {
-    ASSERT_VALID_PROCESS(FindTask(NULL));
+    ASSERT_VALID_PROCESS((struct Process *)FindTask(NULL));
 
     return 0;
 }

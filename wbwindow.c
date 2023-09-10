@@ -888,7 +888,7 @@ static void wbWindowNewCLI(Class *cl, Object *obj)
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbWindow *my = INST_DATA(cl, obj);
 
-    ASSERT_VALID_PROCESS(FindTask(NULL));
+    ASSERT_VALID_PROCESS((struct Process *)FindTask(NULL));
 
     SetWindowPointer(my->Window, WA_BusyPointer, TRUE, TAG_END);
     BPTR old = CurrentDir(my->Lock);

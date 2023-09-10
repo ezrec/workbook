@@ -68,17 +68,19 @@ exit:
     return rc;
 }
 
-static const ULONG mem_types[] = { MEMF_CHIP, MEMF_FAST };
+extern const ULONG mem_types[];
+const ULONG mem_types[] = { MEMF_CHIP, MEMF_FAST };
 #define TEST_MEMAVAIL() do { \
     D(ULONG mem_start[sizeof(mem_types)/sizeof(mem_types)[0]]); \
     D(for (int type = 0; type < sizeof(mem_types)/sizeof(mem_types[0]); type++) mem_start[type]=AvailMem(mem_types[type]));
 
 #define TEST_MEMUSED() \
     D(bug("Memory Information: (NOTE: 32k used by icon.library cache is acceptable)\n")); \
-    D(for (int type = 0; type < sizeof(mem_types)/sizeof(mem_types[0]); type++) bug(" Type 0x%04lx: %ld\n", mem_types[type], mem_start[type] - AvailMem(mem_types[type]))); \
+    D(for (int type = 0; type < sizeof(mem_types)/sizeof(mem_types[0]); type++) bug(" Type 0x%04lx: %ld\n", (IPTR)mem_types[type], mem_start[type] - AvailMem(mem_types[type]))); \
 } while (0)
 
-static void wbUnitTests(struct WorkbookBase *wb) {
+void wbUnitTests(struct WorkbookBase *wb);
+void wbUnitTests(struct WorkbookBase *wb) {
 #include "workbook_test.inc"
 }
 
@@ -98,11 +100,11 @@ AROS_PROCH(wbOpener, argstr, argsize, SysBase)
     struct Process *proc = (struct Process *)FindTask(NULL);
     CONST_STRPTR file = proc->pr_Task.tc_Node.ln_Name;
 
-    // Duplicate lock for CurrentDir (as our parent didn't)
-    CurrentDir(DupLock(CurrentDir(BNULL)));
-
     APTR DOSBase = OpenLibrary("dos.library", 0);
     if (DOSBase) {
+        // Duplicate lock for CurrentDir (as our parent didn't)
+        CurrentDir(DupLock(CurrentDir(BNULL)));
+
         // Determine the absolute path for the thing to open.
         STRPTR abspath = wbAbspathCurrent(file);
         if (abspath != NULL) {
