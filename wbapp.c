@@ -13,6 +13,7 @@
 #include <proto/utility.h>
 #include <proto/gadtools.h>
 #include <proto/graphics.h>
+#include <proto/layers.h>
 
 #include <dos/dostags.h>
 #include <intuition/classusr.h>
@@ -36,6 +37,15 @@ struct wbApp {
 
     // Execute... command buffer
     char ExecuteBuffer[128+1];
+
+    // Drag 'n Drop management
+    Object *DragDrop;
+    BOOL    DragDropActive;
+
+    // On-intitick actions
+    struct {
+        BOOL DragDrop;
+    } OnIntuiTick;
 };
 
 static void wbOpenDrawer(Class *cl, Object *obj, CONST_STRPTR path)
@@ -55,6 +65,21 @@ static void wbOpenDrawer(Class *cl, Object *obj, CONST_STRPTR path)
     {
         DoMethod(obj, OM_ADDMEMBER, win);
     }
+}
+
+static struct Window *wbAppWindowAt(Class *cl, Object *obj, struct Screen *screen) {
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct Layer *layer = NULL;
+
+    LockLayerInfo(&screen->LayerInfo);
+    layer = WhichLayer(&screen->LayerInfo, screen->MouseX, screen->MouseY);
+    UnlockLayerInfo(&screen->LayerInfo);
+
+    if (layer != NULL) {
+        return (struct Window *)layer->Window;
+    }
+
+    return NULL;
 }
 
 // OM_NEW
@@ -112,6 +137,16 @@ static IPTR WBApp__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
     my->WinMask |= (1UL << my->WinPort->mp_SigBit);
     my->NotifyMask |= (1UL << my->NotifyPort->mp_SigBit);
 
+    // Initialize our DragDrop information
+    my->DragDrop = NewObject(WBDragDrop, NULL, WBDA_Screen, my->Screen, TAG_END);
+    if (my->DragDrop == NULL) {
+        DeleteMsgPort(my->NotifyPort);
+        DeleteMsgPort(my->WinPort);
+        DeleteMsgPort(my->AppPort);
+        DoSuperMethod(cl, (Object *)rc, OM_DISPOSE);
+        return 0;
+    }
+
     /* Create our root window */
     my->Root = NewObject(WBWindow, NULL,
                          WBWA_Path, NULL,
@@ -119,8 +154,8 @@ static IPTR WBApp__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
                          WBWA_UserPort, my->WinPort,
                          WBWA_NotifyPort, my->NotifyPort,
                          TAG_END);
-
     if (my->Root == NULL) {
+        DisposeObject(my->DragDrop);
         DeleteMsgPort(my->NotifyPort);
         DeleteMsgPort(my->WinPort);
         DeleteMsgPort(my->AppPort);
@@ -149,6 +184,8 @@ static IPTR WBApp__OM_DISPOSE(Class *cl, Object *obj, Msg msg)
         DisposeObject(obj);
     }
 
+    // Get rid of the DragDrop manager
+    DisposeObject(my->DragDrop);
 
     DeleteMsgPort(my->NotifyPort);
     DeleteMsgPort(my->AppPort);
@@ -506,12 +543,40 @@ static BOOL wbMenuPick(Class *cl, Object *obj, struct Window *win, UWORD menuNum
 
 static void wbIntuiTick(Class *cl, Object *obj, struct Window *win)
 {
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbApp *my = INST_DATA(cl, obj);
     Object *owin;
 
+    if (my->OnIntuiTick.DragDrop) {
+        my->OnIntuiTick.DragDrop = FALSE;
+        // Find the WBWindow (we own) that we dropped into.
+        struct Window *win = wbAppWindowAt(cl, obj, my->Screen);
+        BOOL ok = FALSE;
+        if (win) {
+            // See if this matches any of our owned windows.
+            Object *wbwin = wbLookupWindow(cl, obj, win);
+
+            if (wbwin) {
+                ULONG windowX = my->Screen->MouseX - win->LeftEdge;
+                ULONG windowY = my->Screen->MouseY - win->TopEdge;
+                ok = DoMethod(wbwin, WBxM_DragDropped, NULL, windowX, windowY);
+            }
+        }
+        if (ok) {
+            // Update all windows
+            D(bug("%s: Update all windows...\n", __func__));
+            Object *ostate = (Object *)my->Windows.mlh_Head;
+            Object *owin;
+
+            while ((owin = NextObject(&ostate))) {
+                DoMethod(owin, WBWM_InvalidateContents);
+                DoMethod(owin, WBWM_IntuiTick);
+            }
+         }
+    }
+
     if ((owin = wbLookupWindow(cl, obj, win))) {
-        STACKED ULONG wbintuitmethodID;
-        wbintuitmethodID = WBWM_IntuiTick;
-        DoMethodA(owin, (Msg)&wbintuitmethodID);
+        DoMethod(owin, WBWM_IntuiTick);
     }
 }
 
@@ -651,6 +716,57 @@ static IPTR WBApp__WBAM_Workbench(Class *cl, Object *obj, Msg msg)
     return FALSE;
 }
 
+static IPTR WBApp__WBAM_DragDropBegin(Class *cl, Object *obj, Msg msg)
+{
+    struct wbApp *my = INST_DATA(cl, obj);
+
+    if (my->DragDropActive) {
+        CoerceMethod(cl, obj, WBDM_End);
+    }
+
+    // Add all selected images.
+    IPTR rc = wbAppForSelected(cl, obj, WBIM_DragDropAdd, NULL, my->DragDrop);
+    D(bug("%s: %ld selected for DragDrop\n", __func__, rc));
+
+    if (rc > 0) {
+        // Begin drag/drop
+        DoMethod(my->DragDrop, WBDM_Begin);
+
+        my->DragDropActive = TRUE;
+    }
+
+    return rc;
+}
+
+static IPTR WBApp__WBAM_DragDropUpdate(Class *cl, Object *obj, Msg msg)
+{
+    struct wbApp *my = INST_DATA(cl, obj);
+
+    if (my->DragDropActive) {
+        DoMethod(my->DragDrop, WBDM_Update);
+    }
+
+    return my->DragDropActive;
+}
+
+static IPTR WBApp__WBAM_DragDropEnd(Class *cl, Object *obj, Msg msg)
+{
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbApp *my = INST_DATA(cl, obj);
+
+    if (my->DragDropActive) {
+        // End the current drag/drop
+        my->OnIntuiTick.DragDrop = DoMethod(my->DragDrop, WBDM_End);
+        // Clear any existing DnD images.
+        DoMethod(my->DragDrop, WBDM_Clear);
+
+        my->DragDropActive = FALSE;
+    }
+
+    return 0;
+}
+
+
 static IPTR WBApp_dispatcher(Class *cl, Object *obj, Msg msg)
 {
     IPTR rc = 0;
@@ -661,6 +777,9 @@ static IPTR WBApp_dispatcher(Class *cl, Object *obj, Msg msg)
     METHOD_CASE(WBApp, OM_ADDMEMBER);
     METHOD_CASE(WBApp, OM_REMMEMBER);
     METHOD_CASE(WBApp, WBAM_Workbench);
+    METHOD_CASE(WBApp, WBAM_DragDropBegin);
+    METHOD_CASE(WBApp, WBAM_DragDropUpdate);
+    METHOD_CASE(WBApp, WBAM_DragDropEnd);
     METHOD_CASE(WBApp, WBAM_ForSelected);
     METHOD_CASE(WBApp, WBAM_ClearSelected);
     METHOD_CASE(WBApp, WBAM_ReportSelected);

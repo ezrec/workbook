@@ -40,6 +40,10 @@ static int WB_Main(struct WorkbookBase *wb)
     if (!wb->wb_WBIcon)
         goto exit;
 
+    wb->wb_WBDragDrop   = WBDragDrop_MakeClass(wb);
+    if (!wb->wb_WBDragDrop)
+        goto exit;
+
     struct Screen *screen = LockPubScreen(NULL);
     if (screen) {
         wb->wb_App = NewObject(WBApp, NULL, WBAA_Screen, screen, TAG_END);
@@ -54,6 +58,8 @@ static int WB_Main(struct WorkbookBase *wb)
     }
 
 exit:
+    if (wb->wb_WBDragDrop)
+        FreeClass(wb->wb_WBDragDrop);
     if (wb->wb_WBIcon)
         FreeClass(wb->wb_WBIcon);
     if (wb->wb_WBSet)

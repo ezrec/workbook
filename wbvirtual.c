@@ -300,6 +300,19 @@ static IPTR WBVirtual__GM_HANDLEINPUT(Class *cl, Object *obj, struct gpInput *gp
     return DoMethodA(my->Gadget, (Msg)&m);
 }
 
+static IPTR WBVirtual__WBxM_DragDropped(Class *cl, Object *obj, struct wbxm_DragDropped *wbxmd)
+{
+    struct wbVirtual *my = INST_DATA(cl, obj);
+
+    struct wbxm_DragDropped m;
+
+    m = *wbxmd;
+    m.wbxmd_MouseX += my->Virt.Left;
+    m.wbxmd_MouseY += my->Virt.Top;
+
+    return DoMethodA(my->Gadget, (Msg)&m);
+}
+
 static IPTR WBVirtual_dispatcher(Class *cl, Object *obj, Msg msg)
 {
     IPTR rc = 0;
@@ -314,6 +327,7 @@ static IPTR WBVirtual_dispatcher(Class *cl, Object *obj, Msg msg)
     METHOD_CASE(WBVirtual, GM_GOACTIVE);
     METHOD_CASE(WBVirtual, GM_GOINACTIVE);
     METHOD_CASE(WBVirtual, GM_HANDLEINPUT);
+    METHOD_CASE(WBVirtual, WBxM_DragDropped);
     default:        rc = DoSuperMethodA(cl, obj, msg); break;
     }
 

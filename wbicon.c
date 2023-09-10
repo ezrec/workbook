@@ -410,7 +410,6 @@ static IPTR WBIcon__GM_GOACTIVE(Class *cl, Object *obj, struct gpInput *gpi)
     {
         D(bug("%s: Double-clicked => %lx\n", __func__, (IPTR)wb->wb_App));
 
-        // Open all.
         SetAttrs(obj, GA_Selected, TRUE, TAG_END);
         IPTR msg[] = { WBIM_Open };
         DoMethod(wb->wb_App, WBAM_ForSelected, (Msg)msg);
@@ -422,6 +421,9 @@ static IPTR WBIcon__GM_GOACTIVE(Class *cl, Object *obj, struct gpInput *gpi)
 
             // Select this item.
             wbIconToggleSelected(cl, obj, gpi->gpi_GInfo, gpi->gpi_IEvent->ie_Qualifier);
+
+            // Notify that drag/drop should start.
+            DoMethod(wb->wb_App, WBAM_DragDropBegin);
             rc = GMR_MEACTIVE;
         }
     }
@@ -432,12 +434,15 @@ static IPTR WBIcon__GM_GOACTIVE(Class *cl, Object *obj, struct gpInput *gpi)
 // GM_HANDLEINPUT
 static IPTR WBIcon__GM_HANDLEINPUT(Class *cl, Object *obj, struct gpInput *gpi)
 {
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct InputEvent *iev = gpi->gpi_IEvent;
 
     IPTR rc = GMR_MEACTIVE;
 
     if (iev->ie_Class == IECLASS_RAWMOUSE) {
         switch (iev->ie_Code) {
+        case IECODE_NOBUTTON:
+            DoMethod(wb->wb_App, WBAM_DragDropUpdate);
             break;
         case SELECTUP:
             rc = GMR_REUSE;
@@ -452,6 +457,19 @@ static IPTR WBIcon__GM_HANDLEINPUT(Class *cl, Object *obj, struct gpInput *gpi)
     }
 
     return rc;
+}
+
+// GM_GOACTIVE
+static IPTR WBIcon__GM_GOINACTIVE(Class *cl, Object *obj, struct gpGoInactive *gpgi)
+{
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+
+    D(bug("%s: %lx\n", __func__, obj));
+
+    // Turn off the DnD manager.
+    DoMethod(wb->wb_App, WBAM_DragDropEnd);
+
+    return 0;
 }
 
 // WBIM_Open
@@ -789,6 +807,100 @@ static IPTR WBIcon__WBIM_Empty_Trash(Class *cl, Object *obj, Msg msg)
     return 0;
 }
 
+// WBIM_DragDropAdd
+static IPTR WBIcon__WBIM_DragDropAdd(Class *cl, Object *obj, struct wbimd_DragDropAdd *wbimd)
+{
+    struct wbIcon *my = INST_DATA(cl, obj);
+    struct Gadget *gadget = (struct Gadget *)obj;
+
+    // Adjust Top, Left by Window coordinates
+    D(bug("%s: gadget @(%ld,%ld), window @(%ld,%ld)\n", __func__, gadget->LeftEdge, gadget->TopEdge, wbimd->wbimd_GInfo->gi_Window->LeftEdge, wbimd->wbimd_GInfo->gi_Window->TopEdge));
+    struct Rectangle rect = {
+        .MinX = gadget->LeftEdge + my->HitBox.MinX + wbimd->wbimd_GInfo->gi_Window->LeftEdge,
+        .MinY = gadget->TopEdge + my->HitBox.MinY + wbimd->wbimd_GInfo->gi_Window->TopEdge,
+        .MaxX = gadget->LeftEdge + my->HitBox.MaxX + wbimd->wbimd_GInfo->gi_Window->LeftEdge,
+        .MaxY = gadget->TopEdge + my->HitBox.MaxY + wbimd->wbimd_GInfo->gi_Window->TopEdge,
+    };
+
+    D(bug("%s: Rectangle (%ld,%ld)-(%ldx%ld)\n", __func__, rect.MinX, rect.MinY, rect.MaxX, rect.MaxY));
+
+    return DoMethod(wbimd->wbimd_DragDrop, WBDM_Add, (IPTR)WBDT_RECTANGLE, (IPTR)&rect);
+}
+
+static IPTR WBIcon__WBxM_DragDropped(Class *cl, Object *obj, struct wbxm_DragDropped *wbxmd)
+{
+    ASSERT_VALID_PROCESS((struct Process *)FindTask(NULL));
+
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbIcon *my = INST_DATA(cl, obj);
+
+    D(bug("%s: DragDrop accepted by file %s\n", __func__, my->File));
+
+    IPTR arg_count = DoMethod(wb->wb_App, WBAM_ReportSelected, NULL);
+    if (arg_count < 2) {
+        // Nothing selected.
+        return TRUE;
+    }
+
+    BOOL ok = FALSE;
+    struct TagItem *args = NULL;
+    arg_count = DoMethod(wb->wb_App, WBAM_ReportSelected, &args);
+    D(bug("%s: %ld tags in report\n", __func__, arg_count));
+    if (arg_count == 0) {
+        // Unable to collect report.
+        return FALSE;
+    }
+
+    LONG err = 0;
+
+    BPTR lock = BNULL;
+    BPTR oldLock = CurrentDir(my->ParentLock);
+    switch (my->DiskObject->do_Type) {
+    case WBTOOL:
+        // fallthrough
+    case WBPROJECT:
+        // Can we just drop the tags directly?
+        D(bug("%s: Drop all args onto %s\n", __func__, my->File));
+        ok = OpenWorkbenchObjectA(my->File, args);
+        err = IoErr();
+        break;
+    case WBKICK:
+        // fallthrough
+    case WBDISK:
+        // fallthrough
+    case WBGARBAGE:
+        // fallthrough
+    case WBDRAWER:
+        // Move/Copy source items into the location
+        D(bug("%s: Drag all args into %s\n", __func__, my->File));
+        D(wbDebugReportSelected(wb));
+        lock = Lock(my->File, SHARED_LOCK);
+        if (lock != BNULL) {
+            CurrentDir(lock);
+            ok = wbDropOntoCurrent(args);
+            err = IoErr();
+            UnLock(lock);
+        } else {
+            ok = FALSE;
+            err = IoErr();
+        }
+        break;
+    default:
+        ok = FALSE;
+        err = ERROR_OBJECT_WRONG_TYPE;
+        break;
+    }
+    CurrentDir(oldLock);
+
+    FreeTagItems(args);
+
+    if (!ok) {
+        wbPopupIoErr(wb, "Icon Drag/Drop", err, my->File);
+    }
+
+    return ok;
+}
+
 static IPTR WBIcon_dispatcher(Class *cl, Object *obj, Msg msg)
 {
     IPTR rc = 0;
@@ -802,6 +914,7 @@ static IPTR WBIcon_dispatcher(Class *cl, Object *obj, Msg msg)
     METHOD_CASE(WBIcon, GM_HITTEST);
     METHOD_CASE(WBIcon, GM_GOACTIVE);
     METHOD_CASE(WBIcon, GM_HANDLEINPUT);
+    METHOD_CASE(WBIcon, GM_GOINACTIVE);
     METHOD_CASE(WBIcon, WBIM_Open);
     METHOD_CASE(WBIcon, WBIM_Copy);
     METHOD_CASE(WBIcon, WBIM_Rename);
@@ -813,6 +926,8 @@ static IPTR WBIcon_dispatcher(Class *cl, Object *obj, Msg msg)
     METHOD_CASE(WBIcon, WBIM_Delete);
     METHOD_CASE(WBIcon, WBIM_Format);
     METHOD_CASE(WBIcon, WBIM_Empty_Trash);
+    METHOD_CASE(WBIcon, WBIM_DragDropAdd);
+    METHOD_CASE(WBIcon, WBxM_DragDropped);
     default:               rc = DoSuperMethodA(cl, obj, msg); break;
     }
 
