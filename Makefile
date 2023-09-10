@@ -17,7 +17,13 @@ AMIGA_NDK=$(VBCC)/targets/m68k-amigaos/NDK_3.9
 INCLUDES=$(VBCC)/targets/m68k-amigaos/include $(AMIGA_NDK)/Include/include_h
 DEFINES=-DWB_NAME='$(WB_NAME)' -DWB_VERSION=$(WB_VERSION) -DWB_REVISION=$(WB_REVISION) -DWB_ABOUT='$(WB_ABOUT)'
 
-CFLAGS=+$(VBCC_CONFIG) -g -O0 -DDEBUG=$(DEBUG) \
+ifeq ($(DEBUG),1)
+	DFLAGS := -g -O0 -DDEBUG=1
+else
+	DFLAGS := -O0 -DEBUG=0 -dontwarn=64
+endif
+
+CFLAGS=+$(VBCC_CONFIG) $(DFLAGS) \
 	   -warn=-1 \
 	   -dontwarn=65 -dontwarn=81 \
 	   -dontwarn=163 -dontwarn=166 -dontwarn=167 \
