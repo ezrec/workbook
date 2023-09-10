@@ -56,7 +56,7 @@
 /* Icon Menu */
 #define WBMENU_IC               60, "Icons", 0, 0, 0
 #define WBMENU_IC_OPEN              61, "Open",            "O", 0, 0
-#define WBMENU_IC_COPY              62, "Copy",            "C", Broken 0, 0
+#define WBMENU_IC_COPY              62, "Copy",            "C", 0, 0
 #define WBMENU_IC_RENAME            63, "Rename...",       "R", 0, 0
 #define WBMENU_IC_INFO              64, "Information...",  "I", Broken 0, 0
 #define WBMENU_IC_SNAPSHOT          65, "Snapshot",        "S", 0, 0

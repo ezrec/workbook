@@ -465,7 +465,43 @@ static IPTR WBIcon__WBIM_Open(Class *cl, Object *obj, Msg msg)
 // WBIM_Copy
 static IPTR WBIcon__WBIM_Copy(Class *cl, Object *obj, Msg msg)
 {
-    return 0;
+    ASSERT_VALID_PROCESS(FindTask(NULL));
+
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbIcon *my = INST_DATA(cl, obj);
+
+    BOOL ok;
+
+    // Is this object suitable for a bump copy?
+    switch (my->DiskObject->do_Type) {
+    case WBTOOL:
+        // fallthrough
+    case WBPROJECT:
+        // fallthrough
+    case WBDRAWER:
+        // Things we can copy.
+        ok = TRUE;
+        break;
+    case WBKICK:
+        // fallthrough
+    case WBDISK:
+        // fallthrough
+    case WBGARBAGE:
+        // Things we can't copy.
+        ok = FALSE;
+        break;
+    }
+
+    if (ok) {
+        BPTR pwd = CurrentDir(my->ParentLock);
+        ok = wbCopyBumpCurrent(DOSBase, IconBase, my->File);
+        if (!ok) {
+            wbPopupIoErr(wb, "Copy", IoErr(), my->File);
+        }
+        CurrentDir(pwd);
+    }
+
+    return ok;
 }
 
 static BOOL rename_path(struct WorkbookBase *wb, CONST_STRPTR file, CONST_STRPTR input, CONST_STRPTR suffix)
