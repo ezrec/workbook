@@ -624,11 +624,13 @@ static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
      * and disk paths.
      */
     ULONG mn_open_parent = wbMenuNumber(WBMENU_ID(WBMENU_WN_OPEN_PARENT));
+    ULONG mn_ic_copy = wbMenuNumber(WBMENU_ID(WBMENU_IC_COPY));
     ULONG mn_ic_format = wbMenuNumber(WBMENU_ID(WBMENU_IC_FORMAT));
     ULONG mn_wn_show = wbMenuNumber(WBMENU_ID(WBMENU_WN__SHOW));
     ULONG mn_wn_view = wbMenuNumber(WBMENU_ID(WBMENU_WN__VIEW));
     if (my->Lock == BNULL) {
         OffMenu(my->Window, mn_open_parent);
+        OffMenu(my->Window, mn_ic_copy);
         OnMenu(my->Window, mn_ic_format);
         OffMenu(my->Window, mn_wn_show);
         OffMenu(my->Window, mn_wn_view);
@@ -640,6 +642,7 @@ static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
             OnMenu(my->Window, mn_open_parent);
             UnLock(lock);
         }
+        OnMenu(my->Window, mn_ic_copy);
         OffMenu(my->Window, mn_ic_format);
         OnMenu(my->Window, mn_wn_show);
         OnMenu(my->Window, mn_wn_view);
@@ -846,6 +849,7 @@ static void wbWindowNewCLI(Class *cl, Object *obj)
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbWindow *my = INST_DATA(cl, obj);
 
+    ASSERT_VALID_PROCESS(FindTask(NULL));
 
     SetWindowPointer(my->Window, WA_BusyPointer, TRUE, TAG_END);
     BPTR old = CurrentDir(my->Lock);
