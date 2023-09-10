@@ -709,8 +709,30 @@ static IPTR WBIcon__WBIM_Delete(Class *cl, Object *obj, Msg msg)
 
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
-    BOOL ok = TRUE;
-    LONG err = 0;
+
+    BOOL ok;
+    LONG err;
+
+    // Is this object suitable for a delete?
+    switch (my->DiskObject->do_Type) {
+    case WBTOOL:
+        // fallthrough
+    case WBPROJECT:
+        // fallthrough
+    case WBDRAWER:
+        // Things we can copy.
+        ok = TRUE;
+        break;
+    case WBKICK:
+        // fallthrough
+    case WBDISK:
+        // fallthrough
+    case WBGARBAGE:
+        // Things we can't delete.
+        ok = FALSE;
+        err = ERROR_OBJECT_WRONG_TYPE;
+        break;
+    }
 
     if (ok && my->ParentLock == BNULL) {
         // Unable to root window items.
@@ -720,7 +742,7 @@ static IPTR WBIcon__WBIM_Delete(Class *cl, Object *obj, Msg msg)
 
     if (ok) {
         BPTR pwd = CurrentDir(my->ParentLock);
-        ok = wbDeleteFromCurrent(my->File, FALSE);
+        ok = wbDeleteFromCurrent(DOSBase, IconBase, my->File, FALSE);
         err = IoErr();
         CurrentDir(pwd);
     }
