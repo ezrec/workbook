@@ -63,7 +63,7 @@
 #define WBMENU_IC_UNSNAPSHOT        66, "Unsnapshot",      "U", 0, 0
 #define WBMENU_IC_LEAVE_OUT         67, "Leave out",       "L", Broken 0, 0
 #define WBMENU_IC_PUT_AWAY          68, "Put away",        "P", Broken 0, 0
-#define WBMENU_IC_DELETE            69, "Delete...",         0, Broken 0, 0
+#define WBMENU_IC_DELETE            69, "Delete...",         0, 0, 0
 #define WBMENU_IC_FORMAT            70, "Format...",         0, 0, 0
 #define WBMENU_IC_EMPTY_TRASH       71, "Empty trash",       0, Broken 0, 0
 

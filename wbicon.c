@@ -709,7 +709,12 @@ static IPTR WBIcon__WBIM_Delete(Class *cl, Object *obj, Msg msg)
 
     BPTR pwd = CurrentDir(my->ParentLock);
     BOOL ok = wbDeleteFromCurrent(DOSBase, IconBase, my->File, FALSE);
+    LONG err = IoErr();
     CurrentDir(pwd);
+
+    if (!ok) {
+        wbPopupIoErr(wb, "Delete", err, my->File);
+    }
 
     return ok ? WBIF_REFRESH : 0;
 }
