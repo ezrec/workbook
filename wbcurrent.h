@@ -46,3 +46,6 @@ BOOL _wbMoveIntoCurrentAt(struct Library *_DOSBase, struct Library *_IconBase, B
 #define wbMoveIntoCurrentAt(src_dir, src_file, targetX, targetY) _wbMoveIntoCurrentAt(DOSBase, IconBase, src_dir, src_file, targetX, targetY)
 #define wbMoveIntoCurrent(src_dir, src_file) _wbMoveIntoCurrentAt(DOSBase, IconBase, src_dir, src_file, (LONG)NO_ICON_POSITION, (LONG)NO_ICON_POSITION)
 
+BOOL _wbDropOntoCurrentAt(struct Library *_DOSBase, struct Library *_IconBase, struct Library *_UtilityBase, struct TagItem *tags, LONG targetX, LONG targetY);
+#define wbDropOntoCurrentAt(tags, targetX, targetY) _wbDropOntoCurrentAt(DOSBase, IconBase, UtilityBase, tags, targetX, targetY)
+#define wbDropOntoCurrent(tags) _wbDropOntoCurrentAt(DOSBase, IconBase, UtilityBase, tags, (LONG)NO_ICON_POSITION, (LONG)NO_ICON_POSITION)

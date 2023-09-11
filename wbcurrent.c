@@ -567,3 +567,101 @@ BOOL _wbMoveIntoCurrentAt(struct Library *DOSBase, struct Library *IconBase, BPT
 
     return ok;
 }
+
+// Drop all items into CurrentDir()
+// NOTE: CurrentDir(my->ParentLock) must already be set before calling!
+BOOL _wbDropOntoCurrentAt(struct Library *DOSBase, struct Library *IconBase, struct Library *UtilityBase, struct TagItem *args, LONG targetX, LONG targetY)
+{
+    ASSERT_VALID_PROCESS(FindTask(NULL));
+
+    struct TagItem *ti;
+
+    // Get the lock for CurrentDir()
+    BPTR dst_lock = CurrentDir(BNULL);
+    CurrentDir(dst_lock);
+
+    BPTR src_lock = BNULL;
+    CONST_STRPTR src_file;
+    BOOL ok = TRUE;
+    LONG err = 0;
+
+    while ((ti = NextTagItem(&args)) != NULL) {
+        switch (ti->ti_Tag) {
+        case WBOPENA_ArgLock:
+            src_lock = (BPTR)ti->ti_Data;
+            break;
+        case WBOPENA_ArgName:
+            src_file = (CONST_STRPTR)ti->ti_Data;
+
+            // Dropping to same directory? Ignore icon reposition for now.
+            if (SameLock(dst_lock, src_lock) == LOCK_SAME) {
+                // Ok, nothing to do here. (yet)
+                D(bug("%s: Window icon reposition of %s to %ld,%ld\n", __func__, src_file, targetX, targetY));
+                ok = TRUE;
+                break;
+            }
+
+            // Is the lock for the source the same as current? Don't do that, it'd be recusive!
+            CurrentDir(src_lock);
+            BPTR this_lock = Lock(src_file, SHARED_LOCK);
+            err = IoErr();
+            CurrentDir(dst_lock);
+            if (this_lock == BNULL) {
+                ok = FALSE;
+                D(bug("%s: Unable to lock source file %s\n", __func__, src_file));
+                break;
+            }
+
+            BOOL same = (SameLock(dst_lock, this_lock) == LOCK_SAME);
+            UnLock(this_lock);
+            if (same) {
+                // Ok, nothing to do here. (ever)
+                D(bug("%s: Ignoring recusive directory move of %s\n", __func__, src_file));
+                break;
+            }
+
+            // If both parent locks are BNULL, it's a diskcopy. (not yet supported!)
+            if (dst_lock == BNULL) {
+                // root window move - is this an icon move or a 'bad drop'?
+                if (src_lock == BNULL) {
+                    D(bug("%s: Root icon position move of %s to (%ld,%ld)\n", __func__, src_file, targetX, targetY));
+                    ok = TRUE;
+                    break;
+                } else {
+                    D(bug("%s: Ignoring into-root-window move of %s\n", __func__, src_file));
+                    break;
+                }
+            } else {
+                BPTR dst_parent = ParentDir(dst_lock);
+                BOOL is_diskcopy = (src_lock == BNULL && dst_parent == BNULL);
+                UnLock(dst_parent);
+                if (is_diskcopy) {
+                    D(bug("%s: Ignoring DiskCopy of %s\n", __func__, src_file));
+                    break;
+                }
+            }
+
+            // If parent is on same device, it's a move. Otherwise it's a copy.
+            if (SameDevice(dst_lock, src_lock)) {
+                D(bug("%s: Move %s into %s at (%ld,%ld)\n", __func__, src_file, sCURRDIR(), targetX, targetY));
+                ok = _wbMoveIntoCurrentAt(DOSBase, IconBase, src_lock, src_file, targetX, targetY);
+                err = IoErr();
+            } else {
+                D(bug("%s: Copy %s into %s at (%ld,%ld)\n", __func__, src_file, sCURRDIR(), targetX, targetY));
+                ok = _wbCopyIntoCurrentAt(DOSBase, IconBase, src_lock, src_file, targetX, targetY);
+                err = IoErr();
+            }
+            break;
+        default:
+            break;
+        }
+
+        if (!ok) {
+            break;
+        }
+    }
+
+    SetIoErr(err);
+
+    return ok;
+}
