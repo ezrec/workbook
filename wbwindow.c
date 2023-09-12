@@ -515,6 +515,7 @@ static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
                         WA_Activate,    TRUE,
                         WA_NewLookMenus, TRUE,
                         WA_PubScreen, screen,
+                        WA_BusyPointer, TRUE,
                         ops->ops_AttrList == NULL ? TAG_END : TAG_MORE, ops->ops_AttrList );
         my->Window->BorderTop = my->Window->WScreen->BarHeight+1;
     } else {
@@ -564,6 +565,7 @@ static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
                         WA_SmartRefresh, TRUE,
                         WA_AutoAdjust, TRUE,
                         WA_PubScreen, NULL,
+                        WA_BusyPointer, TRUE,
                         TAG_MORE, (IPTR)&extra[0] );
 
         if (my->Window)
@@ -938,15 +940,19 @@ static IPTR WBWindow__WBWM_ForSelected(Class *cl, Object *obj, struct wbwm_ForSe
     IPTR count = 0;
     BOOL rescan = FALSE;
 
+    BOOL modifier = (wbwmf->wbwmf_Msg->MethodID == WBIM_Rename ||
+                     wbwmf->wbwmf_Msg->MethodID == WBIM_Copy   ||
+                     wbwmf->wbwmf_Msg->MethodID == WBIM_Delete );
+
+    if (modifier) {
+        SetWindowPointer(my->Window, WA_BusyPointer, TRUE, WA_PointerDelay, TRUE, TAG_END);
+    }
     ForeachNode(&my->IconList, wbwi) {
         IPTR selected = FALSE;
         GetAttr(GA_Selected, wbwi->wbwiObject, &selected);
         if (selected) {
             IPTR rc = DoMethodA(wbwi->wbwiObject, wbwmf->wbwmf_Msg);
-            if ((wbwmf->wbwmf_Msg->MethodID == WBIM_Rename ||
-                 wbwmf->wbwmf_Msg->MethodID == WBIM_Copy   ||
-                 wbwmf->wbwmf_Msg->MethodID == WBIM_Delete )
-                && (rc & WBIF_REFRESH)) {
+            if (modifier && (rc & WBIF_REFRESH)) {
                 rescan |= TRUE;
             }
             GetAttr(GA_Selected, wbwi->wbwiObject, &selected);
@@ -956,6 +962,9 @@ static IPTR WBWindow__WBWM_ForSelected(Class *cl, Object *obj, struct wbwm_ForSe
             }
             count += 1;
         }
+    }
+    if (modifier) {
+        SetWindowPointer(my->Window, WA_BusyPointer, FALSE, TAG_END);
     }
 
     if (rescan) {
