@@ -205,35 +205,4 @@ struct phony_segment
     BPTR  Next; /* Next segment (always 0 for this) */
 };
 
-#define __AROS_ASMJMP                   0x4EF9  // m68k
-
-#define __AROS_SET_FULLJMP(v,a)                          \
-do                                                       \
-{                                                        \
-        struct FullJumpVec *_v = v;                      \
-        _v->jmp = __AROS_ASMJMP;                         \
-        _v->vec = ((void *)(a));                         \
-} while(0)
-
-static BPTR __inline_CreateSegList(struct ExecBase *SysBase, APTR function) {
-    struct phony_segment *segtmp;
-    struct FullJumpVec *Code;   /* Code to jump to the offset */
-
-    segtmp = AllocMem(sizeof(*segtmp) + sizeof(*Code), MEMF_ANY);
-    if (!segtmp)
-        return BNULL;
-
-    Code = (struct FullJumpVec *)((IPTR)segtmp + sizeof(*segtmp));
-    segtmp->Size = sizeof(*segtmp) + sizeof(*Code);
-    segtmp->Next = (BPTR)0;
-    __AROS_SET_FULLJMP(Code, function);
-
-    if (SysBase->LibNode.lib_Version >= 36)
-        CacheClearE(Code, sizeof(*Code), CACRF_ClearI | CACRF_ClearD);
-
-    return MKBADDR(&segtmp->Next);
-}
-#define CreateSegList(function) __inline_CreateSegList(SysBase, function)
-
-
 #endif // WORKBOOK_VBCC_H
