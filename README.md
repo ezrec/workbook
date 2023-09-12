@@ -2,6 +2,10 @@
 
 Copy to SYS:System/Workbook
 
+- v1.9
+  - Several Copy and Delete item fixes.
+  - Support StartNotify() for filesystems that have it.
+  - Faster window opening.
 - v1.8
   - Add Copy menu item functionality.
   - Add Delete menu item functionality.
