@@ -30,6 +30,7 @@
 #include "workbook_intern.h"
 #include "workbook_menu.h"
 #include "classes.h"
+#include "wbcurrent.h"
 
 struct wbWindow_Icon {
     struct MinNode wbwiNode;
@@ -50,7 +51,6 @@ struct wbWindow {
     UWORD          dd_ViewModes;
 
     /* Temporary path buffer */
-    TEXT           PathBuffer[PATH_MAX];
     TEXT           ScreenTitle[256];
 
     ULONG          AvailChip;
@@ -59,6 +59,13 @@ struct wbWindow {
 
     /* List of icons in this window */
     struct MinList IconList;
+
+    // Notify request for this drawer.
+    struct {
+        struct NotifyRequest Request;
+        struct MsgPort *NotifyPort;
+        BOOL Cached;                    // Contents have been cached.
+    } Notify;
 };
 
 #define Broken NM_ITEMDISABLED |
@@ -233,6 +240,7 @@ static void wbAddFiles(Class *cl, Object *obj)
 
     struct FileInfoBlock *fib = AllocDosObject(DOS_FIB, NULL);
     if (fib != NULL) {
+        D(bug("%s: Examine %ld\n", __func__, (IPTR)BADDR(my->Lock)));
         if (!Examine(my->Lock, fib)) {
             wbPopupIoErr(wb, "Update", IoErr(), my->Path);
         } else {
@@ -308,10 +316,10 @@ static void wbWindowRedimension(Class *cl, Object *obj)
     real.Height= win->Height- (win->BorderTop  + win->BorderBottom);
 
     D(bug("%s: Real   (%ld,%ld) %ldx%ld\n", __func__,
-                real.Left, real.Top, real.Width, real.Height));
+                (IPTR)real.Left, (IPTR)real.Top, (IPTR)real.Width, (IPTR)real.Height));
     D(bug("%s: Border (%ld,%ld) %ldx%ld\n", __func__,
-                my->Window->BorderLeft, my->Window->BorderTop,
-                my->Window->BorderRight, my->Window->BorderBottom));
+                (IPTR)my->Window->BorderLeft, (IPTR)my->Window->BorderTop,
+                (IPTR)my->Window->BorderRight, (IPTR)my->Window->BorderBottom));
 
     SetAttrs(my->Area, GA_Top, real.Top,
                        GA_Left,  real.Left,
@@ -360,21 +368,37 @@ static void wbWindowRedimension(Class *cl, Object *obj)
 
 }
 
+// Invalidate the cache.
+static IPTR WBWindow__WBWM_InvalidateContents(Class *cl, Object *obj, Msg msg)
+{
+    struct wbWindow *my = INST_DATA(cl, obj);
+
+    my->Notify.Cached = FALSE;
+
+    return 0;
+}
+
 /* Rescan the Lock for new entries */
-static void wbRescan(Class *cl, Object *obj)
+static IPTR WBWindow__WBWM_CacheContents(Class *cl, Object *obj, Msg msg)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbWindow *my = INST_DATA(cl, obj);
     struct wbWindow_Icon *wbwi;
 
+    if (my->Notify.Cached) {
+        return 0;
+    }
+
     /* We're going to busy for a while */
-    D(bug("BUSY....\n"));
+    D(bug("%s: BUSY....\n", __func__));
     SetWindowPointer(my->Window, WA_BusyPointer, TRUE, TAG_END);
 
     /* Remove and undisplay any existing icons */
-    while ((wbwi = (struct wbWindow_Icon *)REMHEAD((struct List *)&my->IconList)) != NULL) {
+    struct wbWindow_Icon *tmp;
+    ForeachNodeSafe(&my->IconList, wbwi, tmp) {
         DoMethod(my->Set, OM_REMMEMBER, wbwi->wbwiObject);
         DisposeObject(wbwi->wbwiObject);
+        RemoveMinNode(&wbwi->wbwiNode);
         FreeMem(wbwi, sizeof(*wbwi));
     }
 
@@ -394,15 +418,19 @@ static void wbRescan(Class *cl, Object *obj)
         DoMethod(my->Set, OM_ADDMEMBER, (IPTR)wbwi->wbwiObject);
     }
 
-    /* Re-render the set */
-    DoGadgetMethod((struct Gadget *)my->Set, my->Window, NULL, GM_RENDER, NULL, NULL, GREDRAW_REDRAW);
+    /* Arrange the set */
+    DoGadgetMethod((struct Gadget *)my->Set, my->Window, NULL, (IPTR)WBSM_Clean_Up, NULL);
 
     /* Adjust the scrolling regions */
     wbWindowRedimension(cl, obj);
 
     /* Return the point back to normal */
     SetWindowPointer(my->Window, WA_BusyPointer, FALSE, TAG_END);
-    D(bug("Not BUSY....\n"));
+    D(bug("%s: Not BUSY....\n", __func__));
+
+    my->Notify.Cached = TRUE;
+
+    return 0;
 }
 
 
@@ -436,7 +464,6 @@ static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
     ULONG idcmp;
     IPTR rc = 0;
     APTR vis;
-    struct wbWindow_Icon *wbwi;
 
     struct Screen *screen = (struct Screen *)GetTagData(WBWA_Screen, (IPTR)NULL, ops->ops_AttrList);
     if (screen == NULL) {
@@ -477,6 +504,7 @@ static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
 
     idcmp = IDCMP_MENUPICK | IDCMP_INTUITICKS;
     struct MsgPort *userport = (struct MsgPort *)GetTagData(WBWA_UserPort, (IPTR)NULL, ops->ops_AttrList);
+    struct MsgPort *notifyport = (struct MsgPort *)GetTagData(WBWA_NotifyPort, (IPTR)NULL, ops->ops_AttrList);
 
     if (my->Path == NULL) {
         my->Window = OpenWindowTags(NULL,
@@ -590,9 +618,6 @@ static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
                 PGA_Top, 0,
                 TAG_END)), 0);
 
-    /* Send first intuitick */
-    DoMethod(obj, WBWM_IntuiTick);
-
     my->Menu = CreateMenusA((struct NewMenu *)WBWindow_menu, NULL);
     if (my->Menu == NULL) {
         D(bug("%s: Unable to create  menus\n", __func__));
@@ -674,29 +699,30 @@ static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
 
     RefreshGadgets(my->Window->FirstGadget, my->Window, NULL);
 
-    wbRescan(cl, obj);
+    // Now that we are ready to go, start watching this drawer.
+    my->Notify.Request = (struct NotifyRequest){
+        .nr_Name = my->Path,
+        .nr_UserData = (IPTR)obj,
+        .nr_Flags = NRF_SEND_MESSAGE  | NRF_NOTIFY_INITIAL,
+    };
+    my->Notify.Request.nr_stuff.nr_Msg.nr_Port = notifyport;
+    my->Notify.Cached = FALSE;
+
+    if (notifyport != NULL && StartNotify(&my->Notify.Request)) {
+        D(bug("%s: StartNotify('%s') - '%s' actual.\n", __func__, my->Path, my->Notify.Request.nr_FullName));
+    } else {
+        D(bug("%s: Unable to StartNotify('%s') - faking it. (%ld)\n", __func__, my->Path, IoErr()));
+        my->Notify.Request.nr_stuff.nr_Msg.nr_Port = NULL;
+    }
+
+    /* Send first intuitick */
+    DoMethod(obj, WBWM_IntuiTick);
 
     return rc;
 
 error:
-    while ((wbwi = (APTR)GetHead((struct List *)&my->IconList)) != NULL) {
-        Remove((struct Node *)wbwi);
-        FreeMem(wbwi, sizeof(*wbwi));
-    }
+    CoerceMethod(cl, obj, OM_DISPOSE, 0);
 
-    if (my->Set)
-        DisposeObject(my->Set);
-
-    if (my->Window)
-        CloseWindow(my->Window);
-
-    if (my->Path)
-        FreeVec(my->Path);
-
-    if (my->Lock != BNULL)
-        UnLock(my->Lock);
-
-    DoSuperMethod(cl, obj, OM_DISPOSE, 0);
     return 0;
 }
 
@@ -705,6 +731,10 @@ static IPTR WBWindow__OM_DISPOSE(Class *cl, Object *obj, Msg msg)
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbWindow *my = INST_DATA(cl, obj);
     struct wbWindow_Icon *wbwi;
+
+    if (my->Notify.Request.nr_stuff.nr_Msg.nr_Port != NULL) {
+        EndNotify(&my->Notify.Request);
+    }
 
     ClearMenuStrip(my->Window);
     FreeMenus(my->Menu);
@@ -747,11 +777,13 @@ static IPTR WBWindow__OM_DISPOSE(Class *cl, Object *obj, Msg msg)
     /* .. except for my->Set */
     DisposeObject(my->Set);
 
-    if (my->Path)
+    if (my->Path) {
         FreeVec(my->Path);
+    }
 
-    if (my->Lock != BNULL)
+    if (my->Lock != BNULL) {
         UnLock(my->Lock);
+    }
 
     return DoSuperMethodA(cl, obj, msg);
 }
@@ -914,7 +946,7 @@ static IPTR WBWindow__WBWM_ForSelected(Class *cl, Object *obj, struct wbwm_ForSe
             if ((wbwmf->wbwmf_Msg->MethodID == WBIM_Rename ||
                  wbwmf->wbwmf_Msg->MethodID == WBIM_Copy   ||
                  wbwmf->wbwmf_Msg->MethodID == WBIM_Delete )
-                && rc == WBIF_REFRESH) {
+                && (rc & WBIF_REFRESH)) {
                 rescan |= TRUE;
             }
             GetAttr(GA_Selected, wbwi->wbwiObject, &selected);
@@ -927,7 +959,10 @@ static IPTR WBWindow__WBWM_ForSelected(Class *cl, Object *obj, struct wbwm_ForSe
     }
 
     if (rescan) {
-        wbRescan(cl, obj);
+        if (my->Notify.Request.nr_stuff.nr_Msg.nr_Port==NULL) {
+            CoerceMethod(cl, obj, WBWM_InvalidateContents);
+            CoerceMethod(cl, obj, WBWM_CacheContents);
+        }
     }
 
     D(bug("%s: %ld selected.\n", __func__, count));
@@ -943,17 +978,20 @@ static IPTR WBWindow__WBWM_MenuPick(Class *cl, Object *obj, struct wbwm_MenuPick
     struct wbWindow *my = INST_DATA(cl, obj);
     struct MenuItem *item = wbwmp->wbwmp_MenuItem;
     BPTR lock;
-    IPTR rc = 0;
+    IPTR rc;
 
     switch (WBMENU_ITEM_ID(item)) {
     case WBMENU_ID(WBMENU_WN_OPEN_PARENT):
         if (my->Lock != BNULL) {
             lock = ParentDir(my->Lock);
-            if (NameFromLock(lock, my->PathBuffer, sizeof(my->PathBuffer))) {
-                OpenWorkbenchObject(my->PathBuffer, TAG_END);
+            STRPTR path = wbAbspathLock(lock);
+            if (path != NULL) {
+                OpenWorkbenchObject(path, TAG_END);
+                FreeVec(path);
             }
             UnLock(lock);
         }
+        rc = 0;
         break;
     case WBMENU_ID(WBMENU_WN_SELECT_CONTENTS):
         DoGadgetMethod((struct Gadget *)my->Set, my->Window, NULL, (IPTR)WBSM_Select, NULL, (IPTR)TRUE);
@@ -967,10 +1005,12 @@ static IPTR WBWindow__WBWM_MenuPick(Class *cl, Object *obj, struct wbwm_MenuPick
         rc = WBIF_REFRESH;
         break;
     case WBMENU_ID(WBMENU_WN__SNAP_WINDOW):
-        rc = wbWindowSnapshot(cl, obj, FALSE);
+        wbWindowSnapshot(cl, obj, FALSE);
+        rc = 0;
         break;
     case WBMENU_ID(WBMENU_WN__SNAP_ALL):
-        rc = wbWindowSnapshot(cl, obj, TRUE);
+        wbWindowSnapshot(cl, obj, TRUE);
+        rc = 0;
         break;
     case WBMENU_ID(WBMENU_WN__SHOW_ICONS):
         my->dd_Flags = DDFLAGS_SHOWICONS;
@@ -989,7 +1029,9 @@ static IPTR WBWindow__WBWM_MenuPick(Class *cl, Object *obj, struct wbwm_MenuPick
     }
 
     if (rc & WBIF_REFRESH) {
-        wbRescan(cl, obj);
+        // Always force, regardless of notification mode.
+        CoerceMethod(cl, obj, WBWM_InvalidateContents);
+        CoerceMethod(cl, obj, WBWM_CacheContents);
     }
 
     return rc;
@@ -1038,6 +1080,9 @@ static IPTR WBWindow__WBWM_IntuiTick(Class *cl, Object *obj, Msg msg)
         rc = TRUE;
     }
 
+    // Fake notifications
+    CoerceMethod(cl, obj, WBWM_CacheContents);
+
     return rc;
 }
 
@@ -1055,6 +1100,8 @@ static IPTR WBWindow_dispatcher(Class *cl, Object *obj, Msg msg)
     METHOD_CASE(WBWindow, WBWM_IntuiTick);
     METHOD_CASE(WBWindow, WBWM_Refresh);
     METHOD_CASE(WBWindow, WBWM_ForSelected);
+    METHOD_CASE(WBWindow, WBWM_InvalidateContents);
+    METHOD_CASE(WBWindow, WBWM_CacheContents);
     default:             rc = DoSuperMethodA(cl, obj, msg); break;
     }
 
