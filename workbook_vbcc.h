@@ -38,7 +38,7 @@ static inline VOID bug(CONST_STRPTR format, ...) {
 #if DEBUG
 #define D(x) x
 #define ASSERT(x) do { \
-    if (!(x)) { bug("%s: assertion (%s) == FALSE", __func__, #x); Alert(AN_Workbench); } \
+    if (!(x)) { bug("%s: assertion (%s) == FALSE\n", __func__, #x); Alert(AN_Workbench); } \
 } while (0)
 #define ASSERT_VALID_PTR(x) do { ASSERT((IPTR)(x) > 1024); ASSERT(TypeOfMem((APTR)(x)) != 0); } while (0)
 #define ASSERT_VALID_PROCESS(p) do { \
