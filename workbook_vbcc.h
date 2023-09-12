@@ -45,7 +45,7 @@ static inline VOID bug(CONST_STRPTR format, ...) {
     ASSERT_VALID_PTR(p); ASSERT(((struct Node *)(p))->ln_Type == NT_PROCESS); \
 } while (0)
 #else
-#define ASSERT(x) do { if (0) { (void)(x); } } while (0)
+#define ASSERT(x) do { if (x) { } } while (0)
 #define ASSERT_VALID_PTR(x) do { if (0) { (void)(x); } } while (0)
 #define ASSERT_VALID_PROCESS(x) do { if (0) { (void)(x); } } while (0)
 #define D(x)
