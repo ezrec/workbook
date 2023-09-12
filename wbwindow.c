@@ -592,6 +592,8 @@ static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
      */
     AddGadget(my->Window, (struct Gadget *)(my->Area = NewObject(WBVirtual, NULL,
                 WBVA_Gadget, (IPTR)my->Set,
+                GA_Left, my->Window->BorderLeft,
+                GA_Top, my->Window->BorderTop,
                 TAG_END)), 0);
 
     /* Add the verical scrollbar */
