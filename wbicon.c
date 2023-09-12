@@ -155,6 +155,7 @@ static IPTR WBIcon__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
 
     file = StrDup(file);
     if (!file) {
+        FreeDiskObject(diskobject);
         return 0;
     }
 
@@ -164,6 +165,7 @@ static IPTR WBIcon__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
     label = StrDup(label);
     if (label == NULL) {
         FreeVec(file);
+        FreeDiskObject(diskobject);
         return 0;
     }
 
@@ -171,6 +173,7 @@ static IPTR WBIcon__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
     if (obj == NULL) {
         FreeVec(label);
         FreeVec(file);
+        FreeDiskObject(diskobject);
         return 0;
     }
 
@@ -195,8 +198,13 @@ static IPTR WBIcon__OM_DISPOSE(Class *cl, Object *obj, Msg msg)
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
 
+    ASSERT(my->Label != NULL);
     FreeVec(my->Label);
+
+    ASSERT(my->File != NULL);
     FreeVec(my->File);
+
+    ASSERT(my->DiskObject != NULL);
     FreeDiskObject(my->DiskObject);
 
     return DoSuperMethodA(cl, obj, msg);
@@ -457,7 +465,7 @@ static IPTR WBIcon__WBIM_Open(Class *cl, Object *obj, Msg msg)
             NP_Entry, (IPTR)wbOpener,
             NP_CurrentDir, (IPTR)my->ParentLock,
             TAG_END);
-    D(bug("WBIcon.Open: %s via %lx\n", my->File, proc));
+    D(bug("WBIcon.Open: %s via %lx\n", my->File, (IPTR)proc));
 
     return 0;
 }
