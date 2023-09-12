@@ -29,6 +29,8 @@ struct wbApp {
     ULONG           WinMask;   /* Mask of our port(s) */
     struct MsgPort *AppPort;
     ULONG           AppMask;   /* Mask of our port(s) */
+    struct MsgPort *NotifyPort;
+    ULONG           NotifyMask;   /* Mask of our port(s) */
     Object         *Root;      /* Background 'root' window */
     struct MinList  Windows; /* Subwindows */
 
@@ -43,8 +45,9 @@ static void wbOpenDrawer(Class *cl, Object *obj, CONST_STRPTR path)
     Object *win;
 
     win = NewObject(WBWindow, NULL,
-                        WBWA_UserPort, my->WinPort,
                         WBWA_Path, path,
+                        WBWA_UserPort, my->WinPort,
+                        WBWA_NotifyPort, my->NotifyPort,
                         WBWA_Screen, my->Screen,
                         TAG_END);
 
@@ -95,17 +98,30 @@ static IPTR WBApp__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
         return 0;
     }
 
+    /* Create our Notify message port */
+    my->NotifyPort = CreatePort(NULL, 0);
+
+    if (my->NotifyPort == NULL) {
+        DeleteMsgPort(my->WinPort);
+        DeleteMsgPort(my->AppPort);
+        DoSuperMethod(cl, (Object *)rc, OM_DISPOSE);
+        return 0;
+    }
+
     my->AppMask |= (1UL << my->AppPort->mp_SigBit);
     my->WinMask |= (1UL << my->WinPort->mp_SigBit);
+    my->NotifyMask |= (1UL << my->NotifyPort->mp_SigBit);
 
     /* Create our root window */
     my->Root = NewObject(WBWindow, NULL,
                          WBWA_Path, NULL,
                          WBWA_Screen, my->Screen,
                          WBWA_UserPort, my->WinPort,
+                         WBWA_NotifyPort, my->NotifyPort,
                          TAG_END);
 
     if (my->Root == NULL) {
+        DeleteMsgPort(my->NotifyPort);
         DeleteMsgPort(my->WinPort);
         DeleteMsgPort(my->AppPort);
         DoSuperMethod(cl, (Object *)rc, OM_DISPOSE);
@@ -134,6 +150,7 @@ static IPTR WBApp__OM_DISPOSE(Class *cl, Object *obj, Msg msg)
     }
 
 
+    DeleteMsgPort(my->NotifyPort);
     DeleteMsgPort(my->AppPort);
     DeleteMsgPort(my->WinPort);
 
@@ -256,7 +273,7 @@ static IPTR WBApp__WBAM_ForSelected(Class *cl, Object *obj, struct wbam_ForSelec
     Object *ostate = (Object *)my->Windows.mlh_Head;
     Object *owin;
 
-    D(bug("%s: MethodID: 0x%08lx\n", __func__, wbamf->wbamf_Msg->MethodID));
+    D(bug("%s: MethodID: 0x%08lx\n", __func__, (IPTR)wbamf->wbamf_Msg->MethodID));
 
     // Broadcast to all child windows.
     IPTR rc = 0;
@@ -442,7 +459,7 @@ static void wbIntuiTick(Class *cl, Object *obj, struct Window *win)
     }
 }
 
-static void wbHideAllWindows(Class *cl, Object *obj)
+static void wbForAllWindows(Class *cl, Object *obj, ULONG method)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbApp *my = INST_DATA(cl, obj);
@@ -450,20 +467,18 @@ static void wbHideAllWindows(Class *cl, Object *obj)
     Object *owin;
 
     while ((owin = NextObject(&ostate))) {
-        DoMethod(owin, WBWM_Hide);
+        DoMethod(owin, method);
     }
+}
+
+static void wbHideAllWindows(Class *cl, Object *obj)
+{
+    wbForAllWindows(cl, obj, WBWM_Hide);
 }
 
 static void wbShowAllWindows(Class *cl, Object *obj)
 {
-    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
-    struct wbApp *my = INST_DATA(cl, obj);
-    Object *ostate = (Object *)my->Windows.mlh_Head;
-    Object *owin;
-
-    while ((owin = NextObject(&ostate))) {
-        DoMethod(owin, WBWM_Show);
-    }
+    wbForAllWindows(cl, obj, WBWM_Show);
 }
 
 static void wbCloseAllWindows(Class *cl, Object *obj)
@@ -494,7 +509,7 @@ static IPTR WBApp__WBAM_Workbench(Class *cl, Object *obj, Msg msg)
         while (!done) {
             ULONG mask;
 
-            mask = Wait(my->AppMask | my->WinMask);
+            mask = Wait(my->AppMask | my->WinMask | my->NotifyMask);
 
             if (mask & my->AppMask) {
                 struct WBHandlerMessage *wbhm;
@@ -553,7 +568,24 @@ static IPTR WBApp__WBAM_Workbench(Class *cl, Object *obj, Msg msg)
                     GT_ReplyIMsg(im);
                 }
             }
-        }
+
+            if (mask & my->NotifyMask) {
+                struct NotifyMessage *nm;
+                BOOL invalidated = FALSE;
+                D(bug("%s: Notify messages waiting.\n", __func__));
+                while ((nm = (APTR)GetMsg(my->NotifyPort)) != NULL) {
+                    Object *wbwin = (Object *)nm->nm_NReq->nr_UserData;
+                    D(bug("%s: Notfied: %lx\n", __func__, (IPTR)wbwin));
+                    DoMethod(wbwin, WBWM_InvalidateContents);
+                    invalidated = TRUE;
+                }
+
+                if (invalidated) {
+                    wbForAllWindows(cl, obj, WBWM_CacheContents);
+                }
+            }
+
+         }
 
         wbCloseAllWindows(cl, obj);
 

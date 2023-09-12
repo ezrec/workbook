@@ -53,6 +53,7 @@ Class *WBApp_MakeClass(struct WorkbookBase *wb);
 #define WBWA_UserPort            (WBWA_Dummy+1)  // (struct MsgPort *) [OM_NEW]
 #define WBWA_Window              (WBWA_Dummy+2)  // (struct Window *) [OM_GET]
 #define WBWA_Screen              (WBWA_Dummy+3)  // (struct Screen *) [OM_NEW]
+#define WBWA_NotifyPort          (WBWA_Dummy+4)  // (struct MsgPort *) [OM_NEW]
 
 /* Methods */
 #define WBWM_Dummy               (TAG_USER | 0x40410100)
@@ -63,6 +64,8 @@ Class *WBApp_MakeClass(struct WorkbookBase *wb);
 #define WBWM_Show                (WBWM_Dummy+4)  /* N/A */
 #define WBWM_Refresh             (WBWM_Dummy+5)  /* N/A */
 #define WBWM_ForSelected         (WBWM_Dummy+6)  /* Msg */
+#define WBWM_InvalidateContents  (WBWM_Dummy+7)  /* N/A */
+#define WBWM_CacheContents       (WBWM_Dummy+8)  /* N/A */
 
 struct wbwm_MenuPick {
     STACKED ULONG             MethodID;
