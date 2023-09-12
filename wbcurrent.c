@@ -74,7 +74,6 @@ static BOOL wbDeleteInto(struct Library *DOSBase, BPTR dir, struct FileInfoBlock
         }
 
         // Re-Examine the directory, as we may have disturbed the directory's ExNext() chains.
-        D(bug("%s: Examine %ld\n", __func__, (IPTR)BADDR(dir)));
         ok = Examine(dir, fib);
         if (!ok) {
             break;
@@ -102,7 +101,6 @@ static BOOL wbDeleteThisCurrent(struct Library *DOSBase, CONST_STRPTR file, stru
         err = IoErr();
         ok = FALSE;
     } else {
-        D(bug("%s: Examine %ld\n", __func__, (IPTR)BADDR(lock)));
         ok = Examine(lock, fib);
         if (ok) {
             if (fib->fib_DirEntryType >= 0) {
@@ -139,7 +137,6 @@ BOOL _wbDeleteFromCurrent(struct Library *DOSBase, struct Library *IconBase, CON
     if (only_contents) {
         BPTR lock = Lock(file, SHARED_LOCK);
         if (lock != BNULL) {
-            D(bug("%s: Examine %ld\n", __func__, (IPTR)BADDR(lock)));
             ok = Examine(lock, fib);
             if (fib->fib_DirEntryType < 0) {
                 // We can't "delete only contents" a file.
@@ -279,6 +276,7 @@ static inline CONST_STRPTR _sLOCKNAME(struct Library *DOSBase, BPTR lock) {
 
 // Copy a single file/directory to here.
 // Does NOT take special care for .icon files!
+// NOTE: This routine _eats_ src_lock!
 static BOOL wbCopyLockCurrent(struct Library *DOSBase, CONST_STRPTR dst_file, BPTR src_lock)
 {
     ASSERT_VALID_PROCESS(FindTask(NULL));
@@ -290,13 +288,11 @@ static BOOL wbCopyLockCurrent(struct Library *DOSBase, CONST_STRPTR dst_file, BP
     struct FileInfoBlock *fib = AllocDosObjectTags(DOS_FIB, TAG_END);
     if (!fib) {
         D(bug("%s: Can't allocate FIB\n", __func__));
+        UnLock(src_lock);
         return FALSE;
     }
 
-    D(bug("%s: %s => %s/%s\n", __func__, sLOCKNAME(src_lock), sCURRDIR(), dst_file));
-
     // Examine the lock to see what it is.
-    D(bug("%s: Examine %ld\n", __func__, (IPTR)BADDR(src_lock)));
     ok = Examine(src_lock, fib);
     if (ok) {
         // Cache attributes we may need later.
@@ -307,7 +303,6 @@ static BOOL wbCopyLockCurrent(struct Library *DOSBase, CONST_STRPTR dst_file, BP
             // Directory copies.
             BPTR dst_lock = CreateDir(dst_file);
             err = IoErr();
-            D(if (dst_lock == BNULL) bug("%s: CreateDir(%s): %ld\n", __func__, dst_file, (IPTR)err));
             if (dst_lock != BNULL) {
                 // 'cd' into destination dir
                 BPTR pwd = CurrentDir(dst_lock);
@@ -317,11 +312,12 @@ static BOOL wbCopyLockCurrent(struct Library *DOSBase, CONST_STRPTR dst_file, BP
                     BPTR this_lock;
                     CurrentDir(src_lock);
                     this_lock = Lock(fib->fib_FileName, SHARED_LOCK);
-                    err = IoErr();
                     CurrentDir(dst_lock);
+
+                    D(if (this_lock == BNULL) bug("%s: Can't lock %s|%s\n", sCURRDIR(), fib->fib_FileName));
+                    err = IoErr();
                     if (this_lock != BNULL) {
                         ok = wbCopyLockCurrent(DOSBase, fib->fib_FileName, this_lock);
-                        UnLock(this_lock);
                         err = IoErr();
                         if (!ok) {
                             break;
@@ -330,23 +326,29 @@ static BOOL wbCopyLockCurrent(struct Library *DOSBase, CONST_STRPTR dst_file, BP
                 }
                 CurrentDir(pwd);
                 UnLock(dst_lock);
+            } else {
+                D(bug("%s: CreateDir(%s): %ld\n", __func__, dst_file, (IPTR)err));
             }
+            UnLock(src_lock);
         } else {
             // Copy the old file to the new location
-            BYTE *buff = AllocMem(buff_size, MEMF_ANY);
-            D(if (!buff) bug("%s: AllocMem(%ld) = NULL\n", __func__, buff_size));
+            BYTE *buff = AllocVec(buff_size, MEMF_ANY);
             if (!buff) {
+                D(bug("%s: AllocVec(%ld, MEMF_ANY) = NULL\n", __func__, buff_size));
+                UnLock(src_lock);
                 err = ERROR_NO_FREE_STORE;
                 ok = FALSE;
             } else {
-                BPTR flock = DupLock(src_lock);
-                BPTR srcfh = OpenFromLock(flock);
+                BPTR srcfh = OpenFromLock(src_lock);
                 err = IoErr();
                 if (srcfh == BNULL) {
-                    UnLock(flock);
-                }
-                D(if (srcfh == BNULL) bug("%s: OpenFromLock(%s): %ld\n", __func__, sLOCKNAME(src_lock), IoErr()));
-                if (srcfh != BNULL) {
+                    D(bug("%s: OpenFromLock(%s): %ld\n", __func__, sLOCKNAME(src_lock), IoErr()));
+                    if (err != 0) {
+                        // WORKAROUND: Some AROS kernels have a bug where OpenFromLock() succeeds, yet
+                        //             returns an BNULL filehandle! If (fh = BNULL, IoErr() == 0), don't UnLock()!
+                        UnLock(src_lock);
+                    }
+                } else {
                     BPTR dst_lock = Lock(dst_file, SHARED_LOCK);
                     if (dst_lock != BNULL) {
                         // Don't copy on top of an existing object.
@@ -381,7 +383,7 @@ static BOOL wbCopyLockCurrent(struct Library *DOSBase, CONST_STRPTR dst_file, BP
                     }
                     Close(srcfh);
                 }
-                FreeMem(buff, buff_size);
+                FreeVec(buff);
             }
         }
 
@@ -390,6 +392,8 @@ static BOOL wbCopyLockCurrent(struct Library *DOSBase, CONST_STRPTR dst_file, BP
             ok = SetProtection(dst_file, protection);
             err = IoErr();
         }
+    } else {
+        UnLock(src_lock);
     }
 
     FreeDosObject(DOS_FIB, fib);
@@ -406,16 +410,21 @@ BOOL _wbCopyBumpCurrent(struct Library *DOSBase, struct Library *IconBase, CONST
 {
     ASSERT_VALID_PROCESS(FindTask(NULL));
 
-    // Compute the new name
-    char dst_file[FILENAME_MAX];
+    BOOL ok = TRUE;
+    LONG err = 0;
 
-    if (!wbBumpRevisionCurrent(DOSBase, src_file, dst_file)) {
-        D(bug("%s: Can't bump version of '%s'\n", __func__, src_file));
+    // Compute the new name
+    char *dst_file = AllocVec(FILENAME_MAX, MEMF_ANY);
+    if (!dst_file) {
+        err = ERROR_NO_FREE_STORE;
         return FALSE;
     }
 
-    BOOL ok = TRUE;
-    LONG err = 0;
+    if (!wbBumpRevisionCurrent(DOSBase, src_file, dst_file)) {
+        D(bug("%s: Can't bump version of '%s'\n", __func__, src_file));
+        FreeVec(dst_file);
+        return FALSE;
+    }
 
     // Is there a DiskObject to copy?
     // Copy it, but clear it's positioning information.
@@ -438,12 +447,12 @@ BOOL _wbCopyBumpCurrent(struct Library *DOSBase, struct Library *IconBase, CONST
         if (src_lock != BNULL) {
             ok = wbCopyLockCurrent(DOSBase, dst_file, src_lock);
             err = IoErr();
-            D(if (!ok) bug("%s: Top level copy to %s: %s (%ld)\n", __func__, src_file, ok ? "TRUE" : "FALSE", (IPTR)err));
-            UnLock(src_lock);
+            D(if (!ok) bug("%s: Top level %s|%s copy to %s - (%ld)\n", __func__, sCURRDIR(), src_file, dst_file, (IPTR)err));
         }
     }
-    
+
     SetIoErr(err);
+    FreeVec(dst_file);
 
     return ok;
 }
@@ -480,8 +489,9 @@ BOOL _wbCopyIntoCurrentAt(struct Library *DOSBase, struct Library *IconBase, BPT
             if (!ok && diskobject != NULL) {
                 DeleteDiskObject((STRPTR)src_file);
             }
+        } else {
+            UnLock(src_lock);
         }
-        UnLock(src_lock);
     }
 
     SetIoErr(err);
