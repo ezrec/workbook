@@ -26,6 +26,24 @@
 
 #include "wbcurrent.h"
 
+// Return the absolute path of a lock.
+// Caller must FreeVec() the result.
+STRPTR _wbAbspathLock(struct Library *DOSBase, BPTR lock)
+{
+    STRPTR buff;
+    STRPTR path = NULL;
+
+    buff = AllocVec(PATH_MAX, MEMF_ANY);
+    if (buff) {
+         if (NameFromLock(lock, buff, PATH_MAX)) {
+            path = StrDup(buff);
+        }
+        FreeVec(buff);
+    }
+
+    return path;
+}
+
 // Return the absolute path of CurrentDir() and a file.
 // Caller must FreeVec() the result.
 STRPTR _wbAbspathCurrent(struct Library *DOSBase, CONST_STRPTR file)

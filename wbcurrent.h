@@ -25,6 +25,9 @@
 #include "workbook_vbcc.h"
 #endif
 
+STRPTR _wbAbspathLock(struct Library *_DOSBase, BPTR lock);
+#define wbAbspathLock(lock) _wbAbspathLock(DOSBase, lock);
+
 STRPTR _wbAbspathCurrent(struct Library *_DOSBase, CONST_STRPTR file);
 #define wbAbspathCurrent(file) _wbAbspathCurrent(DOSBase, file);
 
