@@ -653,6 +653,7 @@ static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
     /* Disable opening the parent for root window
      * and disk paths.
      */
+    ULONG mn_new_drawer = wbMenuNumber(WBMENU_ID(WBMENU_WN_NEW_DRAWER));
     ULONG mn_open_parent = wbMenuNumber(WBMENU_ID(WBMENU_WN_OPEN_PARENT));
     ULONG mn_ic_copy = wbMenuNumber(WBMENU_ID(WBMENU_IC_COPY));
     ULONG mn_ic_format = wbMenuNumber(WBMENU_ID(WBMENU_IC_FORMAT));
@@ -660,6 +661,7 @@ static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
     ULONG mn_wn_show = wbMenuNumber(WBMENU_ID(WBMENU_WN__SHOW));
     ULONG mn_wn_view = wbMenuNumber(WBMENU_ID(WBMENU_WN__VIEW));
     if (my->Lock == BNULL) {
+        OffMenu(my->Window, mn_new_drawer);
         OffMenu(my->Window, mn_open_parent);
         OffMenu(my->Window, mn_ic_copy);
         OffMenu(my->Window, mn_ic_delete);
@@ -674,6 +676,7 @@ static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
             OnMenu(my->Window, mn_open_parent);
             UnLock(lock);
         }
+        OnMenu(my->Window, mn_new_drawer);
         OnMenu(my->Window, mn_ic_copy);
         OnMenu(my->Window, mn_ic_delete);
         OffMenu(my->Window, mn_ic_format);
@@ -1045,6 +1048,37 @@ static IPTR WBWindow__WBWM_ReportSelected(Class *cl, Object *obj, struct wbwm_Re
     return total_tags;
 }
 
+static IPTR wbWindowActionNewDrawer(struct WorkbookBase *wb, CONST_STRPTR input, APTR arg)
+{
+    struct wbWindow *my = (struct wbWindow *)arg;
+
+    ASSERT_VALID_PROCESS((struct Process *)FindTask(NULL));
+
+    BPTR oldDir = CurrentDir(my->Lock);
+    BPTR lock = CreateDir(input);
+    BOOL ok = (lock != BNULL);
+    LONG err = IoErr();
+    if (ok) {
+        struct DiskObject *diskobject = GetDefDiskObject(WBDRAWER);
+        ok = PutDiskObject(input, diskobject);
+        err = IoErr();
+        FreeDiskObject(diskobject);
+        UnLock(lock);
+
+        if (ok) {
+            // Invalidate the cache - we have a new object.
+            my->Notify.Cached = FALSE;
+        }
+    }
+    CurrentDir(oldDir);
+
+    if (!ok) {
+        wbPopupIoErr(wb, "New Drawer", err, input);
+    }
+
+    return ok;
+}
+
 // WBWM_MenuPick
 static IPTR WBWindow__WBWM_MenuPick(Class *cl, Object *obj, struct wbwm_MenuPick *wbwmp)
 {
@@ -1055,6 +1089,9 @@ static IPTR WBWindow__WBWM_MenuPick(Class *cl, Object *obj, struct wbwm_MenuPick
     IPTR rc;
 
     switch (WBMENU_ITEM_ID(item)) {
+    case WBMENU_ID(WBMENU_WN_NEW_DRAWER):
+        wbPopupAction(wb, "New Drawer", "Enter a new name for the drawer.", "New Name:", (STRPTR)"Untitled", 0, ":/", wbWindowActionNewDrawer, my);
+        break;
     case WBMENU_ID(WBMENU_WN_OPEN_PARENT):
         if (my->Lock != BNULL) {
             lock = ParentDir(my->Lock);

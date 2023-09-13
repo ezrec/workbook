@@ -38,7 +38,7 @@
 
 /* Window Menu */
 #define WBMENU_WN               20, "Window", 0, 0, 0
-#define WBMENU_WN_NEW_DRAWER        21, "New drawer",      "N", Broken 0, 0
+#define WBMENU_WN_NEW_DRAWER        21, "New drawer",      "N", 0, 0
 #define WBMENU_WN_OPEN_PARENT       22, "Open parent",     "K", 0, 0
 #define WBMENU_WN_UPDATE            23, "Update",            0, 0, 0
 #define WBMENU_WN_SELECT_CONTENTS   24, "Select contents", "A", 0, 0
