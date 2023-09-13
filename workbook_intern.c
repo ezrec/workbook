@@ -6,6 +6,8 @@
  * Licensed under the AROS PUBLIC LICENSE (APL) Version 1.1
  */
 
+#include <stdio.h>
+
 #include <proto/dos.h>
 #include <proto/gadtools.h>
 #include <proto/graphics.h>
@@ -160,7 +162,7 @@ IPTR wbPopupAction(struct WorkbookBase *wb,
     newGadget.ng_GadgetID = inputField;
     inputGadget = gctx = CreateGadget(STRING_KIND, gctx, &newGadget,
                    GTST_String, saveBuffer,
-                   GTST_MaxChars, saveBufferSize > 0 ? saveBufferSize : 80,
+                   GTST_MaxChars, saveBufferSize > 0 ? saveBufferSize : FILENAME_MAX,
                    GACT_RELVERIFY, TRUE,
                    GTST_EditHook, forbidden ? &input_hook : NULL,
                    TAG_END);

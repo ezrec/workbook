@@ -3,7 +3,8 @@
 Copy to SYS:System/Workbook
 
 - Unreleased
-  - Add Drag/Drop manager
+  - Add 'New Drawer' window menu feature.
+  - Add Drag/Drop manager.
 - v1.9
   - Several Copy and Delete item fixes.
   - Support StartNotify() for filesystems that have it.
