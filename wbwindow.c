@@ -53,6 +53,7 @@ struct wbWindow {
 
     /* Temporary path buffer */
     TEXT           ScreenTitle[256];
+    TEXT           WindowTitle[256];
 
     ULONG          AvailChip;
     ULONG          AvailFast;
@@ -428,6 +429,53 @@ static IPTR WBWindow__WBWM_CacheContents(Class *cl, Object *obj, Msg msg)
     /* Return the point back to normal */
     SetWindowPointer(my->Window, WA_BusyPointer, FALSE, TAG_END);
     D(bug("%s: Not BUSY....\n", __func__));
+
+    // Update volume titles (if a volume)
+    if (my->Lock != BNULL) {
+        BPTR parent = ParentDir(my->Lock);
+        if (parent != BNULL) {
+            UnLock(parent);
+        } else {
+            struct InfoData info;
+            if (Info(my->Lock, &info)) {
+                IPTR full_perc = info.id_NumBlocksUsed * 100 / info.id_NumBlocks;
+                IPTR free_k = (info.id_NumBlocks - info.id_NumBlocksUsed) * (info.id_BytesPerBlock / 256) / 4;
+                IPTR used_k = (info.id_NumBlocksUsed) * (info.id_BytesPerBlock / 256) / 4;
+                CONST_STRPTR free_u = "K";
+                CONST_STRPTR used_u = "K";
+                if (free_k >= 2048) {
+                    free_k /= 1024;
+                    free_u = "M";
+                    if (free_k >= 2048) {
+                        free_k /= 1024;
+                        free_u = "G";
+                    }
+                }
+                if (used_k >= 2048) {
+                    used_k /= 1024;
+                    used_u = "M";
+                    if (used_k >= 2048) {
+                        used_k /= 1024;
+                        used_u = "G";
+                    }
+                }
+                IPTR val[] = {
+                    (IPTR)full_perc,
+                    (IPTR)free_k, (IPTR)free_u,
+                    (IPTR)used_k, (IPTR)used_u,
+                };
+                int index = 0;
+                if (NameFromLock(my->Lock, my->WindowTitle, sizeof(my->WindowTitle))) {
+                    index = STRLEN(my->WindowTitle);
+                    if (index > 0 && my->WindowTitle[index-1] == ':') {
+                        index--;
+                    }
+                }
+                RawDoFmt("  %ld%% full, %ld%s free, %ld%s in use", (RAWARG)val, RAWFMTFUNC_STRING, &my->WindowTitle[index]);
+                SetWindowTitles(my->Window, my->WindowTitle, (CONST_STRPTR)-1);
+            }
+        }
+    }
 
     my->Notify.Cached = TRUE;
 
