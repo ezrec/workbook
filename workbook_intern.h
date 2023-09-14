@@ -51,6 +51,7 @@ struct WorkbookBase {
     APTR wb_WorkbenchBase;
     APTR wb_GfxBase;
     APTR wb_LayersBase;
+    APTR wb_LocaleBase;
 
     Class  *wb_WBApp;
     Class  *wb_WBWindow;
@@ -73,6 +74,7 @@ struct WorkbookBase {
 #define WorkbenchBase wb->wb_WorkbenchBase
 #define GfxBase       wb->wb_GfxBase
 #define LayersBase    wb->wb_LayersBase
+#define LocaleBase    wb->wb_LocaleBase
 
 extern struct ExecBase *SysBase;
 

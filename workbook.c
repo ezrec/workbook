@@ -182,6 +182,10 @@ ULONG WorkbookMain(void)
     if (wb->wb_LayersBase == NULL)
         goto error;
 
+    wb->wb_LocaleBase = OpenLibrary("locale.library", 0);
+    if (wb->wb_LocaleBase == NULL)
+        goto error;
+
     D(wbUnitTests(wb));
 
     // Set process and task name to "Workbench", for old AmigaOS tools
@@ -198,6 +202,9 @@ ULONG WorkbookMain(void)
 
 error:
     if (wb) {
+        if (wb->wb_LocaleBase)
+            CloseLibrary(wb->wb_LocaleBase);
+
         if (wb->wb_LayersBase)
             CloseLibrary(wb->wb_LayersBase);
 
