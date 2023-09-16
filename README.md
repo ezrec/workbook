@@ -3,6 +3,7 @@
 Copy to SYS:System/Workbook
 
 - Unreleased
+  - Add list view (Name, Size, Date, Type) modes.
   - Set Volume window title to include disk usage information.
   - Add 'New Drawer' window menu feature.
   - Add Drag/Drop manager.

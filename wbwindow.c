@@ -49,7 +49,8 @@ struct wbWindow {
     Object        *Set;       /* Set of icons */
 
     ULONG          dd_Flags;
-    UWORD          dd_ViewModes;
+    UWORD          dd_ViewModes;        /* Toggled setting */
+    UWORD          DefaultViewModes;    /* Parent's view modes */
 
     /* Temporary path buffer */
     TEXT           ScreenTitle[256];
@@ -98,8 +99,12 @@ static const struct NewMenu WBWindow_menu[] =  {
             WBMENU_SUBITEM(WBMENU_WN__SHOW_ICONS),
             WBMENU_SUBITEM(WBMENU_WN__SHOW_ALL),
         WBMENU_SUBTITLE(WBMENU_WN__VIEW),
+            WBMENU_SUBITEM(WBMENU_WN__VIEW_DEFAULT),
             WBMENU_SUBITEM(WBMENU_WN__VIEW_ICON),
-            WBMENU_SUBITEM(WBMENU_WN__VIEW_DETAILS),
+            WBMENU_SUBITEM(WBMENU_WN__VIEW_NAME),
+            WBMENU_SUBITEM(WBMENU_WN__VIEW_SIZE),
+            WBMENU_SUBITEM(WBMENU_WN__VIEW_DATE),
+            WBMENU_SUBITEM(WBMENU_WN__VIEW_TYPE),
     WBMENU_TITLE(WBMENU_IC),
         WBMENU_ITEM(WBMENU_IC_OPEN),
         WBMENU_ITEM(WBMENU_IC_COPY),
@@ -380,6 +385,36 @@ static IPTR WBWindow__WBWM_InvalidateContents(Class *cl, Object *obj, Msg msg)
     return 0;
 }
 
+// Refresh the view of the set
+static void wbWindowRefreshView(Class *cl, Object *obj)
+{
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbWindow *my = INST_DATA(cl, obj);
+
+    // Set the set's view method
+    UWORD viewModes = DDVM_BYICON;
+    if (my->Path != NULL) {
+        viewModes = (my->dd_ViewModes == DDVM_BYDEFAULT) ? my->DefaultViewModes : my->dd_ViewModes;
+    }
+
+    // Set clean-up enabled/disabled
+    ULONG mn_clean_up = wbMenuNumber(WBMENU_ID(WBMENU_WN_CLEAN_UP));
+    if (viewModes == DDVM_BYICON) {
+        OnMenu(my->Window, mn_clean_up);
+    } else {
+        OffMenu(my->Window, mn_clean_up);
+    }
+
+    D(bug("%s: ViewModes: %ld (actual: %ld, parent: %ld)\n", __func__, (IPTR)viewModes, (IPTR)my->dd_ViewModes, (IPTR)my->DefaultViewModes));
+    SetAttrs(my->Set, WBSA_ViewModes, (IPTR)viewModes, TAG_END);
+
+    /* Arrange and render the set */
+    DoGadgetMethod((struct Gadget *)my->Set, my->Window, NULL, (IPTR)GM_RENDER, NULL, NULL, (IPTR)GREDRAW_REDRAW);
+
+    /* Adjust the scrolling regions */
+    wbWindowRedimension(cl, obj);
+}
+
 /* Rescan the Lock for new entries */
 static IPTR WBWindow__WBWM_CacheContents(Class *cl, Object *obj, Msg msg)
 {
@@ -420,11 +455,8 @@ static IPTR WBWindow__WBWM_CacheContents(Class *cl, Object *obj, Msg msg)
         DoMethod(my->Set, OM_ADDMEMBER, (IPTR)wbwi->wbwiObject);
     }
 
-    /* Arrange the set */
-    DoGadgetMethod((struct Gadget *)my->Set, my->Window, NULL, (IPTR)WBSM_Clean_Up, NULL);
-
-    /* Adjust the scrolling regions */
-    wbWindowRedimension(cl, obj);
+    // Refresh the view of the set.
+    wbWindowRefreshView(cl, obj);
 
     /* Return the point back to normal */
     SetWindowPointer(my->Window, WA_BusyPointer, FALSE, TAG_END);
@@ -504,6 +536,45 @@ static void wbFixBorders(struct Window *win)
     win->BorderRight += br;
 }
 
+static UWORD wbWindowParentViewModes(struct WorkbookBase *wb, BPTR lock)
+{
+    if (lock == BNULL) {
+        return DDVM_BYICON;
+    }
+
+    // Find my parent's name, and it's DiskObject, and see if it chose a view.
+    UWORD rc = DDVM_BYDEFAULT;
+    char *path = AllocVec(PATH_MAX, MEMF_ANY);
+    if (path) {
+        if (NameFromLock(lock, path, PATH_MAX)) {
+            struct DiskObject *diskobject = GetDiskObjectNew(path);
+            if (diskobject) {
+                if (diskobject->do_DrawerData && diskobject->do_DrawerData->dd_ViewModes != DDVM_BYDEFAULT) {
+                    rc = diskobject->do_DrawerData->dd_ViewModes;
+                }
+                FreeDiskObject(diskobject);
+            }
+        }
+        FreeVec(path);
+    }
+
+    // No selection from this lock? Try the parent of it!
+    if (rc == DDVM_BYDEFAULT) {
+        BPTR parent = ParentDir(lock);
+        if (parent != BNULL) {
+            rc = wbWindowParentViewModes(wb, parent);
+            UnLock(parent);
+        }
+    }
+
+    // Still nothing? Assume icons.
+    if (rc == DDVM_BYDEFAULT) {
+        rc = DDVM_BYICON;
+    }
+
+    return rc;
+}
+
 // OM_NEW
 static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
 {
@@ -527,7 +598,6 @@ static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
     my = INST_DATA(cl, obj);
 
     my->dd_Flags = DDFLAGS_SHOWDEFAULT;
-    my->dd_ViewModes = DDVM_BYDEFAULT;
 
     NEWLIST(&my->IconList);
 
@@ -547,9 +617,7 @@ static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
         strcpy(my->Path, path);
     }
 
-    /* Create icon set */
-    my->Set = NewObject(WBSet, NULL,
-                TAG_END);
+    my->DefaultViewModes = wbWindowParentViewModes(wb, my->Lock);
 
     idcmp = IDCMP_MENUPICK | IDCMP_INTUITICKS;
     struct MsgPort *userport = (struct MsgPort *)GetTagData(WBWA_UserPort, (IPTR)NULL, ops->ops_AttrList);
@@ -611,7 +679,6 @@ static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
                         WA_CloseGadget, TRUE,
                         WA_Activate, TRUE,
                         WA_NewLookMenus, TRUE,
-                        WA_SmartRefresh, TRUE,
                         WA_AutoAdjust, TRUE,
                         WA_PubScreen, NULL,
                         WA_BusyPointer, TRUE,
@@ -636,6 +703,18 @@ static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
         my->Window->UserPort = userport;
         ModifyIDCMP(my->Window, idcmp);
     }
+
+    /* Create icon set */
+    UWORD viewModes;
+    if (my->Path == NULL) {
+        viewModes = DDVM_BYICON;  // Only option for the root window.
+    } else {
+        viewModes = (my->dd_ViewModes == DDVM_BYDEFAULT) ? my->DefaultViewModes : my->dd_ViewModes;
+    }
+
+    my->Set = NewObject(WBSet, NULL,
+                WBSA_ViewModes, (IPTR)viewModes,
+                TAG_END);
 
     /* The gadgets' layout will be performed during wbWindowRedimension
      */
@@ -690,6 +769,25 @@ static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
     } else {
         item_show_icons->Flags |= CHECKED;
         item_show_all->Flags &= ~CHECKED;
+    }
+
+    ULONG mn_view[] = {
+        wbMenuNumber(WBMENU_ID(WBMENU_WN__VIEW_DEFAULT)),
+        wbMenuNumber(WBMENU_ID(WBMENU_WN__VIEW_ICON)),
+        wbMenuNumber(WBMENU_ID(WBMENU_WN__VIEW_NAME)),
+        wbMenuNumber(WBMENU_ID(WBMENU_WN__VIEW_DATE)),
+        wbMenuNumber(WBMENU_ID(WBMENU_WN__VIEW_SIZE)),
+        wbMenuNumber(WBMENU_ID(WBMENU_WN__VIEW_TYPE)),
+    };
+    for (size_t i = 0; i < sizeof(mn_view)/sizeof(mn_view[0]); i++) {
+        struct MenuItem *item = ItemAddress(my->Menu, mn_view[i]);
+        if (item) {
+            if (i == my->dd_ViewModes) {
+                item->Flags |= CHECKED;
+            } else {
+                item->Flags &= ~CHECKED;
+            }
+        }
     }
 
     vis = GetVisualInfo(my->Window->WScreen, TAG_END);
@@ -1135,6 +1233,8 @@ static IPTR WBWindow__WBWM_MenuPick(Class *cl, Object *obj, struct wbwm_MenuPick
     struct MenuItem *item = wbwmp->wbwmp_MenuItem;
     BPTR lock;
     IPTR rc;
+    BOOL refresh = FALSE;
+    BOOL invalidate = FALSE;
 
     switch (WBMENU_ITEM_ID(item)) {
     case WBMENU_ID(WBMENU_WN_NEW_DRAWER):
@@ -1157,11 +1257,15 @@ static IPTR WBWindow__WBWM_MenuPick(Class *cl, Object *obj, struct wbwm_MenuPick
         rc = 0;
         break;
     case WBMENU_ID(WBMENU_WN_CLEAN_UP):
+        RemoveGadget(my->Window, (struct Gadget *)my->Area);
         DoGadgetMethod((struct Gadget *)my->Set, my->Window, NULL, (IPTR)WBSM_Clean_Up, NULL);
+        AddGadget(my->Window, (struct Gadget *)my->Area, 0);
+        RefreshGList((struct Gadget *)my->Area, my->Window, NULL, 1);
         rc = 0;
         break;
     case WBMENU_ID(WBMENU_WN_UPDATE):
-        rc = WBIF_REFRESH;
+        invalidate = TRUE;
+        rc = 0;
         break;
     case WBMENU_ID(WBMENU_WN__SNAP_WINDOW):
         wbWindowSnapshot(cl, obj, FALSE);
@@ -1173,24 +1277,59 @@ static IPTR WBWindow__WBWM_MenuPick(Class *cl, Object *obj, struct wbwm_MenuPick
         break;
     case WBMENU_ID(WBMENU_WN__SHOW_ICONS):
         my->dd_Flags = DDFLAGS_SHOWICONS;
-        rc = WBIF_REFRESH;
+        invalidate = TRUE;
+        rc = 0;
         break;
     case WBMENU_ID(WBMENU_WN__SHOW_ALL):
         my->dd_Flags = DDFLAGS_SHOWALL;
-        rc = WBIF_REFRESH;
+        invalidate = TRUE;
+        rc = 0;
+        break;
+    case WBMENU_ID(WBMENU_WN__VIEW_DEFAULT):
+        my->dd_ViewModes = DDVM_BYDEFAULT;
+        refresh = TRUE;
+        rc = 0;
+        break;
+    case WBMENU_ID(WBMENU_WN__VIEW_ICON):
+        my->dd_ViewModes = DDVM_BYICON;
+        refresh = TRUE;
+        rc = 0;
+        break;
+    case WBMENU_ID(WBMENU_WN__VIEW_NAME):
+        my->dd_ViewModes = DDVM_BYNAME;
+        refresh = TRUE;
+        rc = 0;
+        break;
+    case WBMENU_ID(WBMENU_WN__VIEW_DATE):
+        my->dd_ViewModes = DDVM_BYDATE;
+        refresh = TRUE;
+        rc = 0;
+        break;
+    case WBMENU_ID(WBMENU_WN__VIEW_SIZE):
+        my->dd_ViewModes = DDVM_BYSIZE;
+        refresh = TRUE;
+        rc = 0;
+        break;
+    case WBMENU_ID(WBMENU_WN__VIEW_TYPE):
+        my->dd_ViewModes = DDVM_BYTYPE;
+        refresh = TRUE;
+        rc = 0;
         break;
     case WBMENU_ID(WBMENU_WB_SHELL):
         wbWindowNewCLI(cl, obj);
+        rc = 0;
         break;
     default:
         rc = 0;
         break;
     }
 
-    if (rc & WBIF_REFRESH) {
+    if (invalidate) {
         // Always force, regardless of notification mode.
         CoerceMethod(cl, obj, WBWM_InvalidateContents);
         CoerceMethod(cl, obj, WBWM_CacheContents);
+    } else if (refresh) {
+        wbWindowRefreshView(cl, obj);
     }
 
     return rc;

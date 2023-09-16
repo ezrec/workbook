@@ -7,14 +7,15 @@
 #include <string.h>
 #include <stdio.h>
 
+#include <proto/dos.h>
+#include <proto/exec.h>
+#include <proto/gadtools.h>
+#include <proto/graphics.h>
+#include <proto/icon.h>
 #include <proto/icon.h>
 #include <proto/intuition.h>
-#include <proto/gadtools.h>
+#include <proto/locale.h>
 #include <proto/utility.h>
-#include <proto/exec.h>
-#include <proto/dos.h>
-#include <proto/icon.h>
-#include <proto/graphics.h>
 #ifdef __AROS__
 #include <proto/workbench.h>
 #else
@@ -36,6 +37,14 @@ struct wbIcon {
     struct Screen     *Screen;
 
     struct Rectangle  HitBox;  // Icon image hit box, which does not include label.
+    BOOL ListView;
+    IPTR ListLabelWidth;
+    struct IntuiText ListILabel;
+    struct IntuiText ListIMeta;
+    ULONG Protection;
+    ULONG Size;
+    struct DateStamp DateStamp;
+    char ListLabelMeta[/* size */ 6 + 1 + /* prot */ 8 + 1 + 20 + 1];
 
     struct timeval LastActive;
 };
@@ -87,8 +96,57 @@ static BOOL _DevNameFromLock(struct WorkbookBase *wb, BPTR lock, STRPTR buffer, 
 #define DevNameFromLock(a, b, c, d) _DevNameFromLock(wb, a, b, c, d)
 #endif // !__amigaos4__
 
+static void wbIcon_UpdateAsList(Class *cl, Object *obj)
+{
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbIcon *my = INST_DATA(cl, obj);
 
-static void wbIcon_Update(Class *cl, Object *obj)
+    struct DrawInfo *dri = GetScreenDrawInfo(my->Screen);
+    if (!dri) {
+        return;
+    }
+
+    my->ListILabel = (struct IntuiText){
+        .FrontPen = dri->dri_Pens[TEXTPEN],
+        .BackPen = dri->dri_Pens[BACKGROUNDPEN],
+        .DrawMode = JAM2,
+        .LeftEdge = 0,
+        .TopEdge = 0,
+        .ITextFont = my->Screen->Font,
+        .IText = my->Label,
+    };
+    my->ListIMeta = (struct IntuiText){
+        .FrontPen = dri->dri_Pens[TEXTPEN],
+        .BackPen = dri->dri_Pens[BACKGROUNDPEN],
+        .DrawMode = JAM2,
+        .LeftEdge = 0,
+        .TopEdge = 0,
+        .ITextFont = my->Screen->Font,
+        .IText = my->ListLabelMeta,
+    };
+
+    my->HitBox = (struct Rectangle){
+        .MaxX = IntuiTextLength(&my->ListILabel),
+        .MaxY = my->Screen->Font->ta_YSize,
+    };
+
+    D(bug("%s: %s %s [hitbox (%ld,%ld)-(%ld,%ld)]\n",
+                my->File, my->Label, my->ListLabelMeta,
+                (IPTR)my->HitBox.MinX, (IPTR)my->HitBox.MinY,
+                (IPTR)my->HitBox.MaxX, (IPTR)my->HitBox.MaxY));
+
+    // FIXME: This should be from the (fixed width) screen font.
+    const LONG ta_XSize = 8;
+
+    SetAttrs(obj,
+            GA_Width, (my->ListLabelWidth + STRLEN(my->ListLabelMeta))*ta_XSize,
+            GA_Height, my->Screen->Font->ta_YSize,
+            TAG_END);
+
+    FreeScreenDrawInfo(my->Screen, dri);
+}
+
+static void wbIcon_UpdateAsIcon(Class *cl, Object *obj)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
@@ -119,12 +177,37 @@ static void wbIcon_Update(Class *cl, Object *obj)
                 my->Label));
 
     SetAttrs(obj,
-        GA_Left, (my->DiskObject->do_CurrentX == (LONG)NO_ICON_POSITION) ? ~0 : my->DiskObject->do_CurrentX,
-        GA_Top, (my->DiskObject->do_CurrentY == (LONG)NO_ICON_POSITION) ? ~0 : my->DiskObject->do_CurrentY,
         GA_Width, icon_w,
         GA_Height, icon_h,
         TAG_END);
 }
+
+static void wbIcon_Update(Class *cl, Object *obj)
+{
+    struct wbIcon *my = INST_DATA(cl, obj);
+
+    if (my->ListView) {
+        wbIcon_UpdateAsList(cl, obj);
+    } else {
+        wbIcon_UpdateAsIcon(cl, obj);
+    }
+}
+
+static AROS_UFH3(void, wbIcon_LocalePutChar,
+    AROS_UFHA(struct Hook *, hook, A0),
+    AROS_UFHA(struct Locale *, locale, A2),
+    AROS_UFHA(void *, c, A1))
+{
+    AROS_USERFUNC_INIT
+
+    STRPTR cp = hook->h_Data;
+    *(cp++) = (char)(IPTR)c;
+    *cp = 0;
+    hook->h_Data = cp;
+
+    AROS_USERFUNC_EXIT
+}
+
 
 // OM_NEW
 static IPTR WBIcon__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
@@ -137,6 +220,11 @@ static IPTR WBIcon__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
     STRPTR label= (STRPTR)GetTagData(WBIA_Label, (IPTR)NULL, ops->ops_AttrList);
     BPTR parentlock   = (BPTR)GetTagData(WBIA_ParentLock, (IPTR)BNULL, ops->ops_AttrList);
     struct Screen *screen = (struct Screen *)GetTagData(WBIA_Screen, (IPTR)NULL, ops->ops_AttrList);
+    BOOL listview = (BOOL)GetTagData(WBIA_ListView, (IPTR)FALSE, ops->ops_AttrList);
+    ULONG listlabelwidth = (ULONG)GetTagData(WBIA_ListLabelWidth, (IPTR)15, ops->ops_AttrList);
+    ULONG protection;
+    ULONG size;
+    struct DateStamp datestamp;
 
     if (!file) {
         return 0;
@@ -144,10 +232,27 @@ static IPTR WBIcon__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
 
     struct DiskObject *diskobject = NULL;
     BPTR old = CurrentDir(parentlock);
-    diskobject = GetIconTags(file,
-                           ICONGETA_Screen, screen,
-                           ICONGETA_FailIfUnavailable, FALSE,
-                           TAG_END);
+    BPTR lock = Lock(file, SHARED_LOCK);
+    BOOL ok = FALSE;
+    if (lock != BNULL) {
+        struct FileInfoBlock *fib = AllocDosObjectTags(DOS_FIB, TAG_END);
+        if (fib != NULL) {
+            if (Examine(lock, fib)) {
+                protection = (ULONG)fib->fib_Protection;
+                size = (ULONG)fib->fib_Size;
+                datestamp = fib->fib_Date;
+                ok = TRUE;
+            }
+            FreeDosObject(DOS_FIB, fib);
+        }
+        UnLock(lock);
+    }
+    if (ok) {
+        diskobject = GetIconTags(file,
+                               ICONGETA_Screen, screen,
+                               ICONGETA_FailIfUnavailable, FALSE,
+                               TAG_END);
+    }
     CurrentDir(old);
     if (diskobject == NULL) {
         return 0;
@@ -184,6 +289,63 @@ static IPTR WBIcon__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
     my->ParentLock = parentlock;
     my->DiskObject = diskobject;
     my->Screen = screen;
+
+    my->ListView = listview;
+    my->ListLabelWidth = listlabelwidth;
+    my->Protection = protection;
+    my->Size = size;
+    my->DateStamp = datestamp;
+    my->ListILabel = (struct IntuiText){0};
+    my->ListIMeta  = (struct IntuiText){0};
+
+    char prottext[9]={0};
+    CONST_STRPTR protbits = "xsparwed";
+    for (int i = 0; i < 8; i++) {
+        // Lower 4 bits are inverted for display purposes.
+        if ((my->Protection ^ 0xf) & (1 << i)) {
+            prottext[7-i] = protbits[7-i];
+        } else {
+            prottext[7-i] = '-';
+        }
+    }
+
+    if (my->DiskObject->do_Type == WBDRAWER || my->DiskObject->do_Type == WBGARBAGE) {
+        IPTR val[] = {
+            (IPTR)prottext,
+        };
+        RawDoFmt("Drawer %s ", (RAWARG)val, RAWFMTFUNC_STRING, my->ListLabelMeta);
+    } else {
+        if (size <= 999999) {
+            IPTR val[] = {
+                (IPTR)size,
+                (IPTR)prottext,
+            };
+            RawDoFmt("%6ld %s ", (RAWARG)val, RAWFMTFUNC_STRING, my->ListLabelMeta);
+        } else if (size < 999 * 1000 * 1000) {
+            IPTR val[] = {
+                (IPTR)(size / 1000 / 1000),
+                (IPTR)((size / 1000 / 100) % 10),
+                (IPTR)prottext,
+            };
+            RawDoFmt("%3ld.%ldM %s ", (RAWARG)val, RAWFMTFUNC_STRING, my->ListLabelMeta);
+        } else {
+            IPTR val[] = {
+            (IPTR)(size / 1000 / 1000 / 1000),
+            (IPTR)((size / 1000 / 1000) % 1000),
+            (IPTR)prottext,
+            };
+            RawDoFmt("%ld.%03ldG %s ", (RAWARG)val, RAWFMTFUNC_STRING, my->ListLabelMeta);
+        }
+    }
+    struct Hook datehook = {
+        .h_Entry = (ULONG(*)())wbIcon_LocalePutChar,
+        .h_Data = &my->ListLabelMeta[6 + 1 + 8 + 1],
+    };
+    struct Locale *locale = OpenLocale(NULL);
+    if (locale) {
+        FormatDate(locale, "%d-%b-%Y %X", &my->DateStamp, &datehook);
+        CloseLocale(locale);
+    }
 
     wbIcon_Update(cl, obj);
 
@@ -226,6 +388,24 @@ static IPTR WBIcon__OM_GET(Class *cl, Object *obj, struct opGet *opg)
     case WBIA_ParentLock:
         *(opg->opg_Storage) = (IPTR)my->ParentLock;
         break;
+    case WBIA_Size:
+        *(opg->opg_Storage) = (IPTR)my->Size;
+        break;
+    case WBIA_Protection:
+        *(opg->opg_Storage) = (IPTR)my->Protection;
+        break;
+    case WBIA_DateStamp:
+        *(struct DateStamp *)(opg->opg_Storage) = my->DateStamp;
+        break;
+    case WBIA_Type:
+        *(opg->opg_Storage) = (IPTR)my->DiskObject->do_Type;
+        break;
+    case WBIA_CurrentX:
+        *(opg->opg_Storage) = (IPTR)my->DiskObject->do_CurrentX;
+        break;
+    case WBIA_CurrentY:
+        *(opg->opg_Storage) = (IPTR)my->DiskObject->do_CurrentY;
+        break;
     default:
         rc = DoSuperMethodA(cl, obj, (Msg)opg);
         break;
@@ -238,10 +418,14 @@ static IPTR WBIcon__OM_GET(Class *cl, Object *obj, struct opGet *opg)
 static IPTR WBIcon__OM_SET(Class *cl, Object *obj, struct opSet *ops)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbIcon *my = INST_DATA(cl, obj);
+
     struct TagItem *tags = ops->ops_AttrList;
     struct TagItem *ti;
 
     BOOL render = FALSE;
+    BOOL listview = my->ListView;
+    ULONG listlabelwidth = my->ListLabelWidth;
 
     while ((ti = NextTagItem(&tags)) != NULL) {
         switch (ti->ti_Tag) {
@@ -249,7 +433,35 @@ static IPTR WBIcon__OM_SET(Class *cl, Object *obj, struct opSet *ops)
             // Re-render if this attribute is present.
             render = TRUE;
             break;
+        case WBIA_ListView:
+            listview = (BOOL)ti->ti_Data;
+            break;
+        case WBIA_ListLabelWidth:
+            listlabelwidth = (BOOL)ti->ti_Data;
+            break;
+        case WBIA_CurrentX:
+            my->DiskObject->do_CurrentX = (LONG)ti->ti_Data;
+            break;
+        case WBIA_CurrentY:
+            my->DiskObject->do_CurrentY = (LONG)ti->ti_Data;
+            break;
         }
+    }
+
+    BOOL update = FALSE;
+    if (listview != my->ListView) {
+        my->ListView = listview;
+        update = TRUE;
+    }
+    if (listlabelwidth != my->ListLabelWidth) {
+        my->ListLabelWidth = listlabelwidth;
+        if (my->ListView) {
+            update = TRUE;
+        }
+    }
+
+    if (update) {
+        wbIcon_Update(cl, obj);
     }
 
     render |= DoSuperMethodA(cl, obj, (Msg)ops);
@@ -278,8 +490,18 @@ static IPTR WBIcon__GM_RENDER(Class *cl, Object *obj, struct gpRender *gpr)
     if (rp) {
         /* Clip to the window for drawing */
         clip = wbClipWindow(wb, win);
-        DrawIconStateA(rp, my->DiskObject, (STRPTR)my->Label, x, y,
-            (gadget->Flags & GFLG_SELECTED) ? IDS_SELECTED : IDS_NORMAL, (struct TagItem *)wbIcon_DrawTags);
+        if (my->ListView) {
+            if (gadget->Flags & GFLG_SELECTED) {
+                my->ListILabel.DrawMode = COMPLEMENT;
+            } else {
+                my->ListILabel.DrawMode = JAM2;
+            }
+            PrintIText(rp, &my->ListILabel, x, y);
+            PrintIText(rp, &my->ListIMeta, x + 8 * my->ListLabelWidth, y);
+        } else {
+            DrawIconStateA(rp, my->DiskObject, (STRPTR)my->Label, x, y,
+                (gadget->Flags & GFLG_SELECTED) ? IDS_SELECTED : IDS_NORMAL, (struct TagItem *)wbIcon_DrawTags);
+        }
         wbUnclipWindow(wb, win, clip);
 
         if (gpr->gpr_RPort == NULL) {
@@ -673,9 +895,6 @@ static IPTR WBIcon__WBIM_Snapshot(Class *cl, Object *obj, Msg msg)
     struct Gadget *gadget = (struct Gadget *)obj;
 
     D(bug("%s: %s\n", __func__, my->File));
-
-    my->DiskObject->do_CurrentX = gadget->LeftEdge;
-    my->DiskObject->do_CurrentY = gadget->TopEdge;
 
     BPTR oldLock = CurrentDir(my->ParentLock);
     PutIconTags(my->File, my->DiskObject, ICONPUTA_OnlyUpdatePosition, TRUE, TAG_END);

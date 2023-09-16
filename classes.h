@@ -132,6 +132,7 @@ Class *WBVirtual_MakeClass(struct WorkbookBase *wb);
 
 /* Attributes */
 #define WBSA_Dummy               (TAG_USER | 0x40430000)
+#define WBSA_ViewModes          (WBSA_Dummy + 0) // (UWORD) A 'DrawerData->dd_ViewModes' value
 
 /* Methods */
 #define WBSM_Dummy               (TAG_USER | 0x40430100)
@@ -173,10 +174,18 @@ Class *WBSet_MakeClass(struct WorkbookBase *wb);
 
 /* Attributes */
 #define WBIA_Dummy               (TAG_USER | 0x40440000)
-#define WBIA_File                (WBIA_Dummy+0)        // (CONST_STRPTR) 'VOLNAME:' or FilePart()
-#define WBIA_Label               (WBIA_Dummy+1)        // (CONST_STRPTR) Visible label, overriding WBIA_File [optional]
-#define WBIA_ParentLock          (WBIA_Dummy+2)        // (BPTR) to containing drawer/volume
-#define WBIA_Screen              (WBIA_Dummy+3)        // (struct Screen) to reference for layout and drawing.
+#define WBIA_File                (WBIA_Dummy+0)        // (CONST_STRPTR) [OM_NEW] 'VOLNAME:' or FilePart()
+#define WBIA_Label               (WBIA_Dummy+1)        // (CONST_STRPTR) [OM_NEW] Visible label, overriding WBIA_File [optional]
+#define WBIA_ParentLock          (WBIA_Dummy+2)        // (BPTR) [OM_NEW] to containing drawer/volume
+#define WBIA_Screen              (WBIA_Dummy+3)        // (struct Screen) [OM_NEW] to reference for layout and drawing.
+#define WBIA_ListView            (WBIA_Dummy+4)        // (BOOL) [OM_NEW, OM_SET] List, not icon, rendering.
+#define WBIA_ListLabelWidth      (WBIA_Dummy+5)        // (ULONG) [OM_NEW, OM_SET] Label width, in characters.
+#define WBIA_Size                (WBIA_Dummy+6)        // (ULONG) [OM_GET] Size of the file.
+#define WBIA_Protection          (WBIA_Dummy+7)        // (ULONG) [OM_GET] Protection of the file.
+#define WBIA_DateStamp           (WBIA_Dummy+8)        // (struct DateStamp *) [OM_GET] DateStamp of the file.
+#define WBIA_Type                (WBIA_Dummy+9)        // (UBYTE) [OM_GET] 'DiskObject->do_Type' of the file.
+#define WBIA_CurrentX            (WBIA_Dummy+10)       // (LONG) [OM_SET,OM_GET] 'DiskObject->do_CurrentX'
+#define WBIA_CurrentY            (WBIA_Dummy+11)       // (LONG) [OM_SET,OM_GET] 'DiskObject->do_CurrentY'
 
 /* Methods */
 #define WBIM_Dummy               (TAG_USER | 0x40440100)

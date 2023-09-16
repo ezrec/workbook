@@ -186,7 +186,7 @@ ULONG WorkbookMain(void)
     if (wb->wb_LocaleBase == NULL)
         goto error;
 
-    D(wbUnitTests(wb));
+    _D(wbUnitTests(wb));
 
     // Set process and task name to "Workbench", for old AmigaOS tools
     SetProgramName("Workbench");

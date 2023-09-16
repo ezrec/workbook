@@ -50,8 +50,12 @@
 #define WBMENU_WN__SHOW_ICONS       46, "Only icons",      "-", MENUTOGGLE|CHECKIT|CHECKED, ~((1 << 0))
 #define WBMENU_WN__SHOW_ALL         47, "All files",       "+", MENUTOGGLE|CHECKIT, ~((1 << 1))
 #define WBMENU_WN__VIEW         50, "View by", 0, 0, 0
-#define WBMENU_WN__VIEW_ICON        51, "Icon",            "1", Broken MENUTOGGLE|CHECKIT|CHECKED, ~((1 << 0))
-#define WBMENU_WN__VIEW_DETAILS     52, "Details",           0, Broken MENUTOGGLE|CHECKIT, ~((1 << 1))
+#define WBMENU_WN__VIEW_DEFAULT     51, "Default",           0, MENUTOGGLE|CHECKIT|CHECKED, ~((1 << 0))
+#define WBMENU_WN__VIEW_ICON        52, "Icon",            "1", MENUTOGGLE|CHECKIT, ~((1 << 1))
+#define WBMENU_WN__VIEW_NAME        53, "Name",            "2", MENUTOGGLE|CHECKIT, ~((1 << 2))
+#define WBMENU_WN__VIEW_SIZE        54, "Size",            "3", MENUTOGGLE|CHECKIT, ~((1 << 3))
+#define WBMENU_WN__VIEW_DATE        55, "Date",            "4", MENUTOGGLE|CHECKIT, ~((1 << 4))
+#define WBMENU_WN__VIEW_TYPE        56, "Type",            "5", MENUTOGGLE|CHECKIT, ~((1 << 5))
 
 /* Icon Menu */
 #define WBMENU_IC               60, "Icons", 0, 0, 0
