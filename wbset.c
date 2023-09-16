@@ -24,14 +24,18 @@
 #define WBICON_COL_MARGIN   5
 
 struct wbSetNode {
-    struct MinNode sn_Node;
+    struct Node sn_Node;
     Object        *sn_Object;   // Gadget object
-    BOOL sn_Fixed;              // Is in a fixed location
-    BOOL sn_Arranged;           // Has been arranged?
+    LONG           sn_CurrentX;    // do_CurrentX cache.
+    LONG           sn_CurrentY;    // do_CurrentY cache.
 };
 
+#define IS_ARRANGED(node)   ((node)->sn_CurrentX != (LONG)NO_ICON_POSITION) && ((node)->sn_CurrentY != (LONG)NO_ICON_POSITION)
+
 struct wbSet {
-    struct MinList SetObjects;
+    struct List SetObjects;
+    UWORD ViewModes;            // Same a 'DrawerData->dd_ViewModes'
+    BOOL  Arranged;
 };
 
 static void wbGABox(Object *obj, struct IBox *box)
@@ -46,6 +50,7 @@ static void wbGABox(Object *obj, struct IBox *box)
 // OM_ADDMEMBER
 static IPTR WBSet__OM_ADDMEMBER(Class *cl, Object *obj, struct opMember *opm)
 {
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     Object *iobj = opm->opam_Object;
     struct IBox ibox;
     struct wbSet *my = INST_DATA(cl, obj);
@@ -57,9 +62,17 @@ static IPTR WBSet__OM_ADDMEMBER(Class *cl, Object *obj, struct opMember *opm)
     /* Get bounding box of item to add */
     wbGABox(iobj, &ibox);
 
-    node->sn_Arranged = FALSE;
-    node->sn_Fixed = (ibox.Left != ~0) && (ibox.Top != ~0 );
-    AddTailMinList(&my->SetObjects, &node->sn_Node);
+    GetAttr(WBIA_Label, iobj, (IPTR *)&node->sn_Node.ln_Name);
+    IPTR tmp;
+    GetAttr(WBIA_CurrentX, iobj, &tmp);
+    node->sn_CurrentX = (LONG)tmp;
+    GetAttr(WBIA_CurrentY, iobj, &tmp);
+    node->sn_CurrentY = (LONG)tmp;
+    AddTail(&my->SetObjects, &node->sn_Node);
+
+    SetAttrs(iobj, WBIA_ListView, my->ViewModes != DDVM_BYICON, TAG_END);
+
+    my->Arranged = FALSE;
 
     return DoSuperMethodA(cl, obj, (Msg)opm);
 }
@@ -75,10 +88,12 @@ static IPTR WBSet__OM_REMMEMBER(Class *cl, Object *obj, struct opMember *opm)
 
     ForeachNodeSafe(&my->SetObjects, node, next) {
         if (node->sn_Object == iobj) {
-            RemoveMinNode(&node->sn_Node);
+            Remove(&node->sn_Node);
             FreeMem(node, sizeof(*node));
         }
     }
+
+    my->Arranged = FALSE;
 
     return rc;
 }
@@ -86,6 +101,7 @@ static IPTR WBSet__OM_REMMEMBER(Class *cl, Object *obj, struct opMember *opm)
 // OM_NEW
 static IPTR WBSet__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
 {
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbSet *my;
     IPTR rc;
 
@@ -93,11 +109,46 @@ static IPTR WBSet__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
     if (rc == 0)
         return 0;
 
-    my = INST_DATA(cl, rc);
+    obj = (Object *)rc;
+    my = INST_DATA(cl, obj);
 
-    NewMinList(&my->SetObjects);
+    my->ViewModes = DDVM_BYICON;
+    my->Arranged = FALSE;
+
+    NEWLIST(&my->SetObjects);
+
+    CoerceMethod(cl, obj, OM_SET, ops->ops_AttrList, NULL);
 
     return rc;
+}
+
+// OM_SET
+static IPTR WBSet__OM_SET(Class *cl, Object *obj, struct opSet *ops)
+{
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbSet *my = INST_DATA(cl, obj);
+
+    struct TagItem *tags = ops->ops_AttrList;
+    struct TagItem *ti;
+
+    UWORD viewmodes = my->ViewModes;
+
+    while ((ti = NextTagItem(&tags)) != NULL) {
+        switch (ti->ti_Tag) {
+        case WBSA_ViewModes:
+            viewmodes = (UWORD)ti->ti_Data;
+            break;
+        default:
+            break;
+        }
+    }
+
+    if (viewmodes > DDVM_BYDEFAULT && viewmodes <= DDVM_BYTYPE) {
+        my->ViewModes = viewmodes;
+        my->Arranged = FALSE;
+    }
+
+    return DoSuperMethodA(cl, obj, (Msg)ops);
 }
 
 // OM_DISPOSE
@@ -108,7 +159,7 @@ static IPTR WBSet__OM_DISPOSE(Class *cl, Object *obj, Msg msg)
 
     /* Remove all the nodes */
     ForeachNodeSafe(&my->SetObjects, node, next) {
-        RemoveMinNode(&node->sn_Node);
+        Remove(&node->sn_Node);
         FreeMem(node, sizeof(*node));
     }
 
@@ -135,47 +186,153 @@ static IPTR WBSet__WBSM_Select(Class *cl, Object *obj, struct wbsm_Select *wbss)
     return 0;
 }
 
+static BOOL wbSetInsertTail(struct WorkbookBase *wb, struct wbSetNode *curr_node, struct wbSetNode *new_node)
+{
+    return FALSE;
+}
+
+static BOOL wbSetInsertByName(struct WorkbookBase *wb, struct wbSetNode *curr_node, struct wbSetNode *new_node)
+{
+    return stricmp(curr_node->sn_Node.ln_Name, new_node->sn_Node.ln_Name) < 0;
+}
+
+static BOOL wbSetInsertBySize(struct WorkbookBase *wb, struct wbSetNode *curr_node, struct wbSetNode *new_node)
+{
+    IPTR curr_size = 0;
+    IPTR new_size = 0;
+    GetAttr(WBIA_Size, curr_node->sn_Object, &curr_size );
+    GetAttr(WBIA_Size, new_node->sn_Object, &new_size );
+    LONG rc = (LONG)new_size - (LONG)curr_size;
+    if (rc == 0) {
+        return wbSetInsertByName(wb, curr_node, new_node);
+    }
+    return rc < 0;
+}
+
+static BOOL wbSetInsertByDate(struct WorkbookBase *wb, struct wbSetNode *curr_node, struct wbSetNode *new_node)
+{
+    struct DateStamp curr_date;
+    struct DateStamp new_date;
+    GetAttr(WBIA_DateStamp, curr_node->sn_Object, (IPTR *)&curr_date );
+    GetAttr(WBIA_DateStamp, new_node->sn_Object, (IPTR *)&new_date );
+    LONG rc = CompareDates(&curr_date, &new_date);
+    if (rc == 0) {
+        return wbSetInsertByName(wb, curr_node, new_node);
+    }
+    return rc < 0;
+}
+
+static BOOL wbSetInsertByType(struct WorkbookBase *wb, struct wbSetNode *curr_node, struct wbSetNode *new_node)
+{
+    IPTR curr_type = 0;
+    IPTR new_type = 0;
+    GetAttr(WBIA_Type, curr_node->sn_Object, &curr_type );
+    GetAttr(WBIA_Type, new_node->sn_Object, &new_type );
+    LONG rc = (LONG)new_type - (LONG)curr_type;
+    if (rc == 0) {
+        return wbSetInsertByName(wb, curr_node, new_node);
+    }
+    return rc < 0;
+}
+
+static void wbSetSort(Class *cl, Object *obj)
+{
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbSet *my = INST_DATA(cl, obj);
+
+    struct List sorted;
+    NEWLIST(&sorted);
+
+    BOOL (*insertFunc)(struct WorkbookBase *wb, struct wbSetNode *curr_node, struct wbSetNode *new_node);
+
+    switch (my->ViewModes) {
+    case DDVM_BYICON: insertFunc = wbSetInsertByName; break;
+    case DDVM_BYNAME: insertFunc = wbSetInsertByName; break;
+    case DDVM_BYDATE: insertFunc = wbSetInsertByDate; break;
+    case DDVM_BYSIZE: insertFunc = wbSetInsertBySize; break;
+    case DDVM_BYTYPE: insertFunc = wbSetInsertByType; break;
+    default: return; // Nothing to sort by.
+    }
+
+    struct wbSetNode *node, *next;
+    D(bug("%s: Unsorted:\n", __func__));
+    ForeachNode(&my->SetObjects, node) {
+        D(bug("%s:  %s\n", __func__, node->sn_Node.ln_Name));
+    }
+
+    ForeachNodeSafe(&my->SetObjects, node, next) {
+        Remove(&node->sn_Node);
+
+        struct wbSetNode *curr;
+        BOOL inserted = FALSE;
+        ForeachNode(&sorted, curr) {
+            if (insertFunc(wb, curr, node)) {
+                D(bug("%s: insert %s before %s\n", __func__, node->sn_Node.ln_Name, curr->sn_Node.ln_Name));
+                Insert(&sorted, &node->sn_Node, curr->sn_Node.ln_Pred);
+                inserted = TRUE;
+                break;
+            }
+        }
+        if (!inserted) {
+            AddTail(&sorted, &node->sn_Node);
+            D(bug("%s: add tail: %s\n", __func__, node->sn_Node.ln_Name));
+        }
+    }
+
+    // Move back to original list.
+    ForeachNodeSafe(&sorted, node, next) {
+        Remove(&node->sn_Node);
+        AddTail(&my->SetObjects, &node->sn_Node);
+    }
+}
+
 // WBSM_Clean_Up
 static IPTR WBSet__WBSM_Clean_Up(Class *cl, Object *obj, struct wbsm_CleanUp *wbscu)
 {
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbSet *my = INST_DATA(cl, obj);
     struct wbSetNode *node, *next;
 
     ForeachNodeSafe(&my->SetObjects, node, next) {
-        node->sn_Fixed = FALSE;
-        node->sn_Arranged = FALSE;
+        node->sn_CurrentX = (LONG)NO_ICON_POSITION;
+        node->sn_CurrentY = (LONG)NO_ICON_POSITION;
     }
 
-    return DoMethod(obj, GM_RENDER, wbscu->wbscu_GInfo, NULL, (IPTR)GREDRAW_REDRAW);
+    my->Arranged = FALSE;
+
+    return 0;
 }
 
-static IPTR WBSet__GM_RENDER(Class *cl, Object *obj, struct gpRender *gpr)
+static IPTR WBSet__GM_LAYOUT(Class *cl, Object *obj, struct gpLayout *gpl)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbSet *my = INST_DATA(cl, obj);
-    struct wbSetNode *node;
-    struct RastPort *rp = gpr->gpr_RPort;
-    struct IBox sbox;   // Surrounding box, before rearrangement.
+    struct GadgetInfo *gi = gpl->gpl_GInfo;
+    struct IBox sbox;
 
-    if (!rp) {
-        rp = ObtainGIRPort(gpr->gpr_GInfo);
-    }
-
-    struct Region *clip = wbClipWindow(wb, gpr->gpr_GInfo->gi_Window);
-
-    // Erase surrounding box.
-    wbGABox(obj, &sbox);
-    D(bug("%s: Erase box @(%ld,%ld) %ldx%ld\n", __func__, (IPTR)sbox.Left, (IPTR)sbox.Top, (IPTR)sbox.Width, (IPTR)sbox.Height));
-    EraseRect(rp, sbox.Left, sbox.Top, sbox.Left+sbox.Width, sbox.Top+sbox.Height);
+    BOOL listView = my->ViewModes != DDVM_BYICON;
 
     // Re-arrange anything that needs to be.
     WORD CurrRight, CurrBottom;
 
-    // Remove members that are not fixed nor arranged.
+    // Remove all members that are not fixed nor arranged.
+    struct wbSetNode *node;
     ForeachNode(&my->SetObjects, node) {
-        if (!node->sn_Fixed && !node->sn_Arranged) {
-            D(bug("%s: %lx - Fixed=FALSE and Arranged=FALSE\n", __func__, (IPTR)node));
-            DoSuperMethod(cl, obj, OM_REMMEMBER, node->sn_Object);
+        SetAttrs(node->sn_Object, WBIA_ListView, (IPTR)listView, TAG_END);
+        DoSuperMethod(cl, obj, OM_REMMEMBER, node->sn_Object);
+    }
+
+    // Sort.
+    wbSetSort(cl, obj);
+
+    // If not listview, add fixed or arranged items first.
+    if (!listView) {
+        ForeachNode(&my->SetObjects, node) {
+            if (IS_ARRANGED(node)) {
+                D(bug("%s: %s - fixed @%ld,%ld\n", __func__, node->sn_Node.ln_Name, (IPTR)node->sn_CurrentX, (IPTR)node->sn_CurrentY));
+                SetAttrs(node->sn_Object, GA_Top, node->sn_CurrentY, GA_Left, node->sn_CurrentX, TAG_END);
+                DoSuperMethod(cl, obj, OM_ADDMEMBER, node->sn_Object);
+            }
         }
     }
 
@@ -186,58 +343,80 @@ static IPTR WBSet__GM_RENDER(Class *cl, Object *obj, struct gpRender *gpr)
     /* Set the start of the auto area to be
      * immediately below the current objects.
      */
-    CurrRight = sbox.Left;
-    CurrBottom = sbox.Top + sbox.Height;
+    CurrRight = 0;
+    CurrBottom = sbox.Height + (listView ? 0 : WBICON_ROW_MARGIN);
 
-    /* For each item in the auto list, add it to the right */
+    /* For each item in the auto list, add it */
     ForeachNode(&my->SetObjects, node) {
-        if (node->sn_Fixed || node->sn_Arranged) {
+        if (!listView && IS_ARRANGED(node)) {
+            D(bug("%s: %s - fixed\n", __func__, node->sn_Node.ln_Name));
             continue;
         }
+
+        D(bug("%s: %s - arrange\n", __func__, node->sn_Node.ln_Name));
 
         Object *iobj = node->sn_Object;
         struct IBox ibox;
 
         wbGABox(iobj, &ibox);
+        D(bug("%s: icon is %ldx%lx\n", __func__, (IPTR)ibox.Width, (IPTR)ibox.Height));
+        wbGABox(obj, &sbox);
+        D(bug("%s: set  is %ldx%lx\n", __func__, (IPTR)ibox.Width, (IPTR)ibox.Height));
 
-        if ((CurrRight + ibox.Width) < gpr->gpr_GInfo->gi_Domain.Width) {
+        if (!listView && ((CurrRight + ibox.Width) < gi->gi_Domain.Width)) {
             ibox.Left = CurrRight;
-            D(bug("%s: %lx add to right @(%ld,%ld)\n", __func__, (IPTR)node, (IPTR)CurrRight, (IPTR)CurrBottom));
+            D(bug("%s: %s add to right @(%ld,%ld)\n", __func__, (IPTR)node->sn_Node.ln_Name, (IPTR)CurrRight, (IPTR)CurrBottom));
         } else {
-            wbGABox(obj, &sbox);
-            ibox.Left = sbox.Left;
-            CurrRight = sbox.Left;
-            CurrBottom = sbox.Top + sbox.Height + WBICON_ROW_MARGIN;
-            D(bug("%s: %lx start new line @(%ld,%ld)\n", __func__, (IPTR)node, (IPTR)CurrRight, (IPTR)CurrBottom));
+            ibox.Left = 0;
+            CurrRight = 0;
+            CurrBottom = sbox.Height + (listView ? 0 : WBICON_ROW_MARGIN);
+            D(bug("%s: %s start new line @(%ld,%ld)\n", __func__, (IPTR)node->sn_Node.ln_Name, (IPTR)CurrRight, (IPTR)CurrBottom));
         }
         ibox.Top  = CurrBottom;
         CurrRight += ibox.Width + WBICON_COL_MARGIN;
-        D(bug("%s: %lx next: @%ld,%ld\n", __func__, (IPTR)node, (IPTR)CurrRight, (IPTR)CurrBottom));
+        D(bug("%s: %s next: @%ld,%ld\n", __func__, (IPTR)node->sn_Node.ln_Name, (IPTR)CurrRight, (IPTR)CurrBottom));
 
         // Mark as arranged
-        D(bug("%s: %lx arranged position: @%ld,%ld\n", __func__, (IPTR)node, (IPTR)ibox.Left, (IPTR)ibox.Top));
+        D(bug("%s: %s arranged position: @%ld,%ld\n", __func__, (IPTR)node->sn_Node.ln_Name, (IPTR)ibox.Left, (IPTR)ibox.Top));
 
         // Adjust gadget location _without_ re-rendering.
         SetAttrs(iobj, GA_Top, ibox.Top, GA_Left, ibox.Left, TAG_END);
+        if (!listView) {
+            // Update icon's DiskObject location.
+            node->sn_CurrentX = ibox.Left;
+            node->sn_CurrentY = ibox.Top;
+            SetAttrs(iobj, WBIA_CurrentY, ibox.Top, WBIA_CurrentX, ibox.Left, TAG_END);
+        }
 
         DoSuperMethod(cl, obj, OM_ADDMEMBER, iobj);
-
-        node->sn_Arranged = TRUE;
     }
 
     wbGABox(obj, &sbox);
     D(bug("%s: Arranged box @(%ld,%ld) %ldx%ld\n", __func__, (IPTR)sbox.Left, (IPTR)sbox.Top, (IPTR)sbox.Width, (IPTR)sbox.Height));
 
-    // Call supermethod to render the new arrangement.
-    IPTR rc = DoSuperMethod(cl, obj, GM_RENDER, gpr->gpr_GInfo, rp, GREDRAW_UPDATE);
+    my->Arranged = TRUE;
 
-    wbUnclipWindow(wb, gpr->gpr_GInfo->gi_Window, clip);
+    return DoSuperMethodA(cl, obj, (Msg)gpl);
+}
 
-    if (gpr->gpr_RPort == NULL) {
-        ReleaseGIRPort(rp);
+static IPTR WBSet__GM_RENDER(Class *cl, Object *obj, struct gpRender *gpr)
+{
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbSet *my = INST_DATA(cl, obj);
+
+    if (!my->Arranged) {
+        struct RastPort *rp = gpr->gpr_RPort;
+        ASSERT(rp != NULL);
+
+        struct IBox sbox;
+        wbGABox(obj, &sbox);
+        D(bug("%s: Erase box @(%ld,%ld) %ldx%ld\n", __func__, (IPTR)sbox.Left, (IPTR)sbox.Top, (IPTR)sbox.Width, (IPTR)sbox.Height));
+        EraseRect(rp, sbox.Left, sbox.Top, sbox.Left+sbox.Width, sbox.Top+sbox.Height);
+
+        CoerceMethod(cl, obj, GM_LAYOUT, gpr->gpr_GInfo, FALSE);
     }
 
-    return rc;
+    return DoSuperMethodA(cl, obj, (Msg)gpr);
 }
 
 static IPTR WBSet__WBxM_DragDropped(Class *cl, Object *obj, struct wbxm_DragDropped *wbxmd)
@@ -282,9 +461,11 @@ static IPTR WBSet_dispatcher(Class *cl, Object *obj, Msg msg)
 
     switch (msg->MethodID) {
     METHOD_CASE(WBSet, OM_NEW);
+    METHOD_CASE(WBSet, OM_SET);
     METHOD_CASE(WBSet, OM_DISPOSE);
     METHOD_CASE(WBSet, OM_ADDMEMBER);
     METHOD_CASE(WBSet, OM_REMMEMBER);
+    METHOD_CASE(WBSet, GM_LAYOUT);
     METHOD_CASE(WBSet, GM_RENDER);
     METHOD_CASE(WBSet, WBSM_Select);
     METHOD_CASE(WBSet, WBSM_Clean_Up);
