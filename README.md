@@ -3,6 +3,7 @@
 Copy to SYS:System/Workbook
 
 - Unreleased
+  - Add multi-selection marquee
   - Add list view (Name, Size, Date, Type) modes.
   - Set Volume window title to include disk usage information.
   - Add 'New Drawer' window menu feature.

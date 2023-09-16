@@ -23,6 +23,15 @@
 #define WBICON_ROW_MARGIN   5
 #define WBICON_COL_MARGIN   5
 
+#ifndef SetDrPt
+#define SetDrPt(w,p)	do { \
+				(w)->LinePtrn = (p); \
+				(w)->Flags |= FRST_DOT; \
+				(w)->linpatcnt = 15; \
+			} while (0)
+#endif
+
+
 struct wbSetNode {
     struct Node sn_Node;
     Object        *sn_Object;   // Gadget object
@@ -36,6 +45,8 @@ struct wbSet {
     struct List SetObjects;
     UWORD ViewModes;            // Same a 'DrawerData->dd_ViewModes'
     BOOL  Arranged;
+    struct Rectangle Marquee;
+    BOOL MarqueeEnable;
 };
 
 static void wbGABox(Object *obj, struct IBox *box)
@@ -419,6 +430,195 @@ static IPTR WBSet__GM_RENDER(Class *cl, Object *obj, struct gpRender *gpr)
     return DoSuperMethodA(cl, obj, (Msg)gpr);
 }
 
+static inline void wbDrawRect(struct WorkbookBase *wb, struct RastPort *rp, struct Rectangle *rect)
+{
+    Move(rp, rect->MinX, rect->MinY);
+    Draw(rp, rect->MaxX, rect->MinY);
+    Draw(rp, rect->MaxX, rect->MaxY);
+    Draw(rp, rect->MinX, rect->MaxY);
+    Draw(rp, rect->MinX, rect->MinY);
+}
+
+static void wbSetDrawMarquee(Class *cl, Object *obj, struct GadgetInfo *gi)
+{
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbSet *my = INST_DATA(cl, obj);
+    struct RastPort *rp = ObtainGIRPort(gi);
+
+    struct Rectangle outer = {
+        .MinX = my->Marquee.MinX - 1,
+        .MinY = my->Marquee.MinY - 1,
+        .MaxX = my->Marquee.MaxX + 1,
+        .MaxY = my->Marquee.MaxY + 1,
+    };
+
+    if (rp) {
+        ULONG mode = GetDrMd(rp);
+        SetDrMd(rp, COMPLEMENT);
+        SetDrPt(rp, 0x3333);
+        wbDrawRect(wb, rp, &my->Marquee);
+        wbDrawRect(wb, rp, &outer);
+        SetDrPt(rp, 0xffff);
+        SetDrMd(rp, mode);
+        ReleaseGIRPort(rp);
+    }
+}
+
+static IPTR WBSet__GM_HITTEST(Class *cl, Object *obj, struct gpHitTest *gpht)
+{
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbSet *my = INST_DATA(cl, obj);
+
+    IPTR rc = DoSuperMethodA(cl, obj, (Msg)gpht);
+    if (rc == 0) {
+        D(bug("%s: HITTEST - in window, not icon\n", __func__));
+        my->MarqueeEnable = TRUE;
+        rc = GMR_GADGETHIT;
+    } else {
+        D(bug("%s: HITTEST - in icon\n", __func__));
+    }
+
+    return rc;
+}
+
+static IPTR WBSet__GM_GOACTIVE(Class *cl, Object *obj, struct gpInput *gpi)
+{
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbSet *my = INST_DATA(cl, obj);
+
+    if (!my->MarqueeEnable) {
+        return DoSuperMethodA(cl, obj, (Msg)gpi);
+    }
+
+    my->Marquee.MinX = gpi->gpi_Mouse.X-1;
+    my->Marquee.MinY = gpi->gpi_Mouse.Y-1;
+    my->Marquee.MaxX = gpi->gpi_Mouse.X+1;
+    my->Marquee.MaxY = gpi->gpi_Mouse.Y+1;
+
+    // Draw the marquee
+    wbSetDrawMarquee(cl, obj, gpi->gpi_GInfo);
+
+    return GMR_MEACTIVE;
+}
+
+static IPTR WBSet__GM_HANDLEINPUT(Class *cl, Object *obj, struct gpInput *gpi)
+{
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbSet *my = INST_DATA(cl, obj);
+    struct InputEvent *iev = gpi->gpi_IEvent;
+
+    if (!my->MarqueeEnable) {
+        return DoSuperMethodA(cl, obj, (Msg)gpi);
+    }
+
+    IPTR rc = GMR_MEACTIVE;
+
+    // Erase the old the marquee
+    wbSetDrawMarquee(cl, obj, gpi->gpi_GInfo);
+
+    my->Marquee.MaxX = gpi->gpi_Mouse.X+1;
+    my->Marquee.MaxY = gpi->gpi_Mouse.Y+1;
+
+    // Draw the new marquee
+    wbSetDrawMarquee(cl, obj, gpi->gpi_GInfo);
+
+    if (iev->ie_Class == IECLASS_RAWMOUSE) {
+        switch (iev->ie_Code) {
+        case SELECTUP:
+            rc = GMR_REUSE;
+            break;
+        default:
+            rc = GMR_MEACTIVE;
+            break;
+        }
+    }
+
+    return rc;
+}
+
+static BOOL wbRectOverlap(struct Rectangle *a, struct Rectangle *b)
+{
+    // Swap min/max as needed
+    if (a->MinX > a->MaxX) { WORD t = a->MinX; a->MinX = a->MaxX; a->MaxX = t; }
+    if (a->MinY > a->MaxY) { WORD t = a->MinY; a->MinY = a->MaxY; a->MaxY = t; }
+    if (b->MinX > b->MaxX) { WORD t = b->MinX; b->MinX = b->MaxX; b->MaxX = t; }
+    if (b->MinY > b->MaxY) { WORD t = b->MinY; b->MinY = b->MaxY; b->MaxY = t; }
+
+    // if rectangle has area 0, no overlap
+    if (a->MinX == a->MaxX || a->MinY == a->MaxY) {
+        D(bug("%s: a has no area\n", __func__));
+        return FALSE;
+    }
+    if (b->MinX == b->MaxX || b->MinY == b->MaxY) {
+        D(bug("%s: b has no area\n", __func__));
+        return FALSE;
+    }
+
+    // If one rectangle is on left side of other
+    if (a->MaxX < b->MinX || b->MaxX < a->MinX) {
+        D(bug("%s: a and b do no overlay in X\n", __func__));
+        return FALSE;
+    }
+
+    // If one rectangle is above other
+    if (a->MaxY < b->MinY || b->MaxY < a->MinY) {
+        D(bug("%s: a and b do no overlay in Y\n", __func__));
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+static IPTR WBSet__GM_GOINACTIVE(Class *cl, Object *obj, struct gpGoInactive *gpgi)
+{
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbSet *my = INST_DATA(cl, obj);
+
+    if (!my->MarqueeEnable) {
+        return DoSuperMethodA(cl, obj, (Msg)gpgi);
+    }
+
+    D(bug("%s: marquee @%ld,%ld-%ld,%ld\n", __func__,
+                (IPTR)my->Marquee.MinX,
+                (IPTR)my->Marquee.MinY,
+                (IPTR)my->Marquee.MaxX,
+                (IPTR)my->Marquee.MaxY));
+
+    // Clear the marquee
+    wbSetDrawMarquee(cl, obj, gpgi->gpgi_GInfo);
+
+    // Select all inside the marquee
+    struct wbSetNode *node;
+    ForeachNode(&my->SetObjects, node) {
+        struct Rectangle hitbox;
+        IPTR tmp;
+        LONG top, left;
+        GetAttr(GA_Left, node->sn_Object, &tmp); left = tmp;
+        GetAttr(GA_Top, node->sn_Object, &tmp); top = tmp;
+        GetAttr(WBIA_HitBox, node->sn_Object,(IPTR *)&hitbox);
+        hitbox.MinX += left; hitbox.MaxX += left;
+        hitbox.MinY += top ; hitbox.MaxY += top ;
+        D(bug("%s: %s hitbox @%ld,%ld-%ld,%ld\n",__func__, node->sn_Node.ln_Name,
+                (IPTR)hitbox.MinX,
+                (IPTR)hitbox.MinY,
+                (IPTR)hitbox.MaxX,
+                (IPTR)hitbox.MaxY));
+        if (wbRectOverlap(&my->Marquee, &hitbox)) {
+            D(bug("%s: %s HIT\n", __func__, node->sn_Node.ln_Name));
+            SetAttrs(node->sn_Object, GA_Selected, TRUE, TAG_END);
+            struct RastPort *rp = ObtainGIRPort(gpgi->gpgi_GInfo);
+            if (rp) {
+                DoMethod(node->sn_Object, (IPTR)GM_RENDER, gpgi->gpgi_GInfo, rp, (IPTR)GREDRAW_TOGGLE);
+                ReleaseGIRPort(rp);
+            }
+        }
+    }
+
+    my->MarqueeEnable = FALSE;
+
+    return 0;
+}
+
 static IPTR WBSet__WBxM_DragDropped(Class *cl, Object *obj, struct wbxm_DragDropped *wbxmd)
 {
     struct wbSet *my = INST_DATA(cl, obj);
@@ -467,6 +667,10 @@ static IPTR WBSet_dispatcher(Class *cl, Object *obj, Msg msg)
     METHOD_CASE(WBSet, OM_REMMEMBER);
     METHOD_CASE(WBSet, GM_LAYOUT);
     METHOD_CASE(WBSet, GM_RENDER);
+    METHOD_CASE(WBSet, GM_HITTEST);
+    METHOD_CASE(WBSet, GM_GOACTIVE);
+    METHOD_CASE(WBSet, GM_HANDLEINPUT);
+    METHOD_CASE(WBSet, GM_GOINACTIVE);
     METHOD_CASE(WBSet, WBSM_Select);
     METHOD_CASE(WBSet, WBSM_Clean_Up);
     METHOD_CASE(WBSet, WBxM_DragDropped);
