@@ -494,12 +494,12 @@ static IPTR WBIcon__GM_RENDER(Class *cl, Object *obj, struct gpRender *gpr)
         /* Clip to the window for drawing */
         clip = wbClipWindow(wb, win);
         if (my->ListView) {
+            struct IntuiText label = my->ListILabel;
             if (gadget->Flags & GFLG_SELECTED) {
-                my->ListILabel.DrawMode = COMPLEMENT;
-            } else {
-                my->ListILabel.DrawMode = JAM2;
+                label.FrontPen = my->ListILabel.BackPen;
+                label.BackPen = my->ListILabel.FrontPen;
             }
-            PrintIText(rp, &my->ListILabel, x, y);
+            PrintIText(rp, &label, x, y);
             PrintIText(rp, &my->ListIMeta, x + 8 * my->ListLabelWidth, y);
         } else {
             DrawIconStateA(rp, my->DiskObject, (STRPTR)my->Label, x, y,
