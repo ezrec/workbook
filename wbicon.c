@@ -406,6 +406,9 @@ static IPTR WBIcon__OM_GET(Class *cl, Object *obj, struct opGet *opg)
     case WBIA_CurrentY:
         *(opg->opg_Storage) = (IPTR)my->DiskObject->do_CurrentY;
         break;
+    case WBIA_HitBox:
+        *(struct Rectangle *)(opg->opg_Storage) = my->HitBox;
+        break;
     default:
         rc = DoSuperMethodA(cl, obj, (Msg)opg);
         break;
