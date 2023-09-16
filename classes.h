@@ -186,6 +186,7 @@ Class *WBSet_MakeClass(struct WorkbookBase *wb);
 #define WBIA_Type                (WBIA_Dummy+9)        // (UBYTE) [OM_GET] 'DiskObject->do_Type' of the file.
 #define WBIA_CurrentX            (WBIA_Dummy+10)       // (LONG) [OM_SET,OM_GET] 'DiskObject->do_CurrentX'
 #define WBIA_CurrentY            (WBIA_Dummy+11)       // (LONG) [OM_SET,OM_GET] 'DiskObject->do_CurrentY'
+#define WBIA_HitBox              (WBIA_Dummy+12)       // (struct Rectangle) [OM_GET] Icon hit box
 
 /* Methods */
 #define WBIM_Dummy               (TAG_USER | 0x40440100)
