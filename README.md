@@ -2,7 +2,7 @@
 
 Copy to SYS:System/Workbook
 
-- Unreleased
+- v1.10
   - Add multi-selection marquee
   - Add list view (Name, Size, Date, Type) modes.
   - Set Volume window title to include disk usage information.
