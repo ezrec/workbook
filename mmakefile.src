@@ -8,11 +8,12 @@ USER_CPPFLAGS := \
 
 FILES := workbook workbook_intern wbcurrent \
 	 wbapp \
-         wbdragdrop \
+     wbdragdrop \
 	 wbwindow \
 	 wbvirtual \
 	 wbset \
-	 wbicon
+	 wbicon \
+	 wbdoimage
 
 #MM- workbench-system : workbench-system-workbook
 

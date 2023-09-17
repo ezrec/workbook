@@ -76,8 +76,6 @@ struct WorkbookBase {
 #define LayersBase    wb->wb_LayersBase
 #define LocaleBase    wb->wb_LocaleBase
 
-extern struct ExecBase *SysBase;
-
 #include <string.h>
 #include <proto/exec.h>
 
