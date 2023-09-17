@@ -9,6 +9,8 @@
 #include <clib/alib_protos.h>
 #include <clib/arossupport_protos.h>
 
+extern struct ExecBase *SysBase;
+
 static inline LONG STRLEN(CONST_STRPTR s)
 {
     CONST_STRPTR _s = s;
