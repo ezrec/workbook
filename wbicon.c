@@ -706,7 +706,7 @@ static IPTR WBIcon__WBIM_Open(Class *cl, Object *obj, Msg msg)
     D(struct Process *proc =) CreateNewProcTags(
             NP_Name, (IPTR)my->File,
             NP_Entry, (IPTR)wbOpener,
-            NP_CurrentDir, (IPTR)my->ParentLock,
+            NP_CurrentDir, (IPTR)DupLock(my->ParentLock),
             TAG_END);
     D(bug("WBIcon.Open: %s via %lx\n", my->File, (IPTR)proc));
 
