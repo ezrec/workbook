@@ -108,9 +108,6 @@ AROS_PROCH(wbOpener, argstr, argsize, SysBase)
 
     APTR DOSBase = OpenLibrary("dos.library", 0);
     if (DOSBase) {
-        // Duplicate lock for CurrentDir (as our parent didn't)
-        CurrentDir(DupLock(CurrentDir(BNULL)));
-
         // Determine the absolute path for the thing to open.
         STRPTR abspath = wbAbspathCurrent(file);
         if (abspath != NULL) {
