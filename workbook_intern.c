@@ -317,7 +317,7 @@ VOID wbPopupIoErr(struct WorkbookBase *wb, CONST_STRPTR title, LONG ioerr, CONST
        .es_TextFormat = "%s",
        .es_GadgetFormat = "Ok",
     };
-    char buff[256];
+    char buff[FILENAME_MAX + FAULT_MAX];
     if (ioerr == 0) {
         strcpy(buff, prefix);
         strcat(buff, ": ????");
@@ -346,23 +346,23 @@ void wbDebugReportSelected_(struct WorkbookBase *wb, CONST_STRPTR caller)
         switch (ti->ti_Tag) {
         case WBOPENA_ArgLock:
             if ((BPTR)ti->ti_Data == BNULL) {
-                D(bug("%s: [%ld] { WBOPENA_ArgLock, [BPTR](BNULL) },\n", caller, index));
+                D(bug("%s: [%ld] { WBOPENA_ArgLock, [BPTR](BNULL) },\n", caller, (IPTR)index));
             } else if (NameFromLock((BPTR)ti->ti_Data, path, PATH_MAX)) {
-                D(bug("%s: [%ld] { WBOPENA_ArgLock, [BPTR]\"%s\" },\n", caller, index, path));
+                D(bug("%s: [%ld] { WBOPENA_ArgLock, [BPTR]\"%s\" },\n", caller, (IPTR)index, path));
             } else {
-                D(bug("%s: [%ld] { WBOPENA_ArgLock, [BPTR](%lx) },\n", caller, index, (BPTR)ti->ti_Data));
+                D(bug("%s: [%ld] { WBOPENA_ArgLock, [BPTR](%lx) },\n", caller, (IPTR)index, (IPTR)(BPTR)ti->ti_Data));
             }
             break;
         case WBOPENA_ArgName:
-            D(bug("%s: [%ld] { WBOPENA_ArgName, \"%s\"  },\n", caller, index, (CONST_STRPTR)ti->ti_Data));
+            D(bug("%s: [%ld] { WBOPENA_ArgName, \"%s\"  },\n", caller, (IPTR)index, (CONST_STRPTR)ti->ti_Data));
             break;
         default:
-            D(bug("%s: [%ld] { 0x%lx, 0x%lx  },\n", caller, index, ti->ti_Tag, ti->ti_Data));
+            D(bug("%s: [%ld] { 0x%lx, 0x%lx  },\n", caller, (IPTR)index, (IPTR)ti->ti_Tag, (IPTR)ti->ti_Data));
             break;
         }
 	index++;
     }
-    D(bug("%s: [%ld] { TAG_END },\n", caller, index));
+    D(bug("%s: [%ld] { TAG_END },\n", caller, (IPTR)index));
 
     FreeTagItems(args);
 

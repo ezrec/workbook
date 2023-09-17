@@ -112,7 +112,6 @@ static IPTR WBSet__OM_REMMEMBER(Class *cl, Object *obj, struct opMember *opm)
 // OM_NEW
 static IPTR WBSet__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
 {
-    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbSet *my;
     IPTR rc;
 
@@ -195,11 +194,6 @@ static IPTR WBSet__WBSM_Select(Class *cl, Object *obj, struct wbsm_Select *wbss)
     }
 
     return 0;
-}
-
-static BOOL wbSetInsertTail(struct WorkbookBase *wb, struct wbSetNode *curr_node, struct wbSetNode *new_node)
-{
-    return FALSE;
 }
 
 static BOOL wbSetInsertByName(struct WorkbookBase *wb, struct wbSetNode *curr_node, struct wbSetNode *new_node)
@@ -300,7 +294,6 @@ static void wbSetSort(Class *cl, Object *obj)
 // WBSM_Clean_Up
 static IPTR WBSet__WBSM_Clean_Up(Class *cl, Object *obj, struct wbsm_CleanUp *wbscu)
 {
-    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbSet *my = INST_DATA(cl, obj);
     struct wbSetNode *node, *next;
 
@@ -376,19 +369,19 @@ static IPTR WBSet__GM_LAYOUT(Class *cl, Object *obj, struct gpLayout *gpl)
 
         if (!listView && ((CurrRight + ibox.Width) < gi->gi_Domain.Width)) {
             ibox.Left = CurrRight;
-            D(bug("%s: %s add to right @(%ld,%ld)\n", __func__, (IPTR)node->sn_Node.ln_Name, (IPTR)CurrRight, (IPTR)CurrBottom));
+            D(bug("%s: %s add to right @(%ld,%ld)\n", __func__, node->sn_Node.ln_Name, (IPTR)CurrRight, (IPTR)CurrBottom));
         } else {
             ibox.Left = 0;
             CurrRight = 0;
             CurrBottom = sbox.Height + (listView ? 0 : WBICON_ROW_MARGIN);
-            D(bug("%s: %s start new line @(%ld,%ld)\n", __func__, (IPTR)node->sn_Node.ln_Name, (IPTR)CurrRight, (IPTR)CurrBottom));
+            D(bug("%s: %s start new line @(%ld,%ld)\n", __func__, node->sn_Node.ln_Name, (IPTR)CurrRight, (IPTR)CurrBottom));
         }
         ibox.Top  = CurrBottom;
         CurrRight += ibox.Width + WBICON_COL_MARGIN;
-        D(bug("%s: %s next: @%ld,%ld\n", __func__, (IPTR)node->sn_Node.ln_Name, (IPTR)CurrRight, (IPTR)CurrBottom));
+        D(bug("%s: %s next: @%ld,%ld\n", __func__, node->sn_Node.ln_Name, (IPTR)CurrRight, (IPTR)CurrBottom));
 
         // Mark as arranged
-        D(bug("%s: %s arranged position: @%ld,%ld\n", __func__, (IPTR)node->sn_Node.ln_Name, (IPTR)ibox.Left, (IPTR)ibox.Top));
+        D(bug("%s: %s arranged position: @%ld,%ld\n", __func__, node->sn_Node.ln_Name, (IPTR)ibox.Left, (IPTR)ibox.Top));
 
         // Adjust gadget location _without_ re-rendering.
         SetAttrs(iobj, GA_Top, ibox.Top, GA_Left, ibox.Left, TAG_END);
@@ -466,7 +459,6 @@ static void wbSetDrawMarquee(Class *cl, Object *obj, struct GadgetInfo *gi)
 
 static IPTR WBSet__GM_HITTEST(Class *cl, Object *obj, struct gpHitTest *gpht)
 {
-    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbSet *my = INST_DATA(cl, obj);
 
     IPTR rc = DoSuperMethodA(cl, obj, (Msg)gpht);
@@ -483,7 +475,6 @@ static IPTR WBSet__GM_HITTEST(Class *cl, Object *obj, struct gpHitTest *gpht)
 
 static IPTR WBSet__GM_GOACTIVE(Class *cl, Object *obj, struct gpInput *gpi)
 {
-    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbSet *my = INST_DATA(cl, obj);
 
     if (!my->MarqueeEnable) {
@@ -503,7 +494,6 @@ static IPTR WBSet__GM_GOACTIVE(Class *cl, Object *obj, struct gpInput *gpi)
 
 static IPTR WBSet__GM_HANDLEINPUT(Class *cl, Object *obj, struct gpInput *gpi)
 {
-    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbSet *my = INST_DATA(cl, obj);
     struct InputEvent *iev = gpi->gpi_IEvent;
 

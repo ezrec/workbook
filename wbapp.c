@@ -381,13 +381,13 @@ static IPTR WBApp__WBAM_ReportSelected(Class *cl, Object *obj, struct wbam_Repor
     ostate = (Object *)my->Windows.mlh_Head;
     while ((owin = NextObject(&ostate)) != NULL) {
         IPTR rc = DoMethod(owin, WBWM_ReportSelected, NULL);
-        D(bug("%s: %lx => %ld tags\n", __func__, owin, rc));
+        D(bug("%s: %lx => %ld tags\n", __func__, (IPTR)owin, (IPTR)rc));
         // Account for the TAG_END at the end of the report.
         total_tags += rc - 1;
     }
     total_tags++;
 
-    D(bug("%s: %ld total tags\n", __func__, total_tags));
+    D(bug("%s: %ld total tags\n", __func__, (IPTR)total_tags));
 
     // Did they just want to know how big the report was?
     if (wbamr->wbamr_ReportTags == NULL) {
@@ -403,7 +403,7 @@ static IPTR WBApp__WBAM_ReportSelected(Class *cl, Object *obj, struct wbam_Repor
     while ((owin = NextObject(&ostate)) != NULL) {
         struct TagItem *ti_ptr = NULL;
         IPTR rc = DoMethod(owin, WBWM_ReportSelected, &ti_ptr);
-        D(bug("%s: %lx => %ld tags\n", __func__, owin, rc));
+        D(bug("%s: %lx => %ld tags\n", __func__, (IPTR)owin, (IPTR)rc));
         for (IPTR n = 0; n < rc; n++, index++) {
             ti[index] = ti_ptr[n];
         }
@@ -414,9 +414,9 @@ static IPTR WBApp__WBAM_ReportSelected(Class *cl, Object *obj, struct wbam_Repor
 
     ti[index++].ti_Tag = TAG_END;
 
-    D(bug("%s: %ld reported tags\n", __func__, index));
+    D(bug("%s: %ld reported tags\n", __func__, (IPTR)index));
 
-    D(if (index != total_tags) bug("%s: Expected %ld tags, got %ld tags!!!!\n", __func__, total_tags, index));
+    D(if (index != total_tags) bug("%s: Expected %ld tags, got %ld tags!!!!\n", __func__, (IPTR)total_tags, (IPTR)index));
 
     *(wbamr->wbamr_ReportTags) = ti;
 
@@ -751,7 +751,6 @@ static IPTR WBApp__WBAM_DragDropUpdate(Class *cl, Object *obj, Msg msg)
 
 static IPTR WBApp__WBAM_DragDropEnd(Class *cl, Object *obj, Msg msg)
 {
-    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbApp *my = INST_DATA(cl, obj);
 
     if (my->DragDropActive) {

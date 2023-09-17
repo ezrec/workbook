@@ -689,7 +689,7 @@ static IPTR WBIcon__GM_GOINACTIVE(Class *cl, Object *obj, struct gpGoInactive *g
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
 
-    D(bug("%s: %lx\n", __func__, obj));
+    D(bug("%s: %lx\n", __func__, (IPTR)obj));
 
     // Turn off the DnD manager.
     DoMethod(wb->wb_App, WBAM_DragDropEnd);
@@ -895,7 +895,6 @@ static IPTR WBIcon__WBIM_Snapshot(Class *cl, Object *obj, Msg msg)
 
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
-    struct Gadget *gadget = (struct Gadget *)obj;
 
     D(bug("%s: %s\n", __func__, my->File));
 
@@ -1036,7 +1035,7 @@ static IPTR WBIcon__WBIM_DragDropAdd(Class *cl, Object *obj, struct wbimd_DragDr
     struct Gadget *gadget = (struct Gadget *)obj;
 
     // Adjust Top, Left by Window coordinates
-    D(bug("%s: gadget @(%ld,%ld), window @(%ld,%ld)\n", __func__, gadget->LeftEdge, gadget->TopEdge, wbimd->wbimd_GInfo->gi_Window->LeftEdge, wbimd->wbimd_GInfo->gi_Window->TopEdge));
+    D(bug("%s: gadget @(%ld,%ld), window @(%ld,%ld)\n", __func__, (IPTR)gadget->LeftEdge, (IPTR)gadget->TopEdge, (IPTR)wbimd->wbimd_GInfo->gi_Window->LeftEdge, (IPTR)wbimd->wbimd_GInfo->gi_Window->TopEdge));
     struct Rectangle rect = {
         .MinX = gadget->LeftEdge + my->HitBox.MinX + wbimd->wbimd_GInfo->gi_Window->LeftEdge,
         .MinY = gadget->TopEdge + my->HitBox.MinY + wbimd->wbimd_GInfo->gi_Window->TopEdge,
@@ -1044,7 +1043,7 @@ static IPTR WBIcon__WBIM_DragDropAdd(Class *cl, Object *obj, struct wbimd_DragDr
         .MaxY = gadget->TopEdge + my->HitBox.MaxY + wbimd->wbimd_GInfo->gi_Window->TopEdge,
     };
 
-    D(bug("%s: Rectangle (%ld,%ld)-(%ldx%ld)\n", __func__, rect.MinX, rect.MinY, rect.MaxX, rect.MaxY));
+    D(bug("%s: Rectangle (%ld,%ld)-(%ldx%ld)\n", __func__, (IPTR)rect.MinX, (IPTR)rect.MinY, (IPTR)rect.MaxX, (IPTR)rect.MaxY));
 
     return DoMethod(wbimd->wbimd_DragDrop, WBDM_Add, (IPTR)WBDT_RECTANGLE, (IPTR)&rect);
 }

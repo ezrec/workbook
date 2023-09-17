@@ -43,7 +43,7 @@ static void wbDragDropDraw(Class *cl, Object *obj)
 
     struct RastPort *rp = &my->Screen->RastPort;
 
-    D(bug("%s: o(%ld,%ld), mouse(%ld,%ld)\n", __func__, my->OriginX, my->OriginY, my->CurrentX, my->CurrentY));
+    D(bug("%s: o(%ld,%ld), mouse(%ld,%ld)\n", __func__, (IPTR)my->OriginX, (IPTR)my->OriginY, (IPTR)my->CurrentX, (IPTR)my->CurrentY));
     LONG deltaX = (LONG)my->CurrentX - (LONG)my->OriginX;
     LONG deltaY = (LONG)my->CurrentY - (LONG)my->OriginY;
 
@@ -59,7 +59,7 @@ static void wbDragDropDraw(Class *cl, Object *obj)
             DrawImage(rp, image->IconImage, deltaX, deltaY);
             break;
         case WBDT_RECTANGLE:
-            D(bug("%s: RectFill(%lx, (%ld,%ld)-(%ld,%ld)\n", __func__, rp, deltaX + rect->MinX, deltaY + rect->MinY, deltaX + rect->MaxX, deltaY + rect->MaxY));
+            D(bug("%s: RectFill(%lx, (%ld,%ld)-(%ld,%ld)\n", __func__, (IPTR)rp, (IPTR)(deltaX + rect->MinX), (IPTR)(deltaY + rect->MinY), (IPTR)(deltaX + rect->MaxX), (IPTR)(deltaY + rect->MaxY)));
             RectFill(rp, deltaX + rect->MinX, deltaY + rect->MinY, deltaX + rect->MaxX, deltaY + rect->MaxY);
             break;
         default:
@@ -184,7 +184,7 @@ static IPTR WBDragDrop__WBDM_Add(Class *cl, Object *obj, struct wbdm_Add *wbdma)
         break;
     case WBDT_RECTANGLE:
         node->IconRect = *(struct Rectangle *)wbdma->wbdma_ImageData;
-        D(bug("%s: Rect: (%ld,%ld)-(%ld,%ld)\n", __func__, node->IconRect.MinX, node->IconRect.MinY, node->IconRect.MaxX, node->IconRect.MaxY));
+        D(bug("%s: Rect: (%ld,%ld)-(%ld,%ld)\n", __func__, (IPTR)node->IconRect.MinX, (IPTR)node->IconRect.MinY, (IPTR)node->IconRect.MaxX, (IPTR)node->IconRect.MaxY));
         break;
     default:
         FreeMem(node, sizeof(*node));
@@ -213,7 +213,7 @@ static IPTR WBDragDrop_dispatcher(Class *cl, Object *obj, Msg msg)
 {
     IPTR rc = 0;
 
-    D(bug("%s: MessageID 0x%lx\n", __func__, msg->MethodID));
+    D(bug("%s: MessageID 0x%lx\n", __func__, (IPTR)msg->MethodID));
     switch (msg->MethodID) {
     METHOD_CASE(WBDragDrop, OM_NEW);
     METHOD_CASE(WBDragDrop, OM_DISPOSE);

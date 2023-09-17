@@ -253,20 +253,12 @@ static BOOL wbBumpRevisionCurrent(struct Library *DOSBase, CONST_STRPTR oldname,
     }
 
     for (index++; index != 0; index++) {
-       IPTR val[] = {(IPTR)index, (IPTR)oldname };
-       int vindex = 0;
-       const char *template = "Copy_%ld_of_%s";
        if (index == 1) {
-           template = "Copy_of_%s";
-           vindex = 1;
+           snprintf(newname, FILENAME_MAX, "Copy_of_%s", oldname);
+       } else {
+           snprintf(newname, FILENAME_MAX, "Copy_%d_of_%s", (int)index, oldname);
        }
-       ULONG count = 0;
-       RawDoFmt(template, (RAWARG)&val[vindex], RAWFMTFUNC_COUNT, &count);
-       if (count >= FILENAME_MAX) {
-           index = 0;
-           break;
-       }
-       RawDoFmt(template, (RAWARG)&val[vindex], RAWFMTFUNC_STRING, newname);
+       newname[FILENAME_MAX-1] = 0;
 
        BPTR lock = Lock(newname, SHARED_LOCK);
        if (lock == BNULL) {
@@ -338,7 +330,7 @@ static BOOL wbCopyLockCurrent(struct Library *DOSBase, CONST_STRPTR dst_file, BP
                     this_lock = Lock(fib->fib_FileName, SHARED_LOCK);
                     CurrentDir(dst_lock);
 
-                    D(if (this_lock == BNULL) bug("%s: Can't lock %s|%s\n", sCURRDIR(), fib->fib_FileName));
+                    D(if (this_lock == BNULL) bug("%s: Can't lock %s|%s\n", __func__, sCURRDIR(), fib->fib_FileName));
                     err = IoErr();
                     if (this_lock != BNULL) {
                         ok = wbCopyLockCurrent(DOSBase, fib->fib_FileName, this_lock);
@@ -572,7 +564,7 @@ BOOL _wbMoveIntoCurrentAt(struct Library *DOSBase, struct Library *IconBase, BPT
 // NOTE: CurrentDir(my->ParentLock) must already be set before calling!
 BOOL _wbDropOntoCurrentAt(struct Library *DOSBase, struct Library *IconBase, struct Library *UtilityBase, struct TagItem *args, LONG targetX, LONG targetY)
 {
-    ASSERT_VALID_PROCESS(FindTask(NULL));
+    ASSERT_VALID_PROCESS((struct Process *)FindTask(NULL));
 
     struct TagItem *ti;
 
@@ -596,7 +588,7 @@ BOOL _wbDropOntoCurrentAt(struct Library *DOSBase, struct Library *IconBase, str
             // Dropping to same directory? Ignore icon reposition for now.
             if (SameLock(dst_lock, src_lock) == LOCK_SAME) {
                 // Ok, nothing to do here. (yet)
-                D(bug("%s: Window icon reposition of %s to %ld,%ld\n", __func__, src_file, targetX, targetY));
+                D(bug("%s: Window icon reposition of %s to %ld,%ld\n", __func__, src_file, (IPTR)targetX, (IPTR)targetY));
                 ok = TRUE;
                 break;
             }
@@ -624,7 +616,7 @@ BOOL _wbDropOntoCurrentAt(struct Library *DOSBase, struct Library *IconBase, str
             if (dst_lock == BNULL) {
                 // root window move - is this an icon move or a 'bad drop'?
                 if (src_lock == BNULL) {
-                    D(bug("%s: Root icon position move of %s to (%ld,%ld)\n", __func__, src_file, targetX, targetY));
+                    D(bug("%s: Root icon position move of %s to (%ld,%ld)\n", __func__, src_file, (IPTR)targetX, (IPTR)targetY));
                     ok = TRUE;
                     break;
                 } else {
@@ -643,11 +635,11 @@ BOOL _wbDropOntoCurrentAt(struct Library *DOSBase, struct Library *IconBase, str
 
             // If parent is on same device, it's a move. Otherwise it's a copy.
             if (SameDevice(dst_lock, src_lock)) {
-                D(bug("%s: Move %s into %s at (%ld,%ld)\n", __func__, src_file, sCURRDIR(), targetX, targetY));
+                D(bug("%s: Move %s into %s at (%ld,%ld)\n", __func__, src_file, sCURRDIR(), (IPTR)targetX, (IPTR)targetY));
                 ok = _wbMoveIntoCurrentAt(DOSBase, IconBase, src_lock, src_file, targetX, targetY);
                 err = IoErr();
             } else {
-                D(bug("%s: Copy %s into %s at (%ld,%ld)\n", __func__, src_file, sCURRDIR(), targetX, targetY));
+                D(bug("%s: Copy %s into %s at (%ld,%ld)\n", __func__, src_file, sCURRDIR(), (IPTR)targetX, (IPTR)targetY));
                 ok = _wbCopyIntoCurrentAt(DOSBase, IconBase, src_lock, src_file, targetX, targetY);
                 err = IoErr();
             }
