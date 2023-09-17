@@ -468,11 +468,13 @@ static IPTR WBWindow__WBWM_CacheContents(Class *cl, Object *obj, Msg msg)
         if (parent != BNULL) {
             UnLock(parent);
         } else {
-            struct InfoData info;
-            if (Info(my->Lock, &info)) {
-                IPTR full_perc = info.id_NumBlocksUsed * 100 / info.id_NumBlocks;
-                IPTR free_k = (info.id_NumBlocks - info.id_NumBlocksUsed) * (info.id_BytesPerBlock / 256) / 4;
-                IPTR used_k = (info.id_NumBlocksUsed) * (info.id_BytesPerBlock / 256) / 4;
+            // Must be BADDR alignable!
+            UWORD idbuff[sizeof(struct InfoData)/sizeof(WORD) + 1];
+            struct InfoData *id = BADDR(MKBADDR(&idbuff[1]));
+            if (Info(my->Lock, id)) {
+                IPTR full_perc = id->id_NumBlocksUsed * 100 / id->id_NumBlocks;
+                IPTR free_k = (id->id_NumBlocks - id->id_NumBlocksUsed) * (id->id_BytesPerBlock / 256) / 4;
+                IPTR used_k = (id->id_NumBlocksUsed) * (id->id_BytesPerBlock / 256) / 4;
                 CONST_STRPTR free_u = "K";
                 CONST_STRPTR used_u = "K";
                 if (free_k >= 2048) {
@@ -491,11 +493,6 @@ static IPTR WBWindow__WBWM_CacheContents(Class *cl, Object *obj, Msg msg)
                         used_u = "G";
                     }
                 }
-                IPTR val[] = {
-                    (IPTR)full_perc,
-                    (IPTR)free_k, (IPTR)free_u,
-                    (IPTR)used_k, (IPTR)used_u,
-                };
                 int index = 0;
                 if (NameFromLock(my->Lock, my->WindowTitle, sizeof(my->WindowTitle))) {
                     index = STRLEN(my->WindowTitle);
@@ -503,7 +500,8 @@ static IPTR WBWindow__WBWM_CacheContents(Class *cl, Object *obj, Msg msg)
                         index--;
                     }
                 }
-                RawDoFmt("  %ld%% full, %ld%s free, %ld%s in use", (RAWARG)val, RAWFMTFUNC_STRING, &my->WindowTitle[index]);
+                snprintf(&my->WindowTitle[index], sizeof(my->WindowTitle)-index, "  %u%% full, %u%s free, %u%s in use", (unsigned)full_perc, (unsigned)free_k, free_u, (unsigned)used_k, used_u);
+                my->WindowTitle[sizeof(my->WindowTitle)-1] = 0;
                 SetWindowTitles(my->Window, my->WindowTitle, (CONST_STRPTR)-1);
             }
         }
@@ -1160,7 +1158,7 @@ static IPTR WBWindow__WBWM_ReportSelected(Class *cl, Object *obj, struct wbwm_Re
         total_tags = 1 /* WBOPENA_ArgLock */ + count /* WBOPENA_ArgName */ + 1 /* TAG_END */;
     }
 
-    D(bug("%s: %ld total tags\n", __func__, total_tags));
+    D(bug("%s: %ld total tags\n", __func__, (IPTR)total_tags));
 
     if (wbwmr->wbwmr_ReportTags == NULL) {
         return total_tags;
@@ -1186,8 +1184,8 @@ static IPTR WBWindow__WBWM_ReportSelected(Class *cl, Object *obj, struct wbwm_Re
     }
     ti[index++] = (struct TagItem){ TAG_END };
 
-    D(bug("%s: %ld reported tags\n", __func__, index));
-    D(if (index != total_tags) bug("%s: FATAL: %ld expected, but got %ld items!\n", __func__, total_tags, index));
+    D(bug("%s: %ld reported tags\n", __func__, (IPTR)index));
+    D(if (index != total_tags) bug("%s: FATAL: %ld expected, but got %ld items!\n", __func__, (IPTR)total_tags, (IPTR)index));
 
     *(wbwmr->wbwmr_ReportTags) = ti;
 
@@ -1361,18 +1359,16 @@ static IPTR WBWindow__WBWM_IntuiTick(Class *cl, Object *obj, Msg msg)
     }
 
     if (changed) {
-        IPTR val[6];
-
-        val[0] = (IPTR)AS_STRING(WB_NAME);
-        val[1] = WB_VERSION;
-        val[2] = WB_REVISION;
-        val[3] = my->AvailChip;
-        val[4] = my->AvailFast;
-        val[5] = my->AvailAny;
-
         /* Update the window's title */
-        RawDoFmt("%s %ld.%ld  Chip: %ldk, Fast: %ldk, Any: %ldk", (RAWARG)val,
-                 RAWFMTFUNC_STRING, my->ScreenTitle);
+        snprintf(my->ScreenTitle, sizeof(my->ScreenTitle),
+                 "%s %d.%d  Chip: %uk, Fast: %uk, Any: %uk",
+            AS_STRING(WB_NAME),
+            WB_VERSION,
+            WB_REVISION,
+            (unsigned)my->AvailChip,
+            (unsigned)my->AvailFast,
+            (unsigned)my->AvailAny);
+        my->ScreenTitle[sizeof(my->ScreenTitle)-1] = 0;
 
         SetWindowTitles(my->Window, (CONST_STRPTR)-1, my->ScreenTitle);
         rc = TRUE;
@@ -1445,7 +1441,7 @@ static IPTR WBWindow__WBxM_DragDropped(Class *cl, Object *obj, struct wbxm_DragD
         LONG targetY = areaY + virtTop;
 
         // Area didn't have an icon that could accept it, so we will!
-        D(bug("%s: DragDrop accepted by %s, relMouse (%ld, %ld)\n", __func__, my->Path, targetX, targetY));
+        D(bug("%s: DragDrop accepted by %s, relMouse (%ld, %ld)\n", __func__, my->Path, (IPTR)targetX, (IPTR)targetY));
         D(wbDebugReportSelected(wb));
 
         match = wbWindowDragDropAccept(cl, obj, targetX, targetY);
