@@ -13,7 +13,8 @@ FILES := workbook workbook_intern wbcurrent \
 	 wbvirtual \
 	 wbset \
 	 wbicon \
-	 wbdoimage
+	 wbdoimage \
+	 wbinfo
 
 #MM- workbench-system : workbench-system-workbook
 
