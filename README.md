@@ -2,6 +2,8 @@
 
 Copy to SYS:System/Workbook
 
+- v1.11
+  - Add Information.. window.
 - v1.10
   - Add multi-selection marquee
   - Add list view (Name, Size, Date, Type) modes.
