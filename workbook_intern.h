@@ -15,7 +15,7 @@
 #endif
 #ifndef WB_VERSION
 #define WB_VERSION      1
-#define WB_REVISION     10
+#define WB_REVISION     11
 #endif
 
 #define _D(x)
