@@ -41,9 +41,10 @@ struct wbIcon {
     IPTR ListLabelWidth;
     struct IntuiText ListILabel;
     struct IntuiText ListIMeta;
-    ULONG Protection;
-    ULONG Size;
-    struct DateStamp DateStamp;
+    // Cached FileInfoBlock data
+    LONG FibProtection;
+    LONG FibSize;
+    struct DateStamp FibDateStamp;
     char ListLabelMeta[/* size */ 6 + 1 + /* prot */ 8 + 1 + 20 + 1];
 
     struct timeval LastActive;
@@ -222,8 +223,8 @@ static IPTR WBIcon__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
     struct Screen *screen = (struct Screen *)GetTagData(WBIA_Screen, (IPTR)NULL, ops->ops_AttrList);
     BOOL listview = (BOOL)GetTagData(WBIA_ListView, (IPTR)FALSE, ops->ops_AttrList);
     ULONG listlabelwidth = (ULONG)GetTagData(WBIA_ListLabelWidth, (IPTR)15, ops->ops_AttrList);
-    ULONG protection;
-    ULONG size;
+    LONG protection;
+    LONG size;
     struct DateStamp datestamp;
 
     if (!file) {
@@ -238,8 +239,8 @@ static IPTR WBIcon__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
         struct FileInfoBlock *fib = AllocDosObjectTags(DOS_FIB, TAG_END);
         if (fib != NULL) {
             if (Examine(lock, fib)) {
-                protection = (ULONG)fib->fib_Protection;
-                size = (ULONG)fib->fib_Size;
+                protection = fib->fib_Protection;
+                size = fib->fib_Size;
                 datestamp = fib->fib_Date;
                 ok = TRUE;
             }
@@ -292,9 +293,10 @@ static IPTR WBIcon__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
 
     my->ListView = listview;
     my->ListLabelWidth = listlabelwidth;
-    my->Protection = protection;
-    my->Size = size;
-    my->DateStamp = datestamp;
+
+    my->FibProtection = protection;
+    my->FibSize = size;
+    my->FibDateStamp = datestamp;
     my->ListILabel = (struct IntuiText){0};
     my->ListIMeta  = (struct IntuiText){0};
 
@@ -302,7 +304,7 @@ static IPTR WBIcon__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
     CONST_STRPTR protbits = "xsparwed";
     for (int i = 0; i < 8; i++) {
         // Lower 4 bits are inverted for display purposes.
-        if ((my->Protection ^ 0xf) & (1 << i)) {
+        if ((my->FibProtection ^ 0xf) & (1 << i)) {
             prottext[7-i] = protbits[7-i];
         } else {
             prottext[7-i] = '-';
@@ -310,31 +312,20 @@ static IPTR WBIcon__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
     }
 
     if (my->DiskObject->do_Type == WBDRAWER || my->DiskObject->do_Type == WBGARBAGE) {
-        IPTR val[] = {
-            (IPTR)prottext,
-        };
-        RawDoFmt("Drawer %s ", (RAWARG)val, RAWFMTFUNC_STRING, my->ListLabelMeta);
+        snprintf(my->ListLabelMeta, sizeof(my->ListLabelMeta), "Drawer %s ", prottext);
     } else {
         if (size <= 999999) {
-            IPTR val[] = {
-                (IPTR)size,
-                (IPTR)prottext,
-            };
-            RawDoFmt("%6ld %s ", (RAWARG)val, RAWFMTFUNC_STRING, my->ListLabelMeta);
+            snprintf(my->ListLabelMeta, sizeof(my->ListLabelMeta), "%6u %s ", (unsigned)size, prottext);
         } else if (size < 999 * 1000 * 1000) {
-            IPTR val[] = {
-                (IPTR)(size / 1000 / 1000),
-                (IPTR)((size / 1000 / 100) % 10),
-                (IPTR)prottext,
-            };
-            RawDoFmt("%3ld.%ldM %s ", (RAWARG)val, RAWFMTFUNC_STRING, my->ListLabelMeta);
+            snprintf(my->ListLabelMeta, sizeof(my->ListLabelMeta), "%3u.%uM %s ",
+                    (unsigned)(size / 1000 / 1000),
+                    (unsigned)((size / 1000 / 100) % 10),
+                    prottext);
         } else {
-            IPTR val[] = {
-            (IPTR)(size / 1000 / 1000 / 1000),
-            (IPTR)((size / 1000 / 1000) % 1000),
-            (IPTR)prottext,
-            };
-            RawDoFmt("%ld.%03ldG %s ", (RAWARG)val, RAWFMTFUNC_STRING, my->ListLabelMeta);
+            snprintf(my->ListLabelMeta, sizeof(my->ListLabelMeta), "%u.%03uG %s ",
+                (unsigned)(size / 1000 / 1000 / 1000),
+                (unsigned)((size / 1000 / 1000) % 1000),
+                prottext);
         }
     }
     struct Hook datehook = {
@@ -343,7 +334,7 @@ static IPTR WBIcon__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
     };
     struct Locale *locale = OpenLocale(NULL);
     if (locale) {
-        FormatDate(locale, "%d-%b-%Y %X", &my->DateStamp, &datehook);
+        FormatDate(locale, "%d-%b-%Y %X", &my->FibDateStamp, &datehook);
         CloseLocale(locale);
     }
 
@@ -388,22 +379,22 @@ static IPTR WBIcon__OM_GET(Class *cl, Object *obj, struct opGet *opg)
     case WBIA_ParentLock:
         *(opg->opg_Storage) = (IPTR)my->ParentLock;
         break;
-    case WBIA_Size:
-        *(opg->opg_Storage) = (IPTR)my->Size;
+    case WBIA_FibProtection:
+        *(opg->opg_Storage) = (IPTR)my->FibProtection;
         break;
-    case WBIA_Protection:
-        *(opg->opg_Storage) = (IPTR)my->Protection;
+    case WBIA_FibSize:
+        *(opg->opg_Storage) = (IPTR)my->FibSize;
         break;
-    case WBIA_DateStamp:
-        *(struct DateStamp *)(opg->opg_Storage) = my->DateStamp;
+    case WBIA_FibDateStamp:
+        *(struct DateStamp *)(opg->opg_Storage) = my->FibDateStamp;
         break;
-    case WBIA_Type:
+    case WBIA_DoType:
         *(opg->opg_Storage) = (IPTR)my->DiskObject->do_Type;
         break;
-    case WBIA_CurrentX:
+    case WBIA_DoCurrentX:
         *(opg->opg_Storage) = (IPTR)my->DiskObject->do_CurrentX;
         break;
-    case WBIA_CurrentY:
+    case WBIA_DoCurrentY:
         *(opg->opg_Storage) = (IPTR)my->DiskObject->do_CurrentY;
         break;
     case WBIA_HitBox:
@@ -442,10 +433,10 @@ static IPTR WBIcon__OM_SET(Class *cl, Object *obj, struct opSet *ops)
         case WBIA_ListLabelWidth:
             listlabelwidth = (BOOL)ti->ti_Data;
             break;
-        case WBIA_CurrentX:
+        case WBIA_DoCurrentX:
             my->DiskObject->do_CurrentX = (LONG)ti->ti_Data;
             break;
-        case WBIA_CurrentY:
+        case WBIA_DoCurrentY:
             my->DiskObject->do_CurrentY = (LONG)ti->ti_Data;
             break;
         }

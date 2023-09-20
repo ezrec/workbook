@@ -180,13 +180,13 @@ Class *WBSet_MakeClass(struct WorkbookBase *wb);
 #define WBIA_Screen              (WBIA_Dummy+3)        // (struct Screen) [OM_NEW] to reference for layout and drawing.
 #define WBIA_ListView            (WBIA_Dummy+4)        // (BOOL) [OM_NEW, OM_SET] List, not icon, rendering.
 #define WBIA_ListLabelWidth      (WBIA_Dummy+5)        // (ULONG) [OM_NEW, OM_SET] Label width, in characters.
-#define WBIA_Size                (WBIA_Dummy+6)        // (ULONG) [OM_GET] Size of the file.
-#define WBIA_Protection          (WBIA_Dummy+7)        // (ULONG) [OM_GET] Protection of the file.
-#define WBIA_DateStamp           (WBIA_Dummy+8)        // (struct DateStamp *) [OM_GET] DateStamp of the file.
-#define WBIA_Type                (WBIA_Dummy+9)        // (UBYTE) [OM_GET] 'DiskObject->do_Type' of the file.
-#define WBIA_CurrentX            (WBIA_Dummy+10)       // (LONG) [OM_SET,OM_GET] 'DiskObject->do_CurrentX'
-#define WBIA_CurrentY            (WBIA_Dummy+11)       // (LONG) [OM_SET,OM_GET] 'DiskObject->do_CurrentY'
-#define WBIA_HitBox              (WBIA_Dummy+12)       // (struct Rectangle) [OM_GET] Icon hit box
+#define WBIA_HitBox              (WBIA_Dummy+6)        // (struct Rectangle) [OM_GET] Icon hit box
+#define WBIA_FibProtection       (WBIA_Dummy+16)       // (ULONG) [OM_GET] FileInfoBlock->fib_Protection of the file.
+#define WBIA_FibSize             (WBIA_Dummy+17)       // (ULONG) [OM_GET] FileInfoBlock->fib_Size of the file.
+#define WBIA_FibDateStamp        (WBIA_Dummy+19)       // (struct DateStamp *) [OM_GET] FileInfoBlock->fib_DateStamp of the file.
+#define WBIA_DoType              (WBIA_Dummy+32)       // (UBYTE) [OM_GET] DiskObject->do_Type
+#define WBIA_DoCurrentX          (WBIA_Dummy+35)       // (LONG) [OM_SET,OM_GET] DiskObject->do_CurrentX
+#define WBIA_DoCurrentY          (WBIA_Dummy+36)       // (LONG) [OM_SET,OM_GET] DiskObject->do_CurrentY
 
 /* Methods */
 #define WBIM_Dummy               (TAG_USER | 0x40440100)
