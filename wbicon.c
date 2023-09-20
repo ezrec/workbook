@@ -27,6 +27,7 @@
 
 #include "workbook_intern.h"
 #include "wbcurrent.h"
+#include "wbinfo.h"
 #include "classes.h"
 
 struct wbIcon {
@@ -878,19 +879,17 @@ static IPTR WBIcon__WBIM_Info(Class *cl, Object *obj, Msg msg)
 
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
-    BPTR lock;
 
-    BPTR oldLock = CurrentDir(my->ParentLock);
-    lock = Lock(my->File, SHARED_LOCK);
-    if (lock == BNULL) {
-        wbPopupIoErr(wb, "Info", IoErr(), my->File);
-    } else {
-        // We'd like to use 'WBInfo', but the AROS ROMs directly call WANDERER:Tools/Info.
-        // Sigh.
-        WBInfo(lock, my->File, my->Screen);
-        UnLock(lock);
-    }
-    CurrentDir(oldLock);
+    D(bug("%s: Info for %s\n", __func__, my->File));
+
+    // We'd like to use 'WBInfo', but the AROS ROMs directly call WANDERER:Tools/Info.
+    // Sigh.
+    D(struct Process *proc =) CreateNewProcTags(
+            NP_Name, (IPTR)my->File,
+            NP_Entry, (IPTR)wbInfo,
+            NP_CurrentDir, (IPTR)DupLock(my->ParentLock),
+            TAG_END);
+    D(bug("%s: %s via %lx\n", __func__, my->File, (IPTR)proc));
 
     return 0;
 }
