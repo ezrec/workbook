@@ -27,7 +27,7 @@
 
 /* Workbench Menu */
 #define WBMENU_WB               0, AS_STRING(WB_NAME), 0, 0, 0
-#define WBMENU_WB_BACKDROP      1, "Backdrop",  "B", Broken 0, 0
+#define WBMENU_WB_BACKDROP      1, "Backdrop",  "B", MENUTOGGLE | CHECKIT | CHECKED, 0
 #define WBMENU_WB_EXECUTE       2, "Execute",   "E", 0, 0
 #define WBMENU_WB_SHELL         3, "Shell",     "W", 0, 0
 #define WBMENU_WB_ABOUT         4, "About...",    0, 0, 0

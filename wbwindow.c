@@ -573,6 +573,250 @@ static UWORD wbWindowParentViewModes(struct WorkbookBase *wb, BPTR lock)
     return rc;
 }
 
+static struct Window *wbWindowNew(Class *cl, Object *obj, BOOL backdrop, struct MsgPort *userport, ULONG idcmp, struct Screen *screen)
+{
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbWindow *my = INST_DATA(cl, obj);
+
+    struct Window *window;
+
+    if (backdrop) {
+        window = OpenWindowTags(NULL,
+                        WA_IDCMP, userport ? 0 : idcmp,
+                        WA_Backdrop,    TRUE,
+                        WA_WBenchWindow, TRUE,
+                        WA_Borderless,  TRUE,
+                        WA_Activate,    TRUE,
+                        WA_NewLookMenus, TRUE,
+                        WA_PubScreen, screen,
+                        WA_BusyPointer, TRUE,
+                        TAG_END);
+        window->BorderTop = screen->BarHeight+1;
+    } else {
+        struct DiskObject *icon;
+        struct NewWindow *nwin = NULL;
+        struct TagItem extra[5] = {
+            { WA_Left, 64 },
+            { WA_Top, 64 },
+            { WA_Width, 200, },
+            { WA_Height, 150, },
+            { TAG_END },
+        };
+
+        icon = GetDiskObjectNew(my->Path);
+        if (icon != NULL) {
+            if (icon->do_DrawerData) {
+                my->dd_Flags = icon->do_DrawerData->dd_Flags;
+                my->dd_ViewModes = icon->do_DrawerData->dd_ViewModes;
+                // If we have dd_NewWindow data, override the window placement via extra[]
+                nwin = &icon->do_DrawerData->dd_NewWindow;
+                D(bug("%s: NewWindow %p @%ld,%ld (%ldx%ld)\n", __func__, nwin,
+                            (IPTR)nwin->LeftEdge, (IPTR)nwin->TopEdge,
+                            (IPTR)nwin->Width, (IPTR)nwin->Height));
+                if (nwin->Width > 32 && nwin->Height > 32) {
+                    extra[0].ti_Data = nwin->LeftEdge;
+                    extra[1].ti_Data = nwin->TopEdge;
+                    extra[2].ti_Data = nwin->Width;
+                    extra[3].ti_Data = nwin->Height;
+                }
+            }
+
+            FreeDiskObject(icon);
+        }
+
+        idcmp |= IDCMP_NEWSIZE | IDCMP_CLOSEWINDOW;
+        window = OpenWindowTags(NULL,
+                        WA_IDCMP, userport ? 0 : idcmp,
+                        WA_MinWidth, 100,
+                        WA_MinHeight, 100,
+                        WA_Backdrop, FALSE,
+                        WA_WBenchWindow, TRUE,
+                        WA_Title,    my->Path != NULL ? my->Path : AS_STRING(WB_NAME),
+                        WA_SizeGadget, TRUE,
+                        WA_DragBar, TRUE,
+                        WA_DepthGadget, TRUE,
+                        WA_CloseGadget, my->Path != NULL,
+                        WA_Activate, TRUE,
+                        WA_NewLookMenus, TRUE,
+                        WA_AutoAdjust, TRUE,
+                        WA_PubScreen, NULL,
+                        WA_BusyPointer, TRUE,
+                        TAG_MORE, (IPTR)&extra[0] );
+
+        if (window) {
+            wbFixBorders(window);
+        }
+    }
+
+    if (!window) {
+        return NULL;
+    }
+
+    /* If we want a shared port, do it. */
+    if (userport && idcmp) {
+        window->UserPort = userport;
+        ModifyIDCMP(window, idcmp);
+    }
+
+    /* The gadgets' layout will be performed during wbWindowRedimension
+     */
+    AddGadget(window, (struct Gadget *)(my->Area = NewObject(WBVirtual, NULL,
+                WBVA_Gadget, (IPTR)my->Set,
+                GA_Left, window->BorderLeft,
+                GA_Top, window->BorderTop,
+                TAG_END)), 0);
+
+    /* Add the verical scrollbar */
+    AddGadget(window, (struct Gadget *)(my->ScrollV = NewObject(NULL, "propgclass",
+                GA_RightBorder, TRUE,
+
+                ICA_TARGET, (IPTR)obj,
+                ICA_MAP, (IPTR)scrollv2window,
+                PGA_Freedom, FREEVERT,
+                PGA_NewLook, TRUE,
+                PGA_Borderless, TRUE,
+                PGA_Total, 1,
+                PGA_Visible, 1,
+                PGA_Top, 0,
+                TAG_END)), 0);
+
+    /* Add the horizontal scrollbar */
+    AddGadget(window, (struct Gadget *)(my->ScrollH = NewObject(NULL, "propgclass",
+                ICA_TARGET, (IPTR)obj,
+                ICA_MAP, (IPTR)scrollh2window,
+                PGA_Freedom, FREEHORIZ,
+                PGA_NewLook, TRUE,
+                PGA_Borderless, TRUE,
+                PGA_Total, 1,
+                PGA_Visible, 1,
+                PGA_Top, 0,
+                TAG_END)), 0);
+
+    SetMenuStrip(window, my->Menu);
+
+    /* Disable opening the parent for root window
+     * and disk paths.
+     */
+    ULONG mn_backdrop = wbMenuNumber(WBMENU_ID(WBMENU_WB_BACKDROP));
+    struct MenuItem *item_backdrop = ItemAddress(my->Menu, mn_backdrop);
+    if (backdrop) {
+        item_backdrop->Flags |= CHECKED;
+    } else {
+        item_backdrop->Flags &= ~CHECKED;
+    }
+    ULONG mn_new_drawer = wbMenuNumber(WBMENU_ID(WBMENU_WN_NEW_DRAWER));
+    ULONG mn_open_parent = wbMenuNumber(WBMENU_ID(WBMENU_WN_OPEN_PARENT));
+    ULONG mn_ic_copy = wbMenuNumber(WBMENU_ID(WBMENU_IC_COPY));
+    ULONG mn_ic_format = wbMenuNumber(WBMENU_ID(WBMENU_IC_FORMAT));
+    ULONG mn_ic_delete = wbMenuNumber(WBMENU_ID(WBMENU_IC_DELETE));
+    ULONG mn_wn_show = wbMenuNumber(WBMENU_ID(WBMENU_WN__SHOW));
+    ULONG mn_wn_view = wbMenuNumber(WBMENU_ID(WBMENU_WN__VIEW));
+    if (my->Lock == BNULL) {
+        OnMenu(window, mn_backdrop);
+        OffMenu(window, mn_new_drawer);
+        OffMenu(window, mn_open_parent);
+        OffMenu(window, mn_ic_copy);
+        OffMenu(window, mn_ic_delete);
+        OnMenu(window, mn_ic_format);
+        OffMenu(window, mn_wn_show);
+        OffMenu(window, mn_wn_view);
+    } else {
+        BPTR lock = ParentDir(my->Lock);
+        if (lock == BNULL) {
+            OffMenu(window, mn_open_parent);
+        } else {
+            OnMenu(window, mn_open_parent);
+            UnLock(lock);
+        }
+        OffMenu(window, mn_backdrop);
+        OnMenu(window, mn_new_drawer);
+        OnMenu(window, mn_ic_copy);
+        OnMenu(window, mn_ic_delete);
+        OffMenu(window, mn_ic_format);
+        OnMenu(window, mn_wn_show);
+        OnMenu(window, mn_wn_view);
+    }
+
+    // Check for tools in the filesystem
+    struct {
+        int id;
+        CONST_STRPTR path;
+    } tools[] = {
+        { WBMENU_ID(WBMENU_WB_CUST_UPDATER), "SYS:System/Updater" },
+        { WBMENU_ID(WBMENU_WB_CUST_AMISTORE), "SYS:Utilities/Amistore" },
+        { WBMENU_ID(WBMENU_IC_FORMAT), "SYS:System/Format" },
+    };
+    for (size_t n = 0; n < sizeof(tools)/sizeof(tools[0]); n++) {
+        ULONG menu_number = wbMenuNumber(tools[n].id);
+        if (menu_number != MENUNULL) {
+            BPTR lock = Lock(tools[n].path, SHARED_LOCK);
+            if (lock == BNULL) {
+                OnMenu(window, menu_number);
+            } else {
+                UnLock(lock);
+            }
+        }
+    }
+
+    RefreshGadgets(window->FirstGadget, window, NULL);
+
+    return window;
+}
+
+static void wbWindowClose(Class *cl, Object *obj, struct Window *window)
+{
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbWindow *my = INST_DATA(cl, obj);
+
+    ClearMenuStrip(window);
+
+    /* If we have a custom user port, be paranoid.
+     * See the Autodocs for CloseWindow().
+     */
+    if (window->UserPort) {
+        struct IntuiMessage *msg;
+        struct Node *succ;
+
+        Forbid();
+        msg = (APTR)window->UserPort->mp_MsgList.lh_Head;
+        while ((succ = msg->ExecMessage.mn_Node.ln_Succ ) != NULL) {
+            if (msg->IDCMPWindow == window) {
+                Remove((APTR)msg);
+                ReplyMsg((struct Message *)msg);
+            }
+
+            msg = (struct IntuiMessage *) succ;
+        }
+
+        window->UserPort = NULL;
+        ModifyIDCMP(window, 0);
+
+        Permit();
+    }
+
+    /* As a side effect, this will close all the
+     * gadgets attached to it.
+     */
+    CloseWindow(window);
+}
+
+static void wbWindowSetBackdrop(Class *cl, Object *obj, BOOL backdrop)
+{
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbWindow *my = INST_DATA(cl, obj);
+
+    struct MsgPort *userport = my->Window->UserPort;
+    ULONG idcmp = my->Window->IDCMPFlags;
+    struct Screen *screen = my->Window->WScreen;
+
+    struct Window *window = wbWindowNew(cl, obj, backdrop, userport, idcmp, screen);
+    if (window) {
+        wbWindowClose(cl, obj, my->Window);
+        my->Window = window;
+        CoerceMethod(cl, obj, WBWM_NewSize);
+    }
+}
+
 // OM_NEW
 static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
 {
@@ -621,87 +865,6 @@ static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
     struct MsgPort *userport = (struct MsgPort *)GetTagData(WBWA_UserPort, (IPTR)NULL, ops->ops_AttrList);
     struct MsgPort *notifyport = (struct MsgPort *)GetTagData(WBWA_NotifyPort, (IPTR)NULL, ops->ops_AttrList);
 
-    if (my->Path == NULL) {
-        my->Window = OpenWindowTags(NULL,
-                        WA_IDCMP, userport ? 0 : idcmp,
-                        WA_Backdrop,    TRUE,
-                        WA_WBenchWindow, TRUE,
-                        WA_Borderless,  TRUE,
-                        WA_Activate,    TRUE,
-                        WA_NewLookMenus, TRUE,
-                        WA_PubScreen, screen,
-                        WA_BusyPointer, TRUE,
-                        ops->ops_AttrList == NULL ? TAG_END : TAG_MORE, ops->ops_AttrList );
-        my->Window->BorderTop = my->Window->WScreen->BarHeight+1;
-    } else {
-        struct DiskObject *icon;
-        struct NewWindow *nwin = NULL;
-        struct TagItem extra[5] = {
-            { WA_Left, 64 },
-            { WA_Top, 64 },
-            { WA_Width, 200, },
-            { WA_Height, 150, },
-            { ops->ops_AttrList == NULL ? TAG_END : TAG_MORE, (IPTR)ops->ops_AttrList },
-        };
-
-        icon = GetDiskObjectNew(my->Path);
-        if (icon == NULL)
-            goto error;
-
-        if (icon->do_DrawerData) {
-            // If we have dd_NewWindow data, override the window placement via extra[]
-            nwin = &icon->do_DrawerData->dd_NewWindow;
-            if (nwin->Width > 32 && nwin->Height > 32) {
-                D(bug("%s: NewWindow %p\n", __func__, nwin));
-                extra[0].ti_Tag = ops->ops_AttrList == NULL ? TAG_END : TAG_MORE;
-                extra[0].ti_Data = (IPTR)ops->ops_AttrList;
-                extra[1].ti_Tag = TAG_IGNORE;
-                extra[2].ti_Tag = TAG_IGNORE;
-                extra[3].ti_Tag = TAG_IGNORE;
-            }
-        }
-
-        idcmp |= IDCMP_NEWSIZE | IDCMP_CLOSEWINDOW;
-        my->Window = OpenWindowTags(nwin,
-                        WA_IDCMP, userport ? 0 : idcmp,
-                        WA_MinWidth, 100,
-                        WA_MinHeight, 100,
-                        WA_MaxWidth, ~0,
-                        WA_MaxHeight, ~0,
-                        WA_Backdrop, FALSE,
-                        WA_WBenchWindow, TRUE,
-                        WA_Title,    my->Path,
-                        WA_SizeGadget, TRUE,
-                        WA_DragBar, TRUE,
-                        WA_DepthGadget, TRUE,
-                        WA_CloseGadget, TRUE,
-                        WA_Activate, TRUE,
-                        WA_NewLookMenus, TRUE,
-                        WA_AutoAdjust, TRUE,
-                        WA_PubScreen, NULL,
-                        WA_BusyPointer, TRUE,
-                        TAG_MORE, (IPTR)&extra[0] );
-
-        if (my->Window)
-            wbFixBorders(my->Window);
-
-        if (icon->do_DrawerData) {
-            my->dd_Flags = icon->do_DrawerData->dd_Flags;
-            my->dd_ViewModes = icon->do_DrawerData->dd_ViewModes;
-        }
-
-        FreeDiskObject(icon);
-    }
-
-    if (!my->Window)
-        goto error;
-
-    /* If we want a shared port, do it. */
-    if (userport && idcmp) {
-        my->Window->UserPort = userport;
-        ModifyIDCMP(my->Window, idcmp);
-    }
-
     /* Create icon set */
     UWORD viewModes;
     if (my->Path == NULL) {
@@ -713,40 +876,6 @@ static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
     my->Set = NewObject(WBSet, NULL,
                 WBSA_ViewModes, (IPTR)viewModes,
                 TAG_END);
-
-    /* The gadgets' layout will be performed during wbWindowRedimension
-     */
-    AddGadget(my->Window, (struct Gadget *)(my->Area = NewObject(WBVirtual, NULL,
-                WBVA_Gadget, (IPTR)my->Set,
-                GA_Left, my->Window->BorderLeft,
-                GA_Top, my->Window->BorderTop,
-                TAG_END)), 0);
-
-    /* Add the verical scrollbar */
-    AddGadget(my->Window, (struct Gadget *)(my->ScrollV = NewObject(NULL, "propgclass",
-                GA_RightBorder, TRUE,
-
-                ICA_TARGET, (IPTR)obj,
-                ICA_MAP, (IPTR)scrollv2window,
-                PGA_Freedom, FREEVERT,
-                PGA_NewLook, TRUE,
-                PGA_Borderless, TRUE,
-                PGA_Total, 1,
-                PGA_Visible, 1,
-                PGA_Top, 0,
-                TAG_END)), 0);
-
-    /* Add the horizontal scrollbar */
-    AddGadget(my->Window, (struct Gadget *)(my->ScrollH = NewObject(NULL, "propgclass",
-                ICA_TARGET, (IPTR)obj,
-                ICA_MAP, (IPTR)scrollh2window,
-                PGA_Freedom, FREEHORIZ,
-                PGA_NewLook, TRUE,
-                PGA_Borderless, TRUE,
-                PGA_Total, 1,
-                PGA_Visible, 1,
-                PGA_Top, 0,
-                TAG_END)), 0);
 
     my->Menu = CreateMenusA((struct NewMenu *)WBWindow_menu, NULL);
     if (my->Menu == NULL) {
@@ -788,68 +917,17 @@ static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
         }
     }
 
-    vis = GetVisualInfo(my->Window->WScreen, TAG_END);
-    LayoutMenus(my->Menu, vis, TAG_END);
-    FreeVisualInfo(vis);
-
-    SetMenuStrip(my->Window, my->Menu);
-
-    /* Disable opening the parent for root window
-     * and disk paths.
-     */
-    ULONG mn_new_drawer = wbMenuNumber(WBMENU_ID(WBMENU_WN_NEW_DRAWER));
-    ULONG mn_open_parent = wbMenuNumber(WBMENU_ID(WBMENU_WN_OPEN_PARENT));
-    ULONG mn_ic_copy = wbMenuNumber(WBMENU_ID(WBMENU_IC_COPY));
-    ULONG mn_ic_format = wbMenuNumber(WBMENU_ID(WBMENU_IC_FORMAT));
-    ULONG mn_ic_delete = wbMenuNumber(WBMENU_ID(WBMENU_IC_DELETE));
-    ULONG mn_wn_show = wbMenuNumber(WBMENU_ID(WBMENU_WN__SHOW));
-    ULONG mn_wn_view = wbMenuNumber(WBMENU_ID(WBMENU_WN__VIEW));
-    if (my->Lock == BNULL) {
-        OffMenu(my->Window, mn_new_drawer);
-        OffMenu(my->Window, mn_open_parent);
-        OffMenu(my->Window, mn_ic_copy);
-        OffMenu(my->Window, mn_ic_delete);
-        OnMenu(my->Window, mn_ic_format);
-        OffMenu(my->Window, mn_wn_show);
-        OffMenu(my->Window, mn_wn_view);
-    } else {
-        BPTR lock = ParentDir(my->Lock);
-        if (lock == BNULL) {
-            OffMenu(my->Window, mn_open_parent);
-        } else {
-            OnMenu(my->Window, mn_open_parent);
-            UnLock(lock);
-        }
-        OnMenu(my->Window, mn_new_drawer);
-        OnMenu(my->Window, mn_ic_copy);
-        OnMenu(my->Window, mn_ic_delete);
-        OffMenu(my->Window, mn_ic_format);
-        OnMenu(my->Window, mn_wn_show);
-        OnMenu(my->Window, mn_wn_view);
+    vis = GetVisualInfo(screen, TAG_END);
+    if (vis) {
+        LayoutMenus(my->Menu, vis, TAG_END);
+        FreeVisualInfo(vis);
     }
 
-    // Check for tools in the filesystem
-    struct {
-        int id;
-        CONST_STRPTR path;
-    } tools[] = {
-        { WBMENU_ID(WBMENU_WB_CUST_UPDATER), "SYS:System/Updater" },
-        { WBMENU_ID(WBMENU_WB_CUST_AMISTORE), "SYS:Utilities/Amistore" },
-        { WBMENU_ID(WBMENU_IC_FORMAT), "SYS:System/Format" },
-    };
-    for (size_t n = 0; n < sizeof(tools)/sizeof(tools[0]); n++) {
-        ULONG menu_number = wbMenuNumber(tools[n].id);
-        if (menu_number != MENUNULL) {
-            BPTR lock = Lock(tools[n].path, SHARED_LOCK);
-            if (lock == BNULL) {
-                OnMenu(my->Window, menu_number);
-            } else {
-                UnLock(lock);
-            }
-        }
+    my->Window = wbWindowNew(cl, obj, (my->Path == NULL), userport, idcmp, screen);
+    if (!my->Window) {
+        D(bug("%s: Unable to create Window\n"));
+        goto error;
     }
-
-    RefreshGadgets(my->Window->FirstGadget, my->Window, NULL);
 
     // Now that we are ready to go, start watching this drawer.
     my->Notify.Request = (struct NotifyRequest){
@@ -888,46 +966,26 @@ static IPTR WBWindow__OM_DISPOSE(Class *cl, Object *obj, Msg msg)
         EndNotify(&my->Notify.Request);
     }
 
-    ClearMenuStrip(my->Window);
-    FreeMenus(my->Menu);
-
-    /* If we have a custom user port, be paranoid.
-     * See the Autodocs for CloseWindow().
-     */
-    if (my->Window->UserPort) {
-        struct IntuiMessage *msg;
-        struct Node *succ;
-
-        Forbid();
-        msg = (APTR)my->Window->UserPort->mp_MsgList.lh_Head;
-        while ((succ = msg->ExecMessage.mn_Node.ln_Succ ) != NULL) {
-            if (msg->IDCMPWindow == my->Window) {
-                Remove((APTR)msg);
-                ReplyMsg((struct Message *)msg);
-            }
-
-            msg = (struct IntuiMessage *) succ;
-        }
-
-        my->Window->UserPort = NULL;
-        ModifyIDCMP(my->Window, 0);
-
-        Permit();
+    if (my->Window) {
+        wbWindowClose(cl, obj, my->Window);
     }
 
-    /* We won't need our list of icons anymore */
+    if (my->Menu) {
+        FreeMenus(my->Menu);
+    }
+
+    // We won't need our list of icons anymore
     while ((wbwi = (APTR)GetHead((struct List *)&my->IconList)) != NULL) {
-        Remove((struct Node *)wbwi);
+        DoMethod(my->Set, OM_REMMEMBER, wbwi->wbwiObject);
+        DisposeObject(wbwi->wbwiObject);
+        RemoveMinNode(&wbwi->wbwiNode);
         FreeMem(wbwi, sizeof(*wbwi));
     }
 
-    /* As a side effect, this will close all the
-     * gadgets attached to it.
-     */
-    CloseWindow(my->Window);
-
-    /* .. except for my->Set */
-    DisposeObject(my->Set);
+    // Dispose of our my->Set
+    if (my->Set) {
+        DisposeObject(my->Set);
+    }
 
     if (my->Path) {
         FreeVec(my->Path);
@@ -1235,6 +1293,9 @@ static IPTR WBWindow__WBWM_MenuPick(Class *cl, Object *obj, struct wbwm_MenuPick
     BOOL invalidate = FALSE;
 
     switch (WBMENU_ITEM_ID(item)) {
+    case WBMENU_ID(WBMENU_WB_BACKDROP):
+        wbWindowSetBackdrop(cl, obj, (item->Flags & CHECKED) ? TRUE : FALSE);
+        break;
     case WBMENU_ID(WBMENU_WN_NEW_DRAWER):
         wbPopupAction(wb, "New Drawer", "Enter a new name for the drawer.", "New Name:", (STRPTR)"Untitled", 0, ":/", wbWindowActionNewDrawer, my);
         break;
