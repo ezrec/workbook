@@ -156,7 +156,11 @@ static void wbIcon_UpdateAsIcon(Class *cl, Object *obj)
 
     /* Update the parent's idea of how big we are with labels.
      */
-    GetIconRectangleA(&my->Screen->RastPort, my->DiskObject, (STRPTR)my->Label, &rect, (struct TagItem *)wbIcon_DrawTags);
+    STRPTR label = my->Label;
+    if (label[0] == 0) {
+        label = NULL;
+    }
+    GetIconRectangleA(&my->Screen->RastPort, my->DiskObject, label, &rect, (struct TagItem *)wbIcon_DrawTags);
 
     icon_w = (rect.MaxX - rect.MinX) + 1;
     icon_h = (rect.MaxY - rect.MinY) + 1;
@@ -252,6 +256,9 @@ static IPTR WBIcon__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
         diskobject = GetIconTags(file,
                                ICONGETA_Screen, screen,
                                ICONGETA_FailIfUnavailable, FALSE,
+                               ICONGETA_GetPaletteMappedIcon, TRUE,
+                               ICONGETA_RemapIcon, TRUE,
+                               ICONGETA_GenerateImageMasks, TRUE,
                                TAG_END);
     }
     CurrentDir(old);
@@ -472,6 +479,7 @@ static IPTR WBIcon__GM_RENDER(Class *cl, Object *obj, struct gpRender *gpr)
     struct Window *win = gpr->gpr_GInfo->gi_Window;
     struct Region *clip;
     struct Gadget *gadget = (struct Gadget *)obj;       /* Legal for 'gadgetclass' */
+    struct DrawInfo *dri = gpr->gpr_GInfo->gi_DrInfo;
     WORD x,y;
 
     x = gadget->LeftEdge;
@@ -493,8 +501,16 @@ static IPTR WBIcon__GM_RENDER(Class *cl, Object *obj, struct gpRender *gpr)
             PrintIText(rp, &label, x, y);
             PrintIText(rp, &my->ListIMeta, x + 8 * my->ListLabelWidth, y);
         } else {
-            DrawIconStateA(rp, my->DiskObject, (STRPTR)my->Label, x, y,
-                (gadget->Flags & GFLG_SELECTED) ? IDS_SELECTED : IDS_NORMAL, (struct TagItem *)wbIcon_DrawTags);
+            STRPTR label = my->Label;
+            if (label[0] == 0) {
+                label = NULL;
+            }
+            struct TagItem tags[] = {
+                { ICONDRAWA_DrawInfo, (IPTR)dri },
+                { TAG_MORE, (IPTR)&wbIcon_DrawTags[0] },
+            };
+            ULONG state = (gadget->Flags & GFLG_SELECTED) ? IDS_SELECTED : IDS_NORMAL;
+            DrawIconStateA(rp, my->DiskObject, label, x, y, state, tags);
         }
         wbUnclipWindow(wb, win, clip);
 
