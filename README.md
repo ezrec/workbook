@@ -2,6 +2,9 @@
 
 Copy to SYS:System/Workbook
 
+- Unreleased
+  - Add Backdrop menu item
+  - Add Information.. window.
 - v1.10
   - Add multi-selection marquee
   - Add list view (Name, Size, Date, Type) modes.
