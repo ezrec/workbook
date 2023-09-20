@@ -75,9 +75,9 @@ static IPTR WBSet__OM_ADDMEMBER(Class *cl, Object *obj, struct opMember *opm)
 
     GetAttr(WBIA_Label, iobj, (IPTR *)&node->sn_Node.ln_Name);
     IPTR tmp;
-    GetAttr(WBIA_CurrentX, iobj, &tmp);
+    GetAttr(WBIA_DoCurrentX, iobj, &tmp);
     node->sn_CurrentX = (LONG)tmp;
-    GetAttr(WBIA_CurrentY, iobj, &tmp);
+    GetAttr(WBIA_DoCurrentY, iobj, &tmp);
     node->sn_CurrentY = (LONG)tmp;
     AddTail(&my->SetObjects, &node->sn_Node);
 
@@ -205,8 +205,8 @@ static BOOL wbSetInsertBySize(struct WorkbookBase *wb, struct wbSetNode *curr_no
 {
     IPTR curr_size = 0;
     IPTR new_size = 0;
-    GetAttr(WBIA_Size, curr_node->sn_Object, &curr_size );
-    GetAttr(WBIA_Size, new_node->sn_Object, &new_size );
+    GetAttr(WBIA_FibSize, curr_node->sn_Object, &curr_size );
+    GetAttr(WBIA_FibSize, new_node->sn_Object, &new_size );
     LONG rc = (LONG)new_size - (LONG)curr_size;
     if (rc == 0) {
         return wbSetInsertByName(wb, curr_node, new_node);
@@ -218,8 +218,8 @@ static BOOL wbSetInsertByDate(struct WorkbookBase *wb, struct wbSetNode *curr_no
 {
     struct DateStamp curr_date;
     struct DateStamp new_date;
-    GetAttr(WBIA_DateStamp, curr_node->sn_Object, (IPTR *)&curr_date );
-    GetAttr(WBIA_DateStamp, new_node->sn_Object, (IPTR *)&new_date );
+    GetAttr(WBIA_FibDateStamp, curr_node->sn_Object, (IPTR *)&curr_date );
+    GetAttr(WBIA_FibDateStamp, new_node->sn_Object, (IPTR *)&new_date );
     LONG rc = CompareDates(&curr_date, &new_date);
     if (rc == 0) {
         return wbSetInsertByName(wb, curr_node, new_node);
@@ -231,8 +231,8 @@ static BOOL wbSetInsertByType(struct WorkbookBase *wb, struct wbSetNode *curr_no
 {
     IPTR curr_type = 0;
     IPTR new_type = 0;
-    GetAttr(WBIA_Type, curr_node->sn_Object, &curr_type );
-    GetAttr(WBIA_Type, new_node->sn_Object, &new_type );
+    GetAttr(WBIA_DoType, curr_node->sn_Object, &curr_type );
+    GetAttr(WBIA_DoType, new_node->sn_Object, &new_type );
     LONG rc = (LONG)new_type - (LONG)curr_type;
     if (rc == 0) {
         return wbSetInsertByName(wb, curr_node, new_node);
@@ -389,7 +389,7 @@ static IPTR WBSet__GM_LAYOUT(Class *cl, Object *obj, struct gpLayout *gpl)
             // Update icon's DiskObject location.
             node->sn_CurrentX = ibox.Left;
             node->sn_CurrentY = ibox.Top;
-            SetAttrs(iobj, WBIA_CurrentY, ibox.Top, WBIA_CurrentX, ibox.Left, TAG_END);
+            SetAttrs(iobj, WBIA_DoCurrentY, ibox.Top, WBIA_DoCurrentX, ibox.Left, TAG_END);
         }
 
         DoSuperMethod(cl, obj, OM_ADDMEMBER, iobj);
