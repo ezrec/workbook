@@ -404,17 +404,16 @@ static IPTR WBApp__WBAM_ReportSelected(Class *cl, Object *obj, struct wbam_Repor
         struct TagItem *ti_ptr = NULL;
         IPTR rc = DoMethod(owin, WBWM_ReportSelected, &ti_ptr);
         D(bug("%s: %lx => %ld tags\n", __func__, (IPTR)owin, (IPTR)rc));
-        for (IPTR n = 0; n < rc; n++, index++) {
-            ti[index] = ti_ptr[n];
-        }
         // Account for the TAG_END at the end of the report.
-        index--;
+        rc--;
+        CopyMem(ti_ptr, ti, rc * sizeof(ti[0]));
+        index += rc;
         FreeVec(ti_ptr);
     }
 
-    ti[index++].ti_Tag = TAG_END;
+    ti[index].ti_Tag = TAG_END;
 
-    D(bug("%s: %ld reported tags\n", __func__, (IPTR)index));
+    D(bug("%s: %ld reported tags\n", __func__, (IPTR)++index));
 
     D(if (index != total_tags) bug("%s: Expected %ld tags, got %ld tags!!!!\n", __func__, (IPTR)total_tags, (IPTR)index));
 

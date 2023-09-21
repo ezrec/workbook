@@ -366,7 +366,7 @@ static struct Gadget *wbInfoGadgets_icon_left(struct wbInfo *wb, struct Gadget *
         { 0 },
     };
 
-    const struct entry *map = emptymap;
+    const struct entry *map;
 
     switch (do_Type) {
     case WBDISK:
@@ -558,7 +558,7 @@ static void wbInfo_ToolTypesDEBUG(struct wbInfo *wb, CONST_STRPTR func, LONG whe
     LONG index = 0;
     ForeachNode(tooltypes, curr) {
         D(bug("%s: [%ld] %s%s%s\n", func, (IPTR)index, curr->ln_Type ? "*" : " ", curr->ln_Name, (where == index) ? " <--": ""));
-        index++;
+        D(index++);
     }
 }
 
@@ -941,7 +941,7 @@ static BOOL wbInfo_Window(struct wbInfo *wb)
                 struct Gadget *gctx = CreateContext(&glist);
                 D(if (!gctx) bug("%s: gctx is NULL\n", __func__));
                 if (gctx) {
-                    gctx = wbInfoGadgets(wb, gctx, &ng);
+                    wbInfoGadgets(wb, gctx, &ng);
                     struct Window *win = OpenWindowTags(NULL,
                                     WA_Top, 20,
                                     WA_Left, 20,
