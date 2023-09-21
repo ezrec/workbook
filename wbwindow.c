@@ -766,7 +766,6 @@ static struct Window *wbWindowNew(Class *cl, Object *obj, BOOL backdrop, struct 
 static void wbWindowClose(Class *cl, Object *obj, struct Window *window)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
-    struct wbWindow *my = INST_DATA(cl, obj);
 
     ClearMenuStrip(window);
 
@@ -802,7 +801,6 @@ static void wbWindowClose(Class *cl, Object *obj, struct Window *window)
 
 static void wbWindowSetBackdrop(Class *cl, Object *obj, BOOL backdrop)
 {
-    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbWindow *my = INST_DATA(cl, obj);
 
     struct MsgPort *userport = my->Window->UserPort;

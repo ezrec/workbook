@@ -341,7 +341,7 @@ void wbDebugReportSelected_(struct WorkbookBase *wb, CONST_STRPTR caller)
     }
 
     struct TagItem *ti, *tlist = args;
-    ULONG index = 0;
+    D(ULONG index = 0);
     while ((ti = NextTagItem(&tlist)) != NULL) {
         switch (ti->ti_Tag) {
         case WBOPENA_ArgLock:
@@ -360,7 +360,7 @@ void wbDebugReportSelected_(struct WorkbookBase *wb, CONST_STRPTR caller)
             D(bug("%s: [%ld] { 0x%lx, 0x%lx  },\n", caller, (IPTR)index, (IPTR)ti->ti_Tag, (IPTR)ti->ti_Data));
             break;
         }
-	index++;
+	    D(index++);
     }
     D(bug("%s: [%ld] { TAG_END },\n", caller, (IPTR)index));
 
