@@ -490,6 +490,10 @@ static BOOL wbInfo_ToolTypesGet(struct wbInfo *wb)
 {
     // Construct an exec list of the ToolTypes data
     STRPTR *pstr = wb->DiskObject->do_ToolTypes;
+    STRPTR zero[] = { NULL };
+    if (pstr == NULL) {
+        pstr = &zero[0];
+    }
     size_t count;
     for (count = 0; pstr[count] != NULL; count++) {
         D(bug("%s: [%ld] %s\n", __func__, (IPTR)count, pstr[count]));
@@ -555,7 +559,7 @@ static void wbInfo_ToolTypesPut(struct wbInfo *wb)
 static void wbInfo_ToolTypesDEBUG(struct wbInfo *wb, CONST_STRPTR func, LONG where, struct List *tooltypes)
 {
     struct Node *curr;
-    LONG index = 0;
+    D(LONG index = 0);
     ForeachNode(tooltypes, curr) {
         D(bug("%s: [%ld] %s%s%s\n", func, (IPTR)index, curr->ln_Type ? "*" : " ", curr->ln_Name, (where == index) ? " <--": ""));
         D(index++);
@@ -1078,7 +1082,7 @@ static void wbInfo_Main(struct wbInfo *wb, CONST_STRPTR file)
 
                     if (save && wb->DiskObjectModified) {
                         struct DiskObject *do_local = GetDiskObjectNew(wb->File);
-                        D(if (!do_local) bug("%s: GetDiskObjectNew('%s') failed for modification\n", __func__, do_local));
+                        D(if (!do_local) bug("%s: GetDiskObjectNew('%s') failed for modification\n", __func__, wb->File));
                         D(if (do_local) bug("%s: '%s.info' saved\n", __func__, wb->File));
                         if (do_local) {
                             struct DiskObject do_tmp = *do_local;

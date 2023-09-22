@@ -73,7 +73,7 @@ static IPTR WBDoImage__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
                     my->ImageObject = NULL;
                     CoerceMethod(cl, obj, OM_SET, ops->ops_AttrList, ops->ops_GInfo);
                     SetAttrs(obj, IA_Recessed, TRUE, IA_EdgesOnly, TRUE, TAG_END);
-                    struct Image *im = (struct Image *)obj;
+                    D(struct Image *im = (struct Image *)obj);
                     D(bug("%s: @%ld,%ld (%ldx%ld)\n", __func__,
                                 (IPTR)im->LeftEdge, (IPTR)im->TopEdge,
                                 (IPTR)im->Width, (IPTR)im->Height));

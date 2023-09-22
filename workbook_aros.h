@@ -9,6 +9,10 @@
 #include <clib/alib_protos.h>
 #include <clib/arossupport_protos.h>
 
+#ifndef IA_Screen
+#define IA_Screen   (IA_Dummy + 0x1f) /* OS v44 includes!*/
+#endif
+
 extern struct ExecBase *SysBase;
 
 static inline LONG STRLEN(CONST_STRPTR s)
