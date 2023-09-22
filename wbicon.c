@@ -711,10 +711,12 @@ static IPTR WBIcon__WBIM_Open(Class *cl, Object *obj, Msg msg)
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
 
+    // NOTE! We may _not_ be in Process() context, so we can't DupLock() for NP_CurrentDir.
+    // Sigh.
     D(struct Process *proc =) CreateNewProcTags(
             NP_Name, (IPTR)my->File,
             NP_Entry, (IPTR)wbOpener,
-            NP_CurrentDir, (IPTR)DupLock(my->ParentLock),
+            NP_CurrentDir, (IPTR)my->ParentLock,    // wbOpener must DupLock()!
             TAG_END);
     D(bug("WBIcon.Open: %s via %lx\n", my->File, (IPTR)proc));
 

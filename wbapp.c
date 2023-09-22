@@ -54,6 +54,7 @@ static void wbOpenDrawer(Class *cl, Object *obj, CONST_STRPTR path)
     struct wbApp *my = INST_DATA(cl, obj);
     Object *win;
 
+    ASSERT_VALID_PROCESS((struct Process *)FindTask(NULL));
     win = NewObject(WBWindow, NULL,
                         WBWA_Path, path,
                         WBWA_UserPort, my->WinPort,
@@ -317,11 +318,6 @@ static IPTR WBApp__WBAM_ForSelected(Class *cl, Object *obj, struct wbam_ForSelec
     while ((owin = NextObject(&ostate)) != NULL) {
         IPTR count;
         count = DoMethod(owin, WBWM_ForSelected, wbamf->wbamf_Msg);
-        D(
-                IPTR path;
-                GetAttr(WBWA_Path, owin, &path);
-                bug("%s: selected: %s(%ld)\n", __func__, (CONST_STRPTR)path, (IPTR)count);
-        );
         if (count) {
             DoMethod(owin, WBWM_Refresh);
         }

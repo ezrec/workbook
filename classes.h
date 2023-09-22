@@ -81,6 +81,7 @@ Class *WBApp_MakeClass(struct WorkbookBase *wb);
 #define WBWM_InvalidateContents  (WBWM_Dummy+7)  /* N/A */
 #define WBWM_CacheContents       (WBWM_Dummy+8)  /* N/A */
 #define WBWM_ReportSelected      (WBWM_Dummy+9)  /* struct wbwm_ReportSelected */
+#define WBWM_Front               (WBWM_Dummy+10) // N/A
 
 struct wbwm_MenuPick {
     STACKED ULONG             MethodID;

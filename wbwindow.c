@@ -631,7 +631,7 @@ static struct Window *wbWindowNew(Class *cl, Object *obj, BOOL backdrop, struct 
                         WA_MinHeight, 100,
                         WA_Backdrop, FALSE,
                         WA_WBenchWindow, TRUE,
-                        WA_Title,    my->Path != NULL ? my->Path : AS_STRING(WB_NAME),
+                        WA_Title,    my->Path != NULL ? my->Path : (STRPTR)AS_STRING(WB_NAME),
                         WA_SizeGadget, TRUE,
                         WA_DragBar, TRUE,
                         WA_DepthGadget, TRUE,
@@ -923,7 +923,7 @@ static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
 
     my->Window = wbWindowNew(cl, obj, (my->Path == NULL), userport, idcmp, screen);
     if (!my->Window) {
-        D(bug("%s: Unable to create Window\n"));
+        D(bug("%s: Unable to create Window\n", __func__));
         goto error;
     }
 
@@ -1074,6 +1074,37 @@ static IPTR WBWindow__WBWM_NewSize(Class *cl, Object *obj, Msg msg)
     return 0;
 }
 
+static IPTR WBWindow__WBWM_Front(Class *cl, Object *obj, Msg msg)
+{
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbWindow *my = INST_DATA(cl, obj);
+
+    WindowToFront(my->Window);
+    ActivateWindow(my->Window);
+
+    return 0;
+}
+
+static IPTR WBWindow__WBWM_Show(Class *cl, Object *obj, Msg msg)
+{
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbWindow *my = INST_DATA(cl, obj);
+
+    ActivateWindow(my->Window);
+
+    return 0;
+}
+
+static IPTR WBWindow__WBWM_Hide(Class *cl, Object *obj, Msg msg)
+{
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbWindow *my = INST_DATA(cl, obj);
+
+    HideWindow(my->Window);
+
+    return 0;
+}
+
 static IPTR WBWindow__WBWM_Refresh(Class *cl, Object *obj, Msg msg)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
@@ -1110,19 +1141,21 @@ static IPTR wbWindowSnapshot(Class *cl, Object *obj, BOOL all)
     //
     // Note that we set ICONPUTA_OnlyUpdatePosition to FALSE, so that a new icon will be
     // created if needed to store the drawer data.
-    struct DiskObject *diskObject = GetDiskObjectNew(my->Path);
-    if (diskObject) {
-        if (diskObject->do_DrawerData) {
-            diskObject->do_DrawerData->dd_NewWindow.LeftEdge = my->Window->LeftEdge;
-            diskObject->do_DrawerData->dd_NewWindow.TopEdge = my->Window->TopEdge;
-            diskObject->do_DrawerData->dd_NewWindow.Width = my->Window->Width;
-            diskObject->do_DrawerData->dd_NewWindow.Height = my->Window->Height;
-            diskObject->do_DrawerData->dd_CurrentX = my->Window->LeftEdge;
-            diskObject->do_DrawerData->dd_CurrentY = my->Window->TopEdge;
-            diskObject->do_DrawerData->dd_Flags = my->dd_Flags;
-            diskObject->do_DrawerData->dd_ViewModes = my->dd_ViewModes;
-            PutIconTags(my->Path, diskObject, ICONPUTA_OnlyUpdatePosition, FALSE, TAG_END);
-            FreeDiskObject(diskObject);
+    if (my->Lock != BNULL) {
+        struct DiskObject *diskObject = GetDiskObjectNew(my->Path);
+        if (diskObject) {
+            if (diskObject->do_DrawerData) {
+                diskObject->do_DrawerData->dd_NewWindow.LeftEdge = my->Window->LeftEdge;
+                diskObject->do_DrawerData->dd_NewWindow.TopEdge = my->Window->TopEdge;
+                diskObject->do_DrawerData->dd_NewWindow.Width = my->Window->Width;
+                diskObject->do_DrawerData->dd_NewWindow.Height = my->Window->Height;
+                diskObject->do_DrawerData->dd_CurrentX = my->Window->LeftEdge;
+                diskObject->do_DrawerData->dd_CurrentY = my->Window->TopEdge;
+                diskObject->do_DrawerData->dd_Flags = my->dd_Flags;
+                diskObject->do_DrawerData->dd_ViewModes = my->dd_ViewModes;
+                PutIconTags(my->Path, diskObject, ICONPUTA_OnlyUpdatePosition, FALSE, TAG_END);
+                FreeDiskObject(diskObject);
+            }
         }
     }
 
@@ -1525,6 +1558,9 @@ static IPTR WBWindow_dispatcher(Class *cl, Object *obj, Msg msg)
     METHOD_CASE(WBWindow, WBWM_NewSize);
     METHOD_CASE(WBWindow, WBWM_MenuPick);
     METHOD_CASE(WBWindow, WBWM_IntuiTick);
+    METHOD_CASE(WBWindow, WBWM_Hide);
+    METHOD_CASE(WBWindow, WBWM_Show);
+    METHOD_CASE(WBWindow, WBWM_Front);
     METHOD_CASE(WBWindow, WBWM_Refresh);
     METHOD_CASE(WBWindow, WBWM_ForSelected);
     METHOD_CASE(WBWindow, WBWM_InvalidateContents);

@@ -124,6 +124,9 @@ AROS_PROCH(wbOpener, argstr, argsize, SysBase)
         CloseLibrary(DOSBase);
     }
 
+    // Exiting will auto-close the NP_CurrentDir, which we don't want.
+    CurrentDir(BNULL);
+
     return 0;
 
     AROS_PROCFUNC_EXIT
