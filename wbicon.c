@@ -791,7 +791,7 @@ static BOOL rename_path(struct WorkbookBase *wb, CONST_STRPTR file, CONST_STRPTR
 
     // Return ok if we have a suffix, but the oldname doesn't exist.
     if (suffix[0] != 0) {
-        BPTR lock = Lock(oldname, ACCESS_READ);
+        BPTR lock = Lock(oldname, SHARED_LOCK);
         if (!lock) {
             ok = TRUE;
         } else {
@@ -1009,7 +1009,7 @@ static IPTR WBIcon__WBIM_Format(Class *cl, Object *obj, Msg msg)
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
 
-    BPTR lock = Lock(my->File, ACCESS_READ);
+    BPTR lock = Lock(my->File, SHARED_LOCK);
     BOOL ok = FALSE;
     if (OpenWorkbenchObject("SYS:System/Format",
                 WBOPENA_ArgLock, lock,

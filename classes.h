@@ -54,7 +54,7 @@ Class *WBApp_MakeClass(struct WorkbookBase *wb);
  * icons, that also creates and manages its
  * own struct Window.
  *
- * Use a WBWA_Path of NULL to generate the background
+ * Use a WBWA_Lock of BNULL to generate the background
  * window of AppIcons.
  *
  * NOTE: The caller must have already added the DOS
@@ -63,7 +63,7 @@ Class *WBApp_MakeClass(struct WorkbookBase *wb);
 
 /* Attributes (also takes all WA_* tags) */
 #define WBWA_Dummy               (TAG_USER | 0x40410000)
-#define WBWA_Path                (WBWA_Dummy+0)  // (CONST_STRPTR) [OM_NEW, OM_GET]
+#define WBWA_Lock                (WBWA_Dummy+0)  // (BPTR) [OM_NEW, OM_GET] The class will DupLock() if needed.
 #define WBWA_UserPort            (WBWA_Dummy+1)  // (struct MsgPort *) [OM_NEW]
 #define WBWA_Window              (WBWA_Dummy+2)  // (struct Window *) [OM_GET]
 #define WBWA_Screen              (WBWA_Dummy+3)  // (struct Screen *) [OM_NEW]

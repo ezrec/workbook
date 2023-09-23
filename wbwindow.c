@@ -820,7 +820,6 @@ static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbWindow *my;
-    CONST_STRPTR path;
     ULONG idcmp;
     IPTR rc = 0;
     APTR vis;
@@ -841,20 +840,18 @@ static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
 
     NEWLIST(&my->IconList);
 
-    path = (CONST_STRPTR)GetTagData(WBWA_Path, (IPTR)NULL, ops->ops_AttrList);
-    if (path == NULL) {
+    BPTR lock = (BPTR)GetTagData(WBWA_Lock, (IPTR)BNULL, ops->ops_AttrList);
+    if (lock == NULL) {
         my->Lock = BNULL;
         my->Path = NULL;
     } else {
-        my->Lock = Lock(path, SHARED_LOCK);
+        my->Lock = DupLock(lock);
         if (my->Lock == BNULL)
             goto error;
 
-        my->Path = AllocVec(strlen(path)+1, MEMF_ANY);
+        my->Path = wbAbspathLock(my->Lock);
         if (my->Path == NULL)
             goto error;
-
-        strcpy(my->Path, path);
     }
 
     my->DefaultViewModes = wbWindowParentViewModes(wb, my->Lock);
@@ -1003,8 +1000,8 @@ static IPTR WBWindow__OM_GET(Class *cl, Object *obj, struct opGet *opg)
     IPTR rc = TRUE;
 
     switch (opg->opg_AttrID) {
-    case WBWA_Path:
-        *(opg->opg_Storage) = (IPTR)my->Path;
+    case WBWA_Lock:
+        *(opg->opg_Storage) = (IPTR)my->Lock;
         break;
     case WBWA_Window:
         *(opg->opg_Storage) = (IPTR)my->Window;
