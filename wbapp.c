@@ -23,6 +23,7 @@
 #include "workbook_intern.h"
 #include "workbook_menu.h"
 #include "classes.h"
+#include "wbcurrent.h"
 
 struct wbApp {
     struct Screen  *Screen;
@@ -55,16 +56,44 @@ static void wbOpenDrawer(Class *cl, Object *obj, CONST_STRPTR path)
     Object *win;
 
     ASSERT_VALID_PROCESS((struct Process *)FindTask(NULL));
-    win = NewObject(WBWindow, NULL,
-                        WBWA_Path, path,
-                        WBWA_UserPort, my->WinPort,
-                        WBWA_NotifyPort, my->NotifyPort,
-                        WBWA_Screen, my->Screen,
-                        TAG_END);
 
-    if (win)
-    {
-        DoMethod(obj, OM_ADDMEMBER, win);
+    BPTR lock = BNULL;
+    if (path != NULL) {
+        lock = Lock(path, SHARED_LOCK);
+        if (lock == NULL) {
+            return;
+        }
+    }
+
+    Object *ostate = (Object *)my->Windows.mlh_Head;
+    Object *owin;
+
+    while ((owin = NextObject(&ostate))) {
+        IPTR win_lock = (IPTR)BNULL;
+        GetAttr(WBWA_Lock, owin, &win_lock);
+        if (SameLock((BPTR)win_lock, lock) == LOCK_SAME) {
+            break;
+        }
+    }
+
+    if (owin == NULL) {
+        win = NewObject(WBWindow, NULL,
+                            WBWA_Lock, lock,
+                            WBWA_UserPort, my->WinPort,
+                            WBWA_NotifyPort, my->NotifyPort,
+                            WBWA_Screen, my->Screen,
+                            TAG_END);
+
+        if (win)
+        {
+            DoMethod(obj, OM_ADDMEMBER, win);
+        }
+    } else {
+        DoMethod(owin, WBWM_Front);
+    }
+
+    if (lock != BNULL) {
+        UnLock(lock);
     }
 }
 
@@ -150,7 +179,7 @@ static IPTR WBApp__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
 
     /* Create our root window */
     my->Root = NewObject(WBWindow, NULL,
-                         WBWA_Path, NULL,
+                         WBWA_Lock, NULL,
                          WBWA_Screen, my->Screen,
                          WBWA_UserPort, my->WinPort,
                          WBWA_NotifyPort, my->NotifyPort,
