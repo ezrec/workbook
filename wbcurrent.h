@@ -25,6 +25,13 @@
 #include "workbook_vbcc.h"
 #endif
 
+#if DEBUG
+CONST_STRPTR _sCURRDIR(struct Library *_DOSBase);
+#define sCURRDIR() _sCURRDIR(DOSBase)
+CONST_STRPTR _sLOCKNAME(struct Library *_DOSBase, BPTR lock);
+#define sLOCKNAME(lock) _sLOCKNAME(DOSBase, lock)
+#endif
+
 STRPTR _wbAbspathLock(struct Library *_DOSBase, BPTR lock);
 #define wbAbspathLock(lock) _wbAbspathLock(DOSBase, lock);
 
