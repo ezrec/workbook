@@ -35,16 +35,19 @@
 struct wbSetNode {
     struct Node sn_Node;
     Object        *sn_Object;   // Gadget object
+    BOOL           sn_Backdrop;    // Is in the backdrop?
     LONG           sn_CurrentX;    // do_CurrentX cache.
     LONG           sn_CurrentY;    // do_CurrentY cache.
 };
 
-#define IS_ARRANGED(node)   ((node)->sn_CurrentX != (LONG)NO_ICON_POSITION) && ((node)->sn_CurrentY != (LONG)NO_ICON_POSITION)
+#define IS_VISIBLE(node)    ((node)->sn_Backdrop == my->Backdrop)
+#define IS_ARRANGED(node)   (!(node)->sn_Backdrop && (node)->sn_CurrentX != (LONG)NO_ICON_POSITION) && ((node)->sn_CurrentY != (LONG)NO_ICON_POSITION)
 
 struct wbSet {
     struct List SetObjects;
     UWORD ViewModes;            // Same a 'DrawerData->dd_ViewModes'
     BOOL  Arranged;
+    BOOL  Backdrop;
     struct Rectangle Marquee;
     BOOL MarqueeEnable;
 };
@@ -67,25 +70,33 @@ static IPTR WBSet__OM_ADDMEMBER(Class *cl, Object *obj, struct opMember *opm)
     struct wbSet *my = INST_DATA(cl, obj);
     struct wbSetNode *node;
 
-    node = AllocMem(sizeof(*node), MEMF_ANY);
-    node->sn_Object = iobj;
+    IPTR rc = 0;
 
-    /* Get bounding box of item to add */
-    wbGABox(iobj, &ibox);
+    node = AllocVec(sizeof(*node), MEMF_ANY);
+    if (node) {
+        node->sn_Object = iobj;
 
-    GetAttr(WBIA_Label, iobj, (IPTR *)&node->sn_Node.ln_Name);
-    IPTR tmp;
-    GetAttr(WBIA_DoCurrentX, iobj, &tmp);
-    node->sn_CurrentX = (LONG)tmp;
-    GetAttr(WBIA_DoCurrentY, iobj, &tmp);
-    node->sn_CurrentY = (LONG)tmp;
-    AddTail(&my->SetObjects, &node->sn_Node);
+        /* Get bounding box of item to add */
+        wbGABox(iobj, &ibox);
 
-    SetAttrs(iobj, WBIA_ListView, my->ViewModes != DDVM_BYICON, TAG_END);
+        GetAttr(WBIA_Label, iobj, (IPTR *)&node->sn_Node.ln_Name);
+        IPTR tmp;
+        GetAttr(WBIA_Backdrop, iobj, &tmp);
+        node->sn_Backdrop = (BOOL)tmp;
+        GetAttr(WBIA_DoCurrentX, iobj, &tmp);
+        node->sn_CurrentX = (LONG)tmp;
+        GetAttr(WBIA_DoCurrentY, iobj, &tmp);
+        node->sn_CurrentY = (LONG)tmp;
+        AddTail(&my->SetObjects, &node->sn_Node);
 
-    my->Arranged = FALSE;
+        SetAttrs(iobj, WBIA_ListView, my->ViewModes != DDVM_BYICON, TAG_END);
 
-    return DoSuperMethodA(cl, obj, (Msg)opm);
+        my->Arranged = FALSE;
+
+        rc = DoSuperMethodA(cl, obj, (Msg)opm);
+    }
+
+    return rc;
 }
 
 static IPTR WBSet__OM_REMMEMBER(Class *cl, Object *obj, struct opMember *opm)
@@ -100,7 +111,7 @@ static IPTR WBSet__OM_REMMEMBER(Class *cl, Object *obj, struct opMember *opm)
     ForeachNodeSafe(&my->SetObjects, node, next) {
         if (node->sn_Object == iobj) {
             Remove(&node->sn_Node);
-            FreeMem(node, sizeof(*node));
+            FreeVec(node);
         }
     }
 
@@ -142,12 +153,15 @@ static IPTR WBSet__OM_SET(Class *cl, Object *obj, struct opSet *ops)
     struct TagItem *ti;
 
     UWORD viewmodes = my->ViewModes;
+    BOOL backdrop = my->Backdrop;
 
     while ((ti = NextTagItem(&tags)) != NULL) {
         switch (ti->ti_Tag) {
         case WBSA_ViewModes:
             viewmodes = (UWORD)ti->ti_Data;
             break;
+        case WBSA_Backdrop:
+            backdrop = (BOOL)ti->ti_Data;
         default:
             break;
         }
@@ -156,6 +170,10 @@ static IPTR WBSet__OM_SET(Class *cl, Object *obj, struct opSet *ops)
     if (viewmodes > DDVM_BYDEFAULT && viewmodes <= DDVM_BYTYPE) {
         my->ViewModes = viewmodes;
         my->Arranged = FALSE;
+    }
+
+    if (backdrop != my->Backdrop) {
+        my->Backdrop = backdrop;
     }
 
     return DoSuperMethodA(cl, obj, (Msg)ops);
@@ -170,7 +188,7 @@ static IPTR WBSet__OM_DISPOSE(Class *cl, Object *obj, Msg msg)
     /* Remove all the nodes */
     ForeachNodeSafe(&my->SetObjects, node, next) {
         Remove(&node->sn_Node);
-        FreeMem(node, sizeof(*node));
+        FreeVec(node);
     }
 
     return DoSuperMethodA(cl, obj, msg);
@@ -319,7 +337,7 @@ static IPTR WBSet__GM_LAYOUT(Class *cl, Object *obj, struct gpLayout *gpl)
     // Re-arrange anything that needs to be.
     WORD CurrRight, CurrBottom;
 
-    // Remove all members that are not fixed nor arranged.
+    // Remove all members (and set their view mode)
     struct wbSetNode *node;
     ForeachNode(&my->SetObjects, node) {
         SetAttrs(node->sn_Object, WBIA_ListView, (IPTR)listView, TAG_END);
@@ -332,7 +350,7 @@ static IPTR WBSet__GM_LAYOUT(Class *cl, Object *obj, struct gpLayout *gpl)
     // If not listview, add fixed or arranged items first.
     if (!listView) {
         ForeachNode(&my->SetObjects, node) {
-            if (IS_ARRANGED(node)) {
+            if (IS_VISIBLE(node) && IS_ARRANGED(node)) {
                 D(bug("%s: %s - fixed @%ld,%ld\n", __func__, node->sn_Node.ln_Name, (IPTR)node->sn_CurrentX, (IPTR)node->sn_CurrentY));
                 SetAttrs(node->sn_Object, GA_Top, node->sn_CurrentY, GA_Left, node->sn_CurrentX, TAG_END);
                 DoSuperMethod(cl, obj, OM_ADDMEMBER, node->sn_Object);
@@ -352,6 +370,10 @@ static IPTR WBSet__GM_LAYOUT(Class *cl, Object *obj, struct gpLayout *gpl)
 
     /* For each item in the auto list, add it */
     ForeachNode(&my->SetObjects, node) {
+        if (!IS_VISIBLE(node)) {
+            D(bug("%s: %s - not visible\n", __func__, node->sn_Node.ln_Name));
+            continue;
+        }
         if (!listView && IS_ARRANGED(node)) {
             D(bug("%s: %s - fixed\n", __func__, node->sn_Node.ln_Name));
             continue;

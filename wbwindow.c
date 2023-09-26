@@ -309,6 +309,39 @@ static void wbAddVolumeIcons(Class *cl, Object *obj)
     }
 }
 
+static void wbAddBackdropIcons(Class *cl, Object *obj)
+{
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbWindow *my = INST_DATA(cl, obj);
+
+    BPTR lock = BNULL;
+
+    D(bug("%s: Scanning backdrop locks...\n", __func__));
+    while ((lock = DoMethod(wb->wb_Backdrop, WBBM_LockNext, lock)) != BNULL) {
+        D(bug("%s: lock %lx\n", __func__, (IPTR)lock));
+        BPTR parent = ParentDir(lock);
+        if (parent != BNULL) {
+            D(bug("%s:   parent %lx\n", __func__, (IPTR)parent));
+            STRPTR path = wbAbspathLock(lock);
+            if (path != NULL) {
+                D(bug("%s:   path   %s\n", __func__, path));
+                Object *iobj = NewObject(WBIcon, NULL,
+                        WBIA_File, FilePart(path),
+                        WBIA_Label, FilePart(path),
+                        WBIA_ParentLock, parent,
+                        WBIA_Screen, my->Window->WScreen,
+                        TAG_END);
+                D(bug("%s: %s => %p\n", __func__, path, iobj));
+                if (iobj) {
+                    wbwiAppend(cl, obj, iobj);
+                }
+                FreeVec(path);
+            }
+            UnLock(parent);
+        }
+    }
+}
+
 static void wbWindowRedimension(Class *cl, Object *obj)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
@@ -447,6 +480,7 @@ static IPTR WBWindow__WBWM_CacheContents(Class *cl, Object *obj, Msg msg)
     if (my->Lock == BNULL) {
         /* Root window */
         wbAddVolumeIcons(cl, obj);
+        wbAddBackdropIcons(cl, obj);
     } else {
         /* Directory window */
         wbAddFiles(cl, obj);
@@ -872,6 +906,7 @@ static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
 
     my->Set = NewObject(WBSet, NULL,
                 WBSA_ViewModes, (IPTR)viewModes,
+                WBSA_Backdrop, (my->Path == NULL),
                 TAG_END);
 
     my->Menu = CreateMenusA((struct NewMenu *)WBWindow_menu, NULL);
