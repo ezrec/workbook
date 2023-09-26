@@ -15,6 +15,9 @@
 #include "wbcurrent.h"
 #include "classes.h"
 
+// The first include defines 'WORKBOOK_TEST_H' and gets the macros and helper functions.
+#include "workbook_test.inc"
+
 /* Allocate classes and run the main app */
 static int WB_Main(struct WorkbookBase *wb)
 {
@@ -85,9 +88,12 @@ const ULONG mem_types[] = { MEMF_CHIP, MEMF_FAST };
     D(for (int type = 0; type < sizeof(mem_types)/sizeof(mem_types[0]); type++) bug(" Type 0x%04lx: %ld\n", (IPTR)mem_types[type], mem_start[type] - AvailMem(mem_types[type]))); \
 } while (0)
 
-void wbUnitTests(struct WorkbookBase *wb);
-void wbUnitTests(struct WorkbookBase *wb) {
+BOOL wbUnitTests(struct WorkbookBase *wb);
+BOOL wbUnitTests(struct WorkbookBase *wb) {
+    BOOL PASSED=TRUE;
+// The second include actually renders 'WORKBOOK_TEST_H' (if 'DEBUG==1')
 #include "workbook_test.inc"
+    return PASSED;
 }
 
 
@@ -186,19 +192,19 @@ ULONG WorkbookMain(void)
     if (wb->wb_LocaleBase == NULL)
         goto error;
 
-    _D(wbUnitTests(wb));
+    D(if (wbUnitTests(wb))) {
+        // Set process and task name to "Workbench", for old AmigaOS tools
+        SetProgramName("Workbench");
+        struct Task *task = FindTask(NULL);
+        STRPTR oldName = task->tc_Node.ln_Name;
+        task->tc_Node.ln_Name = (STRPTR)"Workbench";
 
-    // Set process and task name to "Workbench", for old AmigaOS tools
-    SetProgramName("Workbench");
-    struct Task *task = FindTask(NULL);
-    STRPTR oldName = task->tc_Node.ln_Name;
-    task->tc_Node.ln_Name = (STRPTR)"Workbench";
+        SetConsoleTask(NULL);
+        rc = WB_Main(wb);
 
-    SetConsoleTask(NULL);
-    rc = WB_Main(wb);
-
-    // Restore (possibly allocated) task name.
-    task->tc_Node.ln_Name = oldName;
+        // Restore (possibly allocated) task name.
+        task->tc_Node.ln_Name = oldName;
+    }
 
 error:
     if (wb) {
