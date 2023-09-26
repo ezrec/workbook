@@ -228,6 +228,21 @@ static IPTR WBApp__OM_DISPOSE(Class *cl, Object *obj, Msg msg)
     return DoSuperMethodA(cl, obj, msg);
 }
 
+// OM_GET
+static IPTR WBApp__OM_GET(Class *cl, Object *obj, struct opGet *opg) {
+    struct wbApp *my = INST_DATA(cl, obj);
+
+    switch (opg->opg_AttrID) {
+    case WBAA_Screen:
+        *(opg->opg_Storage) = (IPTR)my->Screen;
+        break;
+    default:
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
 // OM_ADDMEMBER
 static IPTR WBApp__OM_ADDMEMBER(Class *cl, Object *obj, struct opMember *opm)
 {
@@ -817,6 +832,7 @@ static IPTR WBApp_dispatcher(Class *cl, Object *obj, Msg msg)
     switch (msg->MethodID) {
     METHOD_CASE(WBApp, OM_NEW);
     METHOD_CASE(WBApp, OM_DISPOSE);
+    METHOD_CASE(WBApp, OM_GET);
     METHOD_CASE(WBApp, OM_ADDMEMBER);
     METHOD_CASE(WBApp, OM_REMMEMBER);
     METHOD_CASE(WBApp, WBAM_Workbench);
