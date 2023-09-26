@@ -219,7 +219,7 @@ Class *WBSet_MakeClass(struct WorkbookBase *wb);
 #define WBIF_OK                 (0)         // Window imagery unchanged.
 #define WBIF_REFRESH            (1 << 0)    // Refresh of containing window requested
 
-struct wbimd_DragDropAdd {
+struct wbim_DragDropAdd {
     STACKED ULONG MethodID;
     STACKED struct GadgetInfo *wbimd_GInfo;
     STACKED Object *wbimd_DragDrop;
