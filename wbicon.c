@@ -1038,7 +1038,11 @@ static IPTR WBIcon__WBIM_Unsnapshot(Class *cl, Object *obj, Msg msg)
 // WBIM_Leave_Out
 static IPTR WBIcon__WBIM_Leave_Out(Class *cl, Object *obj, Msg msg)
 {
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+
     ASSERT_VALID_PROCESS((struct Process *)FindTask(NULL));
+
+    SetAttrs(obj, WBIA_Backdrop, TRUE, TAG_END);
 
     return 0;
 }
@@ -1046,7 +1050,11 @@ static IPTR WBIcon__WBIM_Leave_Out(Class *cl, Object *obj, Msg msg)
 // WBIM_Put_Away
 static IPTR WBIcon__WBIM_Put_Away(Class *cl, Object *obj, Msg msg)
 {
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+
     ASSERT_VALID_PROCESS((struct Process *)FindTask(NULL));
+
+    SetAttrs(obj, WBIA_Backdrop, FALSE, TAG_END);
 
     return 0;
 }
