@@ -145,6 +145,7 @@ Class *WBVirtual_MakeClass(struct WorkbookBase *wb);
 /* Attributes */
 #define WBSA_Dummy               (TAG_USER | 0x40430000)
 #define WBSA_ViewModes          (WBSA_Dummy + 0) // (UWORD) A 'DrawerData->dd_ViewModes' value
+#define WBSA_Backdrop           (WBSA_Dummy + 1) // (BOOL) Is this the Backdrop set?
 
 /* Methods */
 #define WBSM_Dummy               (TAG_USER | 0x40430100)
