@@ -59,8 +59,10 @@ struct WorkbookBase {
     Class  *wb_WBIcon;
     Class  *wb_WBSet;
     Class  *wb_WBDragDrop;
+    Class  *wb_WBBackdrop;
 
     Object *wb_App;
+    Object *wb_Backdrop;
 };
 
 /* FIXME: Remove these #define xxxBase hacks

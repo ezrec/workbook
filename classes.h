@@ -275,5 +275,35 @@ struct wbxm_DragDropped {
     STACKED LONG              wbxmd_MouseY;
 };
 
+/* WBBackdrop Class
+ *
+ * A .backdrop manager.
+ *
+ * The .backdrop manager manages the .backdrop for a volume.
+ */
+
+/* Attributes */
+#define WBBA_Dummy              (TAG_USER | 0x40450000)
+
+/* Methods */
+//
+// OM_NEW, OM_DISPOSE
+#define WBBM_Dummy              (TAG_USER | 0x40450100)
+#define WBBM_LockIs             (WBBM_Dummy + 0)    // (BPTR) Is lock a backdrop for any managed volume?
+#define WBBM_LockNext           (WBBM_Dummy + 1)    // (BPTR) -> (BPTR) Get the next lock (start with BNULL)
+#define WBBM_LockAdd            (WBBM_Dummy + 2)    // (BPTR) Add file for a lock to the backdrop for its volume.
+#define WBBM_LockDel            (WBBM_Dummy + 3)    // (BPTR) Del file for a lock from the backdrop for its volume.
+#define WBBM_VolumeAdd          (WBBM_Dummy + 4)    // (BPTR) Manage .backdrop entries for a volume.
+#define WBBM_VolumeDel          (WBBM_Dummy + 5)    // (BPTR) Stop managing .backdrop entries for a volume.
+
+struct wbbm_Lock {
+    STACKED ULONG MethodID;
+    STACKED BPTR  wbbml_Lock;
+};
+
+Class *WBBackdrop_MakeClass(struct WorkbookBase *wb);
+
+#define WBBackdrop  wb->wb_WBBackdrop
+
 
 #endif /* WORKBOOK_CLASSES_H */
