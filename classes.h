@@ -199,6 +199,7 @@ Class *WBSet_MakeClass(struct WorkbookBase *wb);
 #define WBIA_DoType              (WBIA_Dummy+32)       // (UBYTE) [OM_GET] DiskObject->do_Type
 #define WBIA_DoCurrentX          (WBIA_Dummy+35)       // (LONG) [OM_SET,OM_GET] DiskObject->do_CurrentX
 #define WBIA_DoCurrentY          (WBIA_Dummy+36)       // (LONG) [OM_SET,OM_GET] DiskObject->do_CurrentY
+#define WBIA_Backdrop            (WBIA_Dummy+37)       // (BOOL) [OM_SET,OM_GET] Is this a backdrop icon?
 
 /* Methods */
 #define WBIM_Dummy               (TAG_USER | 0x40440100)
