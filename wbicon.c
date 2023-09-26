@@ -214,7 +214,6 @@ static AROS_UFH3(void, wbIcon_LocalePutChar,
     AROS_USERFUNC_EXIT
 }
 
-
 // OM_NEW
 static IPTR WBIcon__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
 {
@@ -1037,7 +1036,7 @@ static IPTR WBIcon__WBIM_Empty_Trash(Class *cl, Object *obj, Msg msg)
 }
 
 // WBIM_DragDropAdd
-static IPTR WBIcon__WBIM_DragDropAdd(Class *cl, Object *obj, struct wbimd_DragDropAdd *wbimd)
+static IPTR WBIcon__WBIM_DragDropAdd(Class *cl, Object *obj, struct wbim_DragDropAdd *wbimd)
 {
     struct wbIcon *my = INST_DATA(cl, obj);
     struct Gadget *gadget = (struct Gadget *)obj;
