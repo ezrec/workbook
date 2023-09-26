@@ -47,6 +47,14 @@ static int WB_Main(struct WorkbookBase *wb)
     if (!wb->wb_WBDragDrop)
         goto exit;
 
+    wb->wb_WBBackdrop = WBBackdrop_MakeClass(wb);
+    if (!wb->wb_WBBackdrop)
+        goto exit;
+
+    wb->wb_Backdrop = NewObject(WBBackdrop, NULL, TAG_END);
+    if (!wb->wb_Backdrop)
+        goto exit;
+
     struct Screen *screen = LockPubScreen(NULL);
     if (screen) {
         wb->wb_App = NewObject(WBApp, NULL, WBAA_Screen, screen, TAG_END);
@@ -61,6 +69,10 @@ static int WB_Main(struct WorkbookBase *wb)
     }
 
 exit:
+    if (wb->wb_Backdrop)
+        DisposeObject(wb->wb_Backdrop);
+    if (wb->wb_WBBackdrop)
+        FreeClass(wb->wb_WBBackdrop);
     if (wb->wb_WBDragDrop)
         FreeClass(wb->wb_WBDragDrop);
     if (wb->wb_WBIcon)

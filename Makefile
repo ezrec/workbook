@@ -34,7 +34,7 @@ LINKOPTS=-L$(AMIGA_NDK)/Include/linker_libs -ldebug -lamigas
 HDRS=$(wildcard *.h)
 SRCS=main.c \
 	 wbapp.c wbdragdrop.c wbicon.c wbset.c wbvirtual.c wbwindow.c \
-	 wbdoimage.c wbinfo.c \
+	 wbdoimage.c wbinfo.c wbbackdrop.c \
 	 wbcurrent.c workbook.c workbook_intern.c
 OBJS=$(patsubst %.c,%.o,$(SRCS))
 
