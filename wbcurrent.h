@@ -56,3 +56,18 @@ BOOL _wbMoveIntoCurrentAt(struct Library *_DOSBase, struct Library *_IconBase, B
 BOOL _wbDropOntoCurrentAt(struct Library *_DOSBase, struct Library *_IconBase, struct Library *_UtilityBase, struct TagItem *tags, LONG targetX, LONG targetY);
 #define wbDropOntoCurrentAt(tags, targetX, targetY) _wbDropOntoCurrentAt(DOSBase, IconBase, UtilityBase, tags, targetX, targetY)
 #define wbDropOntoCurrent(tags) _wbDropOntoCurrentAt(DOSBase, IconBase, UtilityBase, tags, (LONG)NO_ICON_POSITION, (LONG)NO_ICON_POSITION)
+
+void _wbBackdropLoadCurrent(struct Library *_DOSBase, struct List *backdrops);
+#define wbBackdropLoadCurrent(backdrops) _wbBackdropLoadCurrent(DOSBase, backdrops)
+BOOL _wbBackdropSaveCurrent(struct Library *_DOSBase, struct List *backdrops);
+#define wbBackdropSaveCurrent(backdrops) _wbBackdropSaveCurrent(DOSBase, backdrops)
+void wbBackdropFree(struct List *backdrops);
+
+BOOL _wbBackdropContains(struct Library *_DOSBase, struct List *backdrops, BPTR lock);
+#define wbBackdropContains(backdrops, lock) _wbBackdropContains(DOSBase, backdrops, lock)
+BOOL _wbBackdropAdd(struct Library *_DOSBase, struct List *backdrops, BPTR lock);
+#define wbBackdropAdd(backdrops, lock) _wbBackdropAdd(DOSBase, backdrops, lock)
+BOOL _wbBackdropDel(struct Library *_DOSBase, struct List *backdrops, BPTR lock);
+#define wbBackdropDel(backdrops, lock) _wbBackdropDel(DOSBase, backdrops, lock)
+BOOL _wbBackdropNext(struct Library *_DOSBase, struct List *backdrops, BPTR lock, BPTR *next_ptr);
+#define wbBackdropNext(backdrops, lock, next_ptr) _wbBackdropNext(DOSBase, backdrops, lock, next_ptr)
