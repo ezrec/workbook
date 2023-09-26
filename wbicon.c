@@ -37,6 +37,8 @@ struct wbIcon {
     STRPTR             Label;
     struct Screen     *Screen;
 
+    BPTR BackdropLock;    // Lock for the icon on the backdrop.
+
     struct Rectangle  HitBox;  // Icon image hit box, which does not include label.
     BOOL ListView;
     IPTR ListLabelWidth;
@@ -235,11 +237,22 @@ static IPTR WBIcon__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
         return 0;
     }
 
+    BPTR backdrop_lock = BNULL;
+
     struct DiskObject *diskobject = NULL;
     BPTR old = CurrentDir(parentlock);
     BPTR lock = Lock(file, SHARED_LOCK);
     BOOL ok = FALSE;
     if (lock != BNULL) {
+        if (parentlock == BNULL) {
+            // We're a volume, and always on the backdrop.
+            backdrop_lock = lock;
+        } else {
+            BOOL isBackdrop = DoMethod(wb->wb_Backdrop, WBBM_LockIs, lock);
+            if (isBackdrop) {
+                backdrop_lock = lock;
+            }
+        }
         struct FileInfoBlock *fib = AllocDosObjectTags(DOS_FIB, TAG_END);
         if (fib != NULL) {
             if (Examine(lock, fib)) {
@@ -250,7 +263,9 @@ static IPTR WBIcon__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
             }
             FreeDosObject(DOS_FIB, fib);
         }
-        UnLock(lock);
+        if (backdrop_lock == BNULL) {
+            UnLock(lock);
+        }
     }
     if (ok) {
         diskobject = GetIconTags(file,
@@ -268,6 +283,9 @@ static IPTR WBIcon__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
 
     file = StrDup(file);
     if (!file) {
+        if (backdrop_lock != BNULL) {
+            UnLock(backdrop_lock);
+        }
         FreeDiskObject(diskobject);
         return 0;
     }
@@ -277,13 +295,35 @@ static IPTR WBIcon__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
     }
     label = StrDup(label);
     if (label == NULL) {
+        if (backdrop_lock != BNULL) {
+            UnLock(backdrop_lock);
+        }
         FreeVec(file);
         FreeDiskObject(diskobject);
         return 0;
     }
 
+    if (parentlock != BNULL) {
+        parentlock = DupLock(parentlock);
+        if (parentlock == BNULL) {
+            if (backdrop_lock != BNULL) {
+                UnLock(backdrop_lock);
+            }
+            FreeVec(label);
+            FreeVec(file);
+            FreeDiskObject(diskobject);
+            return 0;
+        }
+    }
+
     obj = (Object *)DoSuperMethodA(cl, obj, (Msg)ops);
     if (obj == NULL) {
+        if (parentlock != BNULL) {
+            UnLock(parentlock);
+        }
+        if (backdrop_lock != BNULL) {
+            UnLock(backdrop_lock);
+        }
         FreeVec(label);
         FreeVec(file);
         FreeDiskObject(diskobject);
@@ -345,6 +385,16 @@ static IPTR WBIcon__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
         CloseLocale(locale);
     }
 
+    my->BackdropLock = backdrop_lock;
+    if (my->BackdropLock != BNULL) {
+        if (my->ParentLock == BNULL) {
+            // Add to the WBApp's volume list.
+            DoMethod(wb->wb_Backdrop, WBBM_VolumeAdd, my->BackdropLock);
+        } else {
+            DoMethod(wb->wb_Backdrop, WBBM_LockAdd, my->BackdropLock);
+        }
+    }
+
     wbIcon_Update(cl, obj);
 
     return (IPTR)obj;
@@ -357,6 +407,19 @@ static IPTR WBIcon__OM_DISPOSE(Class *cl, Object *obj, Msg msg)
 
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbIcon *my = INST_DATA(cl, obj);
+
+    if (my->ParentLock == BNULL) {
+        // If this icon on the backdrop is going away, it's because the volume is unmounted.
+        DoMethod(wb->wb_Backdrop, WBBM_VolumeDel, my->BackdropLock);
+    } else {
+        UnLock(my->ParentLock);
+    }
+
+    if (my->BackdropLock != BNULL) {
+        // We don't delete ourselves from the Backdrop manager - we're still
+        // in the .backdrop, even if this icon visual is no longer on the desktop (ie, Workbook is closing).
+        UnLock(my->BackdropLock);
+    }
 
     ASSERT(my->Label != NULL);
     FreeVec(my->Label);
@@ -407,6 +470,9 @@ static IPTR WBIcon__OM_GET(Class *cl, Object *obj, struct opGet *opg)
     case WBIA_HitBox:
         *(struct Rectangle *)(opg->opg_Storage) = my->HitBox;
         break;
+    case WBIA_Backdrop:
+        *(opg->opg_Storage) = (IPTR)(my->BackdropLock != BNULL);
+        break;
     default:
         rc = DoSuperMethodA(cl, obj, (Msg)opg);
         break;
@@ -427,6 +493,7 @@ static IPTR WBIcon__OM_SET(Class *cl, Object *obj, struct opSet *ops)
     BOOL render = FALSE;
     BOOL listview = my->ListView;
     ULONG listlabelwidth = my->ListLabelWidth;
+    BOOL backdrop = (my->BackdropLock != BNULL);
 
     while ((ti = NextTagItem(&tags)) != NULL) {
         switch (ti->ti_Tag) {
@@ -446,6 +513,42 @@ static IPTR WBIcon__OM_SET(Class *cl, Object *obj, struct opSet *ops)
         case WBIA_DoCurrentY:
             my->DiskObject->do_CurrentY = (LONG)ti->ti_Data;
             break;
+        case WBIA_Backdrop:
+            backdrop = (BOOL)ti->ti_Data;
+            break;
+        }
+    }
+
+    if (my->ParentLock != BNULL && (backdrop != (my->BackdropLock != BNULL))) {
+        D(bug("%s: %s: Not a Volume, and backdrop state changing to %s\n", __func__, my->File, backdrop ? "TRUE" : "FALSE"));
+        if (backdrop) {
+            ASSERT_VALID_PROCESS((struct Process *)FindTask(NULL));
+            BPTR pwd = CurrentDir(my->ParentLock);
+            my->BackdropLock = Lock(my->File, SHARED_LOCK);
+            CurrentDir(pwd);
+            D(if (my->BackdropLock == BNULL) bug("%s: Can't lock %s\n", __func__, my->File));
+            if (my->BackdropLock) {
+                BOOL ok = DoMethod(wb->wb_Backdrop, WBBM_LockAdd, my->BackdropLock);
+                if (ok) {
+                    D(bug("%s: %s - Added to .backdrop for my volume\n", __func__, my->File));
+                    DoMethod(wb->wb_App, WBAM_InvalidateContents, my->BackdropLock);
+                } else {
+                    D(bug("%s: %s - Unable to add to .backdrop for my volume\n", __func__, my->File));
+                    UnLock(my->BackdropLock);
+                    my->BackdropLock = BNULL;
+                }
+            }
+        } else {
+            BPTR lock = my->BackdropLock;
+            my->BackdropLock = BNULL;
+            BOOL ok = DoMethod(wb->wb_Backdrop, WBBM_LockDel, lock);
+            if (ok) {
+                D(bug("%s: %s - Removed from .backdrop for my volume\n", __func__, my->File));
+                DoMethod(wb->wb_App, WBAM_InvalidateContents, lock);
+            } else {
+                D(bug("%s: %s - Unable to remove from .backdrop for my volume\n", __func__, my->File));
+            }
+            UnLock(lock);
         }
     }
 
