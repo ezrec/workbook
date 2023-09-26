@@ -30,6 +30,7 @@
 #define WBAM_DragDropBegin       (WBAM_Dummy+4)         // Enter drag/drop mode.
 #define WBAM_DragDropUpdate      (WBAM_Dummy+5)         // Update
 #define WBAM_DragDropEnd         (WBAM_Dummy+6)         // Leave drag/drop mode.
+#define WBAM_InvalidateContents  (WBAM_Dummy+7)         // (BPTR) Invalidate contents for all windows.
 
 struct wbam_ForSelected {
     STACKED ULONG             MethodID;
@@ -43,6 +44,11 @@ struct wbam_ReportSelected {
                                                 // NOTE: This memory must be freed by FreeTagItems()
                                                 //       *BEFORE* any changes to the icon selection states!
                                                 // The list will contain WBOPENA_ArgLock and WBOPENA_ArgName sets.
+};
+
+struct wbam_InvalidateContents {
+    STACKED ULONG MethodID;
+    STACKED BPTR  wbami_VolumeLock;
 };
 
 Class *WBApp_MakeClass(struct WorkbookBase *wb);
@@ -78,7 +84,7 @@ Class *WBApp_MakeClass(struct WorkbookBase *wb);
 #define WBWM_Show                (WBWM_Dummy+4)  /* N/A */
 #define WBWM_Refresh             (WBWM_Dummy+5)  /* N/A */
 #define WBWM_ForSelected         (WBWM_Dummy+6)  /* Msg */
-#define WBWM_InvalidateContents  (WBWM_Dummy+7)  /* N/A */
+#define WBWM_InvalidateContents  (WBWM_Dummy+7)  // (BPTR) invalidate if BPTR is NULL, or SameLock() as parent.
 #define WBWM_CacheContents       (WBWM_Dummy+8)  /* N/A */
 #define WBWM_ReportSelected      (WBWM_Dummy+9)  /* struct wbwm_ReportSelected */
 #define WBWM_Front               (WBWM_Dummy+10) // N/A
@@ -97,6 +103,11 @@ struct wbwm_ForSelected {
 struct wbwm_ReportSelected {
     STACKED ULONG             MethodID;
     STACKED struct TagItem  **wbwmr_ReportTags; // Must be freed with FreeTagItems() after success
+};
+
+struct wbwm_InvalidateContents {
+    STACKED ULONG             MethodID;
+    STACKED BPTR wbwmi_VolumeLock;
 };
 
 Class *WBWindow_MakeClass(struct WorkbookBase *wb);

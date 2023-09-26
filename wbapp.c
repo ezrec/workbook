@@ -34,7 +34,9 @@ struct wbApp {
     struct MsgPort *NotifyPort;
     ULONG           NotifyMask;   /* Mask of our port(s) */
     Object         *Root;      /* Background 'root' window */
+
     struct MinList  Windows; /* Subwindows */
+    BOOL CacheForced;
 
     // Execute... command buffer
     char ExecuteBuffer[128+1];
@@ -60,7 +62,7 @@ static void wbOpenDrawer(Class *cl, Object *obj, CONST_STRPTR path)
     BPTR lock = BNULL;
     if (path != NULL) {
         lock = Lock(path, SHARED_LOCK);
-        if (lock == NULL) {
+        if (lock == BNULL) {
             return;
         }
     }
@@ -192,6 +194,8 @@ static IPTR WBApp__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
         DoSuperMethod(cl, (Object *)rc, OM_DISPOSE);
         return 0;
     }
+
+    my->CacheForced = FALSE;
 
     DoMethod(my->Root, OM_ADDTAIL, &my->Windows);
 
@@ -565,7 +569,24 @@ static BOOL wbMenuPick(Class *cl, Object *obj, struct Window *win, UWORD menuNum
     return quit;
 }
 
-static void wbIntuiTick(Class *cl, Object *obj, struct Window *win)
+static void wbAppForAllWindowsA(Class *cl, Object *obj, Msg msg)
+{
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbApp *my = INST_DATA(cl, obj);
+    Object *ostate = (Object *)my->Windows.mlh_Head;
+    Object *owin;
+
+    while ((owin = NextObject(&ostate))) {
+        DoMethodA(owin, msg);
+    }
+}
+
+static void wbAppForAllWindows(Class *cl, Object *obj, ULONG MethodID, ...)
+{
+    wbAppForAllWindowsA(cl, obj, (Msg)&MethodID);
+}
+
+static void wbAppIntuiTick(Class *cl, Object *obj, struct Window *win)
 {
     struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbApp *my = INST_DATA(cl, obj);
@@ -593,10 +614,16 @@ static void wbIntuiTick(Class *cl, Object *obj, struct Window *win)
             Object *owin;
 
             while ((owin = NextObject(&ostate))) {
-                DoMethod(owin, WBWM_InvalidateContents);
+                DoMethod(owin, WBWM_InvalidateContents, (IPTR)BNULL);
                 DoMethod(owin, WBWM_IntuiTick);
             }
          }
+    }
+
+    // Set if we invalidated anything.
+    if (my->CacheForced) {
+        wbAppForAllWindows(cl, obj, WBWM_CacheContents);
+        my->CacheForced = FALSE;
     }
 
     if ((owin = wbLookupWindow(cl, obj, win))) {
@@ -604,26 +631,14 @@ static void wbIntuiTick(Class *cl, Object *obj, struct Window *win)
     }
 }
 
-static void wbForAllWindows(Class *cl, Object *obj, ULONG method)
-{
-    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
-    struct wbApp *my = INST_DATA(cl, obj);
-    Object *ostate = (Object *)my->Windows.mlh_Head;
-    Object *owin;
-
-    while ((owin = NextObject(&ostate))) {
-        DoMethod(owin, method);
-    }
-}
-
 static void wbHideAllWindows(Class *cl, Object *obj)
 {
-    wbForAllWindows(cl, obj, WBWM_Hide);
+    wbAppForAllWindows(cl, obj, WBWM_Hide);
 }
 
 static void wbShowAllWindows(Class *cl, Object *obj)
 {
-    wbForAllWindows(cl, obj, WBWM_Show);
+    wbAppForAllWindows(cl, obj, WBWM_Show);
 }
 
 static void wbCloseAllWindows(Class *cl, Object *obj)
@@ -703,7 +718,7 @@ static IPTR WBApp__WBAM_Workbench(Class *cl, Object *obj, Msg msg)
                         done = wbMenuPick(cl, obj, im->IDCMPWindow, im->Code);
                         break;
                     case IDCMP_INTUITICKS:
-                        wbIntuiTick(cl, obj, im->IDCMPWindow);
+                        wbAppIntuiTick(cl, obj, im->IDCMPWindow);
                         break;
                     default:
                         D(bug("im=%lx, Class=%ld, Code=%ld\n", (IPTR)im, (IPTR)im->Class, (IPTR)im->Code));
@@ -716,17 +731,12 @@ static IPTR WBApp__WBAM_Workbench(Class *cl, Object *obj, Msg msg)
 
             if (mask & my->NotifyMask) {
                 struct NotifyMessage *nm;
-                BOOL invalidated = FALSE;
                 D(bug("%s: Notify messages waiting.\n", __func__));
                 while ((nm = (APTR)GetMsg(my->NotifyPort)) != NULL) {
                     Object *wbwin = (Object *)nm->nm_NReq->nr_UserData;
                     D(bug("%s: Notfied: %lx\n", __func__, (IPTR)wbwin));
-                    DoMethod(wbwin, WBWM_InvalidateContents);
-                    invalidated = TRUE;
-                }
-
-                if (invalidated) {
-                    wbForAllWindows(cl, obj, WBWM_CacheContents);
+                    DoMethod(wbwin, WBWM_InvalidateContents, (IPTR)BNULL);
+                    my->CacheForced = TRUE;
                 }
             }
 
@@ -789,6 +799,16 @@ static IPTR WBApp__WBAM_DragDropEnd(Class *cl, Object *obj, Msg msg)
     return 0;
 }
 
+static IPTR WBApp__WBAM_InvalidateContents(Class *cl, Object *obj, struct wbam_InvalidateContents *wbami)
+{
+    struct wbApp *my = INST_DATA(cl, obj);
+
+    wbAppForAllWindows(cl, obj, WBWM_InvalidateContents, wbami->wbami_VolumeLock);
+
+    my->CacheForced = TRUE;
+
+    return 0;
+}
 
 static IPTR WBApp_dispatcher(Class *cl, Object *obj, Msg msg)
 {
@@ -806,6 +826,7 @@ static IPTR WBApp_dispatcher(Class *cl, Object *obj, Msg msg)
     METHOD_CASE(WBApp, WBAM_ForSelected);
     METHOD_CASE(WBApp, WBAM_ClearSelected);
     METHOD_CASE(WBApp, WBAM_ReportSelected);
+    METHOD_CASE(WBApp, WBAM_InvalidateContents);
     default:           rc = DoSuperMethodA(cl, obj, msg); break;
     }
 

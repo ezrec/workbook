@@ -300,7 +300,7 @@ static void wbAddVolumeIcons(Class *cl, Object *obj)
                     WBIA_ParentLock, BNULL,
                     WBIA_Screen, my->Window->WScreen,
                     TAG_END);
-            D(bug("Volume: %s => %p\n", text, iobj));
+            D(bug("%s: %s => %p\n", __func__, text, iobj));
             if (iobj) {
                 wbwiAppend(cl, obj, iobj);
             }
@@ -376,11 +376,14 @@ static void wbWindowRedimension(Class *cl, Object *obj)
 }
 
 // Invalidate the cache.
-static IPTR WBWindow__WBWM_InvalidateContents(Class *cl, Object *obj, Msg msg)
+static IPTR WBWindow__WBWM_InvalidateContents(Class *cl, Object *obj, struct wbwm_InvalidateContents *wbwmi)
 {
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbWindow *my = INST_DATA(cl, obj);
 
-    my->Notify.Cached = FALSE;
+    if (my->Lock == BNULL || wbwmi->wbwmi_VolumeLock == BNULL || SameDevice(wbwmi->wbwmi_VolumeLock, my->Lock)) {
+        my->Notify.Cached = FALSE;
+    }
 
     return 0;
 }
@@ -841,8 +844,7 @@ static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
     NEWLIST(&my->IconList);
 
     BPTR lock = (BPTR)GetTagData(WBWA_Lock, (IPTR)BNULL, ops->ops_AttrList);
-    if (lock == NULL) {
-        my->Lock = BNULL;
+    if (lock == BNULL) {
         my->Path = NULL;
     } else {
         my->Lock = DupLock(lock);
@@ -1210,7 +1212,7 @@ static IPTR WBWindow__WBWM_ForSelected(Class *cl, Object *obj, struct wbwm_ForSe
 
     if (rescan) {
         if (my->Notify.Request.nr_stuff.nr_Msg.nr_Port==NULL) {
-            CoerceMethod(cl, obj, WBWM_InvalidateContents);
+            CoerceMethod(cl, obj, WBWM_InvalidateContents, (IPTR)BNULL);
             CoerceMethod(cl, obj, WBWM_CacheContents);
         }
     }
@@ -1413,7 +1415,7 @@ static IPTR WBWindow__WBWM_MenuPick(Class *cl, Object *obj, struct wbwm_MenuPick
 
     if (invalidate) {
         // Always force, regardless of notification mode.
-        CoerceMethod(cl, obj, WBWM_InvalidateContents);
+        CoerceMethod(cl, obj, WBWM_InvalidateContents, (IPTR)BNULL);
         CoerceMethod(cl, obj, WBWM_CacheContents);
     } else if (refresh) {
         wbWindowRefreshView(cl, obj);
@@ -1537,7 +1539,7 @@ static IPTR WBWindow__WBxM_DragDropped(Class *cl, Object *obj, struct wbxm_DragD
     }
 
     if (match) {
-        CoerceMethod(cl, obj, WBWM_InvalidateContents);
+        CoerceMethod(cl, obj, WBWM_InvalidateContents, (IPTR)BNULL);
     }
 
     return match ? TRUE : FALSE;
