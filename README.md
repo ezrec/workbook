@@ -2,7 +2,8 @@
 
 Copy to SYS:System/Workbook
 
-- Unreleased
+- v1.11
+  - Add Leave-Out & Put-Away in Icon menu.
   - Add Backdrop menu item
   - Add Information.. window.
 - v1.10
