@@ -123,4 +123,47 @@ TEST(wbDeleteFromCurrent, existing)
     TEST_MEMUSED();
 }
 
+TEST(wbBackdrop, load_iter)
+{
+    struct TestFS fs[] = {
+        { "RAM:testcase_1", "empty" },
+        { "RAM:testcase_2", "empty" },
+        { "RAM:testcase_3", "empty" },
+        { "RAM:testdir", NULL },
+        { "RAM:testdir/testcase_4", "empty" },
+        { "RAM:.backdrop", "testcase_1\n" // Invalid
+                           "RAM:testcase_2\n" // Invalid
+                           ":testcase_3\n" // Valid
+                           ":testdir/testcase_4\n" // Valid
+                       },
+        { NULL },
+    };
+    TEST_FS(fs);
+
+
+    struct List backdrop;
+    BPTR ram = Lock("RAM:", SHARED_LOCK);
+    EXPECT_NE(ram, BNULL);
+    BPTR pwd = CurrentDir(ram);
+    wbBackdropLoadCurrent(&backdrop);
+    CurrentDir(pwd);
+
+    BPTR lock = BNULL;
+    BOOL pres = wbBackdropNext(&backdrop, lock, &lock);
+    EXPECT_FALSE(pres);
+    EXPECT_NE(lock, BNULL);
+    EXPECT_LOCK(lock, "RAM:testcase_3");
+    pres = wbBackdropNext(&backdrop, lock, &lock);
+    EXPECT_TRUE(pres);
+    EXPECT_NE(lock, BNULL);
+    EXPECT_LOCK(lock, "RAM:testdir/testcase_4");
+    pres = wbBackdropNext(&backdrop, lock, &lock);
+    EXPECT_TRUE(pres);
+    EXPECT_EQ(lock, BNULL);
+
+    wbBackdropFree(&backdrop);
+
+    UNTEST_FS(fs);
+}
+
 #endif

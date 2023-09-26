@@ -18,6 +18,7 @@
 
 #include <limits.h>
 #include <stdio.h>
+#include <string.h>
 
 #include <proto/dos.h>
 #include <proto/exec.h>
@@ -656,4 +657,181 @@ BOOL _wbDropOntoCurrentAt(struct Library *DOSBase, struct Library *IconBase, str
     SetIoErr(err);
 
     return ok;
+}
+
+// Load .backdrop file into a list of locks.
+void _wbBackdropLoadCurrent(struct Library *DOSBase, struct List *backdrops)
+{
+    ASSERT_VALID_PROCESS((struct Process *)FindTask(NULL));
+
+    NEWLIST(backdrops);
+
+    STRPTR buff = AllocVec(PATH_MAX, MEMF_ANY);
+    if (!buff) {
+        return;
+    }
+
+    BPTR fh = Open(".backdrop", MODE_OLDFILE);
+    D(if (fh == BNULL) bug("%s: No .backdrop on volume\n", sCURRDIR()); );
+    if (fh != BNULL) {
+        while (FGets(fh, buff, PATH_MAX) != NULL) {
+            size_t len = STRLEN(buff);
+            if (len > 0 && buff[len-1] == '\n') {
+                buff[len-1] = 0;
+            }
+            // Every (valid) line in .backdrop must start with a ':', as it is a volume relative abspath!
+            if (buff[0] != ':') {
+                D(bug("%s.backdrop: '%s' <= DIDN'T START WITH ':'\n", sCURRDIR(), buff));
+                continue;
+            }
+            D(bug("%s.backdrop: '%s'\n", sCURRDIR(), buff));
+            struct Node *node = AllocVec(sizeof(*node), MEMF_ANY | MEMF_CLEAR);
+            D(if (node == NULL) bug("%s.backdrop:  OOM?\n", sCURRDIR()));
+            if (node != NULL) {
+                BPTR backdrop_lock = Lock(buff, SHARED_LOCK);
+                if (backdrop_lock != BNULL) {
+                    D(bug("%s: %s.backdrop: %s\n",__func__, sCURRDIR(), sLOCKNAME(backdrop_lock)));
+                    node->ln_Name = (APTR)backdrop_lock;
+                    AddTail(backdrops, node);
+                } else {
+                    D(bug("%s: %s.backdrop: %s - %ld\n",__func__, sCURRDIR(), buff, IoErr()));
+                    FreeVec(node);
+                }
+            }
+        }
+        Close(fh);
+    }
+
+    FreeVec(buff);
+}
+
+void wbBackdropFree(struct List *backdrops)
+{
+    struct Node *node;
+    while ((node = RemHead(backdrops)) != NULL) {
+        UnLock((BPTR)node->ln_Name);
+        FreeVec(node);
+    }
+}
+
+// Save .backdrop file into a list of locks.
+BOOL _wbBackdropSaveCurrent(struct Library *DOSBase, struct List *backdrops)
+{
+    BOOL ok = FALSE;
+    BPTR fh = Open(".backdrop", MODE_NEWFILE);
+    D(bug("%s: Open %s.backdrop\n", __func__, sCURRDIR()));
+    D(if (fh == BNULL) bug("%s: Can't open .backdrop on '%s': %ld\n", __func__, sCURRDIR(), IoErr()); );
+    if (fh != BNULL) {
+        struct Node *node;
+
+        ForeachNode(backdrops, node) {
+            D(bug("%s: %s.backdrop lock %lx\n", __func__, sCURRDIR(), (IPTR)node->ln_Name));
+            STRPTR path = wbAbspathLock((BPTR)node->ln_Name);
+            if (path) {
+                D(bug("%s: %s.backdrop %s\n", __func__, sCURRDIR(), path));
+                // Find leading volume name
+                char *cp = strchr(path, ':');
+                if (cp) {
+                    D(bug("%s: %s.backdrop: << %s\n", __func__, sCURRDIR(), cp));
+                    FPuts(fh, cp);
+                    FPuts(fh, "\n");
+                }
+
+                FreeVec(path);
+            }
+
+        }
+
+        D(bug("%s: Close %s.backdrop\n", __func__, sCURRDIR()));
+        Close(fh);
+        ok = TRUE;
+    }
+
+    return ok;
+}
+
+BOOL _wbBackdropContains(struct Library *DOSBase, struct List *backdrops, BPTR lock)
+{
+    struct Node *node;
+    BOOL found = FALSE;
+    ForeachNode(backdrops, node) {
+        if (SameLock((BPTR)node->ln_Name, lock) == LOCK_SAME) {
+            found = TRUE;
+            break;
+        }
+    }
+
+    return found;
+}
+
+BOOL _wbBackdropAdd(struct Library *DOSBase, struct List *backdrops, BPTR lock)
+{
+    if (wbBackdropContains(backdrops, lock)) {
+        D(bug("%s: Backdrop already has %s in it!\n", __func__, sLOCKNAME(lock)));
+        return TRUE;
+    }
+
+    BOOL added = FALSE;
+    struct Node *node = AllocVec(sizeof(struct Node), MEMF_ANY | MEMF_CLEAR);
+    if (node) {
+        BPTR duplock = DupLock(lock);
+        D(bug("%s: Adding DupLock(%lx) => %lx\n", __func__, lock, duplock));
+        if (duplock != BNULL) {
+            node->ln_Name = (APTR)duplock;
+            AddTail(backdrops, node);
+            added = TRUE;
+        } else {
+            FreeVec(node);
+        }
+    }
+
+    return added;
+}
+
+BOOL _wbBackdropDel(struct Library *DOSBase, struct List *backdrops, BPTR lock)
+{
+    struct Node *node;
+    BOOL removed = FALSE;
+    ForeachNode(backdrops, node) {
+        if (SameLock((BPTR)node->ln_Name, lock) == LOCK_SAME) {
+            Remove(node);
+            UnLock((BPTR)node->ln_Name);
+            FreeVec(node);
+            removed = TRUE;
+            break;
+        }
+    }
+
+    return removed;
+}
+
+BOOL _wbBackdropNext(struct Library *DOSBase, struct List *backdrops, BPTR lock, BPTR *next_ptr)
+{
+    struct Node *node;
+    BPTR next = BNULL;
+
+    BOOL present = FALSE;
+    BOOL valid = FALSE;
+    ForeachNode(backdrops, node) {
+        if (next == lock) {
+            // This also catches the 'lock == BNULL' first case.
+            next = (BPTR)node->ln_Name;
+            valid = TRUE;
+            break;
+        }
+        if (lock == (BPTR)node->ln_Name) {
+            // Mark that the next lock should be returned.
+            next = lock;
+            present = TRUE;
+        }
+    }
+
+    if (!valid) {
+        next = BNULL;
+    }
+
+    D(bug("%s: lock=%lx, next=%lx\n", __func__, (IPTR)lock, (IPTR)next));
+    *next_ptr = next;
+
+    return present;
 }
