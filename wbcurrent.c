@@ -272,7 +272,8 @@ static BOOL wbBumpRevisionCurrent(struct Library *DOSBase, CONST_STRPTR oldname,
     return index != 0;
 }
 
-static inline CONST_STRPTR _sCURRDIR(struct Library *DOSBase) {
+#if DEBUG
+CONST_STRPTR _sCURRDIR(struct Library *DOSBase) {
     BPTR pwd = CurrentDir(BNULL);
     CurrentDir(pwd);
 
@@ -280,14 +281,13 @@ static inline CONST_STRPTR _sCURRDIR(struct Library *DOSBase) {
     NameFromLock(pwd, path, sizeof(path));
     return path;
 }
-#define sCURRDIR() _sCURRDIR(DOSBase)
 
-static inline CONST_STRPTR _sLOCKNAME(struct Library *DOSBase, BPTR lock) {
+CONST_STRPTR _sLOCKNAME(struct Library *DOSBase, BPTR lock) {
     static char path[PATH_MAX];
     NameFromLock(lock, path, sizeof(path));
     return path;
 }
-#define sLOCKNAME(lock) _sLOCKNAME(DOSBase, lock)
+#endif
 
 
 // Copy a single file/directory to here.
