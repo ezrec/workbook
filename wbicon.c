@@ -397,6 +397,9 @@ static IPTR WBIcon__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
 
     wbIcon_Update(cl, obj);
 
+    // Do any OM_SETs
+    CoerceMethod(cl, obj, OM_SET, ops->ops_AttrList, NULL);
+
     return (IPTR)obj;
 }
 
@@ -1042,7 +1045,11 @@ static IPTR WBIcon__WBIM_Leave_Out(Class *cl, Object *obj, Msg msg)
 
     ASSERT_VALID_PROCESS((struct Process *)FindTask(NULL));
 
-    SetAttrs(obj, WBIA_Backdrop, TRUE, TAG_END);
+    SetAttrs(obj, WBIA_Backdrop, TRUE,
+                  WBIA_DoCurrentX, NO_ICON_POSITION,
+                  WBIA_DoCurrentY, NO_ICON_POSITION,
+                  TAG_END);
+    CoerceMethod(cl, obj, WBIM_Snapshot);
 
     return 0;
 }
@@ -1054,7 +1061,11 @@ static IPTR WBIcon__WBIM_Put_Away(Class *cl, Object *obj, Msg msg)
 
     ASSERT_VALID_PROCESS((struct Process *)FindTask(NULL));
 
-    SetAttrs(obj, WBIA_Backdrop, FALSE, TAG_END);
+    SetAttrs(obj, WBIA_Backdrop, FALSE,
+                  WBIA_DoCurrentX, NO_ICON_POSITION,
+                  WBIA_DoCurrentY, NO_ICON_POSITION,
+                  TAG_END);
+    CoerceMethod(cl, obj, WBIM_Snapshot);
 
     return 0;
 }

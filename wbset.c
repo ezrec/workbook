@@ -35,13 +35,13 @@
 struct wbSetNode {
     struct Node sn_Node;
     Object        *sn_Object;   // Gadget object
-    BOOL           sn_Backdrop;    // Is in the backdrop?
+    BOOL           sn_Backdrop;    // Is the backdrop set?
     LONG           sn_CurrentX;    // do_CurrentX cache.
     LONG           sn_CurrentY;    // do_CurrentY cache.
 };
 
 #define IS_VISIBLE(node)    ((node)->sn_Backdrop == my->Backdrop)
-#define IS_ARRANGED(node)   (!(node)->sn_Backdrop && (node)->sn_CurrentX != (LONG)NO_ICON_POSITION) && ((node)->sn_CurrentY != (LONG)NO_ICON_POSITION)
+#define IS_ARRANGED(node)   ((node)->sn_CurrentX != (LONG)NO_ICON_POSITION) && ((node)->sn_CurrentY != (LONG)NO_ICON_POSITION)
 
 struct wbSet {
     struct List SetObjects;
