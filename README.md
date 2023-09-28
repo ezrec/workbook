@@ -2,6 +2,8 @@
 
 Copy to SYS:System/Workbook
 
+- Unreleases
+  - Fix issue introduced in v1.11 where windows could only be resized to be smaller.
 - v1.11
   - Add Leave-Out & Put-Away in Icon menu.
   - Add Backdrop menu item
