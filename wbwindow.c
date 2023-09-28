@@ -666,6 +666,8 @@ static struct Window *wbWindowNew(Class *cl, Object *obj, BOOL backdrop, struct 
                         WA_IDCMP, userport ? 0 : idcmp,
                         WA_MinWidth, 100,
                         WA_MinHeight, 100,
+                        WA_MaxWidth, ~0,
+                        WA_MaxHeight, ~0,
                         WA_Backdrop, FALSE,
                         WA_WBenchWindow, TRUE,
                         WA_Title,    my->Path != NULL ? my->Path : (STRPTR)AS_STRING(WB_NAME),
