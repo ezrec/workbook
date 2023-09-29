@@ -219,8 +219,9 @@ Class *WBSet_MakeClass(struct WorkbookBase *wb);
 #define WBIM_DragDropAdd         (WBIM_Dummy + 11)       // (GadgetInfo *, Object *WBDragDrop) use WBDM_Add to add icon imagery
 
 /* Return flags for all WBIM_ methods */
-#define WBIF_OK                 (0)         // Window imagery unchanged.
-#define WBIF_REFRESH            (1 << 0)    // Refresh of containing window requested
+#define WBIF_OK                 (0)        // Window imagery unchanged.
+#define WBIF_REFRESH           (1 << 0)    // Refresh of imagery only.
+#define WBIF_UPDATE            (1 << 1)    // Update of containing window contents.
 
 struct wbim_DragDropAdd {
     STACKED ULONG MethodID;
