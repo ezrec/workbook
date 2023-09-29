@@ -217,6 +217,7 @@ Class *WBSet_MakeClass(struct WorkbookBase *wb);
 #define WBIM_Format              (WBIM_Dummy + 9)        // NA
 #define WBIM_Empty_Trash         (WBIM_Dummy + 10)       // NA
 #define WBIM_DragDropAdd         (WBIM_Dummy + 11)       // (GadgetInfo *, Object *WBDragDrop) use WBDM_Add to add icon imagery
+#define WBIM_MoveBy              (WBIM_Dummy + 12)       // (GadgetInfo *, LONG deltaX, LONG deltaY)
 
 /* Return flags for all WBIM_ methods */
 #define WBIF_OK                 (0)        // Window imagery unchanged.
@@ -227,6 +228,13 @@ struct wbim_DragDropAdd {
     STACKED ULONG MethodID;
     STACKED struct GadgetInfo *wbimd_GInfo;
     STACKED Object *wbimd_DragDrop;
+};
+
+struct wbim_MoveBy {
+    STACKED ULONG MethodID;
+    STACKED struct GadgetInfo *wbimm_GInfo;
+    STACKED LONG   wbimm_DeltaX;
+    STACKED LONG   wbimm_DeltaY;
 };
 
 Class *WBIcon_MakeClass(struct WorkbookBase *wb);

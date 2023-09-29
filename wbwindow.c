@@ -421,6 +421,17 @@ static IPTR WBWindow__WBWM_InvalidateContents(Class *cl, Object *obj, struct wbw
     return 0;
 }
 
+static UWORD wbWindowViewMode(struct wbWindow *my)
+{
+    // Set the set's view method
+    UWORD viewModes = DDVM_BYICON;
+    if (my->Path != NULL) {
+        viewModes = (my->dd_ViewModes == DDVM_BYDEFAULT) ? my->DefaultViewModes : my->dd_ViewModes;
+    }
+
+    return viewModes;
+}
+
 // Refresh the view of the set
 static void wbWindowRefreshView(Class *cl, Object *obj)
 {
@@ -428,10 +439,7 @@ static void wbWindowRefreshView(Class *cl, Object *obj)
     struct wbWindow *my = INST_DATA(cl, obj);
 
     // Set the set's view method
-    UWORD viewModes = DDVM_BYICON;
-    if (my->Path != NULL) {
-        viewModes = (my->dd_ViewModes == DDVM_BYDEFAULT) ? my->DefaultViewModes : my->dd_ViewModes;
-    }
+    UWORD viewModes = wbWindowViewMode(my);
 
     // Set clean-up enabled/disabled
     ULONG mn_clean_up = wbMenuNumber(WBMENU_ID(WBMENU_WN_CLEAN_UP));
@@ -899,12 +907,7 @@ static IPTR WBWindow__OM_NEW(Class *cl, Object *obj, struct opSet *ops)
     struct MsgPort *notifyport = (struct MsgPort *)GetTagData(WBWA_NotifyPort, (IPTR)NULL, ops->ops_AttrList);
 
     /* Create icon set */
-    UWORD viewModes;
-    if (my->Path == NULL) {
-        viewModes = DDVM_BYICON;  // Only option for the root window.
-    } else {
-        viewModes = (my->dd_ViewModes == DDVM_BYDEFAULT) ? my->DefaultViewModes : my->dd_ViewModes;
-    }
+    UWORD viewModes = wbWindowViewMode(my);
 
     my->Set = NewObject(WBSet, NULL,
                 WBSA_ViewModes, (IPTR)viewModes,
@@ -1218,7 +1221,8 @@ static IPTR WBWindow__WBWM_ForSelected(Class *cl, Object *obj, struct wbwm_ForSe
 
     BOOL modifier = (wbwmf->wbwmf_Msg->MethodID == WBIM_Rename ||
                      wbwmf->wbwmf_Msg->MethodID == WBIM_Copy   ||
-                     wbwmf->wbwmf_Msg->MethodID == WBIM_Delete );
+                     wbwmf->wbwmf_Msg->MethodID == WBIM_Delete ||
+                     wbwmf->wbwmf_Msg->MethodID == WBIM_MoveBy);
 
     if (modifier) {
         SetWindowPointer(my->Window, WA_BusyPointer, TRUE, WA_PointerDelay, TRUE, TAG_END);

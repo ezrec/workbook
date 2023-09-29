@@ -1177,6 +1177,26 @@ static IPTR WBIcon__WBIM_DragDropAdd(Class *cl, Object *obj, struct wbim_DragDro
     return DoMethod(wbimd->wbimd_DragDrop, WBDM_Add, (IPTR)WBDT_RECTANGLE, (IPTR)&rect);
 }
 
+static IPTR WBIcon__WBIM_MoveBy(Class *cl, Object *obj, struct wbim_MoveBy *wbimm)
+{
+    struct wbIcon *my = INST_DATA(cl, obj);
+
+    IPTR rc = WBIF_OK;
+    if (my->DiskObject->do_CurrentX != (LONG)NO_ICON_POSITION &&
+        my->DiskObject->do_CurrentY != (LONG)NO_ICON_POSITION) {
+        my->DiskObject->do_CurrentX += wbimm->wbimm_DeltaX;
+        my->DiskObject->do_CurrentY += wbimm->wbimm_DeltaY;
+
+        D(bug("%s: Moved %s by %ld,%ld to %ld,%ld\n", __func__, my->File, wbimm->wbimm_DeltaX, wbimm->wbimm_DeltaY, my->DiskObject->do_CurrentX, my->DiskObject->do_CurrentY));
+        // Request a refresh of the window.
+        rc = WBIF_REFRESH;
+    } else {
+        D(bug("%s: Unable to move (auto-arrange) %s by %ld,%ld\n", __func__, my->File, wbimm->wbimm_DeltaX, wbimm->wbimm_DeltaY));
+    }
+
+    return rc;
+}
+
 static IPTR WBIcon__WBxM_DragDropped(Class *cl, Object *obj, struct wbxm_DragDropped *wbxmd)
 {
     ASSERT_VALID_PROCESS((struct Process *)FindTask(NULL));
@@ -1277,6 +1297,7 @@ static IPTR WBIcon_dispatcher(Class *cl, Object *obj, Msg msg)
     METHOD_CASE(WBIcon, WBIM_Format);
     METHOD_CASE(WBIcon, WBIM_Empty_Trash);
     METHOD_CASE(WBIcon, WBIM_DragDropAdd);
+    METHOD_CASE(WBIcon, WBIM_MoveBy);
     METHOD_CASE(WBIcon, WBxM_DragDropped);
     default:               rc = DoSuperMethodA(cl, obj, msg); break;
     }
