@@ -3,6 +3,7 @@
 Copy to SYS:System/Workbook
 
 - Unreleases
+  - Add icon move via drag/drop.
   - Fix issue introduced in v1.11 where windows could only be resized to be smaller.
 - v1.11
   - Add Leave-Out & Put-Away in Icon menu.

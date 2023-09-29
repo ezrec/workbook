@@ -1567,8 +1567,17 @@ static IPTR WBWindow__WBxM_DragDropped(Class *cl, Object *obj, struct wbxm_DragD
         return FALSE;
     }
 
+    // Did we start in the virtual scroll window also?
+    LONG originX = wbxmd->wbxmd_OriginX - my->Window->BorderLeft;
+    LONG originY = wbxmd->wbxmd_OriginY - my->Window->BorderTop;
+    D(bug("%s: DragDrop origin is %ld,%ld relative this window.\n", __func__, originX, originY));
+    BOOL origin_here = FALSE;
+    if (originX >= 0 && originY >= 0 && originX < area->Width && originY < area->Height) {
+        origin_here = TRUE;
+    }
+
     // Do the DragDropped on the area.
-    IPTR match = DoGadgetMethod((struct Gadget *)my->Area, my->Window, NULL, WBxM_DragDropped, NULL, areaX, areaY);
+    IPTR match = DoGadgetMethod((struct Gadget *)my->Area, my->Window, NULL, WBxM_DragDropped, NULL, areaX, areaY, originX, originY);
     if (!match) {
         // Compute the offset into the virtual area
         IPTR tmp;
@@ -1577,14 +1586,24 @@ static IPTR WBWindow__WBxM_DragDropped(Class *cl, Object *obj, struct wbxm_DragD
         GetAttr(WBVA_VirtTop, my->Area, &tmp);
         WORD virtTop = (WORD)tmp;
 
-        LONG targetX = areaX + virtLeft;
-        LONG targetY = areaY + virtTop;
+        if (origin_here) {
+            // Started here, so it may be an icon move for the icons, _not_ a drop-into operation.
+            // If we're not in an icon view mode, return TRUE, which will suppress the WBApp attempt to
+            // move all the selected icons by a delta. Otherwise, return FALSE, and WBApp will move all selected
+            // icons by delta.
+            D(bug("%s: DragDrop started here, ended here, and not on an icon.\n", __func__));
+            UWORD viewModes = wbWindowViewMode(my);
+            return (viewModes != DDVM_BYICON);
+        } else {
+            LONG targetX = areaX + virtLeft;
+            LONG targetY = areaY + virtTop;
 
-        // Area didn't have an icon that could accept it, so we will!
-        D(bug("%s: DragDrop accepted by %s, relMouse (%ld, %ld)\n", __func__, my->Path, (IPTR)targetX, (IPTR)targetY));
-        D(wbDebugReportSelected(wb));
+            // Area didn't have an icon that could accept it, so we will!
+            D(bug("%s: DragDrop accepted by %s, relMouse (%ld, %ld)\n", __func__, my->Path, (IPTR)targetX, (IPTR)targetY));
+            D(wbDebugReportSelected(wb));
 
-        match = wbWindowDragDropAccept(cl, obj, targetX, targetY);
+            match = wbWindowDragDropAccept(cl, obj, targetX, targetY);
+        }
     }
 
     if (match) {

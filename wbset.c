@@ -664,11 +664,14 @@ static IPTR WBSet__WBxM_DragDropped(Class *cl, Object *obj, struct wbxm_DragDrop
 
     Object *target = NULL;
     ULONG gadgetX, gadgetY;
+    LONG originX, originY;
 
     ForeachNodeSafe(&my->SetObjects, node, next) {
         struct Gadget *subgad = (struct Gadget *)node->sn_Object;
         gadgetX = gadget->LeftEdge + wbxmd->wbxmd_MouseX - subgad->LeftEdge;
         gadgetY = gadget->TopEdge + wbxmd->wbxmd_MouseY - subgad->TopEdge;
+        originX = gadget->LeftEdge + (LONG)wbxmd->wbxmd_OriginX - subgad->LeftEdge;
+        originY = gadget->TopEdge + (LONG)wbxmd->wbxmd_OriginY - subgad->TopEdge;
         struct gpHitTest gpht = {
             .MethodID = GM_HITTEST,
             .gpht_GInfo = wbxmd->wbxmd_GInfo,
@@ -678,14 +681,14 @@ static IPTR WBSet__WBxM_DragDropped(Class *cl, Object *obj, struct wbxm_DragDrop
             },
         };
         if (DoMethodA(node->sn_Object, (Msg)&gpht)) {
-            // Hit!
+            // Hit an icon!
             target = node->sn_Object;
         }
     }
 
     if (target) {
         // Send the DragDrop to the target object
-        rc = DoMethod(target, WBxM_DragDropped, NULL, gadgetX, gadgetY);
+        rc = DoMethod(target, WBxM_DragDropped, NULL, gadgetX, gadgetY, originX, originY);
     }
 
     return rc;
