@@ -61,6 +61,22 @@ static void wbGABox(Object *obj, struct IBox *box)
     box->Height = gadget->Height;
 }
 
+static void wbSetUpdateNode(Class *cl, Object *obj,  struct wbSetNode *node)
+{
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
+    struct wbSet *my = INST_DATA(cl, obj);
+
+    Object *iobj = node->sn_Object;
+    GetAttr(WBIA_Label, iobj, (IPTR *)&node->sn_Node.ln_Name);
+    IPTR tmp;
+    GetAttr(WBIA_Backdrop, iobj, &tmp);
+    node->sn_Backdrop = (BOOL)tmp;
+    GetAttr(WBIA_DoCurrentX, iobj, &tmp);
+    node->sn_CurrentX = (LONG)tmp;
+    GetAttr(WBIA_DoCurrentY, iobj, &tmp);
+    node->sn_CurrentY = (LONG)tmp;
+}
+
 // OM_ADDMEMBER
 static IPTR WBSet__OM_ADDMEMBER(Class *cl, Object *obj, struct opMember *opm)
 {
@@ -76,17 +92,9 @@ static IPTR WBSet__OM_ADDMEMBER(Class *cl, Object *obj, struct opMember *opm)
     if (node) {
         node->sn_Object = iobj;
 
-        /* Get bounding box of item to add */
-        wbGABox(iobj, &ibox);
+        // Cache some useful info.
+        wbSetUpdateNode(cl, obj, node);
 
-        GetAttr(WBIA_Label, iobj, (IPTR *)&node->sn_Node.ln_Name);
-        IPTR tmp;
-        GetAttr(WBIA_Backdrop, iobj, &tmp);
-        node->sn_Backdrop = (BOOL)tmp;
-        GetAttr(WBIA_DoCurrentX, iobj, &tmp);
-        node->sn_CurrentX = (LONG)tmp;
-        GetAttr(WBIA_DoCurrentY, iobj, &tmp);
-        node->sn_CurrentY = (LONG)tmp;
         AddTail(&my->SetObjects, &node->sn_Node);
 
         SetAttrs(iobj, WBIA_ListView, my->ViewModes != DDVM_BYICON, TAG_END);
@@ -312,18 +320,31 @@ static void wbSetSort(Class *cl, Object *obj)
 // WBSM_Clean_Up
 static IPTR WBSet__WBSM_Clean_Up(Class *cl, Object *obj, struct wbsm_CleanUp *wbscu)
 {
+    struct WorkbookBase *wb = (APTR)cl->cl_UserData;
     struct wbSet *my = INST_DATA(cl, obj);
     struct wbSetNode *node, *next;
 
     ForeachNodeSafe(&my->SetObjects, node, next) {
-        node->sn_CurrentX = (LONG)NO_ICON_POSITION;
-        node->sn_CurrentY = (LONG)NO_ICON_POSITION;
+        SetAttrs(node->sn_Object, WBIA_DoCurrentX, (IPTR)(LONG)NO_ICON_POSITION,
+                                  WBIA_DoCurrentY, (IPTR)(LONG)NO_ICON_POSITION,
+                                  TAG_END);
     }
 
     my->Arranged = FALSE;
 
     return 0;
 }
+
+// WBSM_Arrange
+static IPTR WBSet__WBSM_Arrange(Class *cl, Object *obj, struct wbsm_CleanUp *wbscu)
+{
+    struct wbSet *my = INST_DATA(cl, obj);
+
+    my->Arranged = FALSE;
+
+    return 0;
+}
+
 
 static IPTR WBSet__GM_LAYOUT(Class *cl, Object *obj, struct gpLayout *gpl)
 {
@@ -342,6 +363,9 @@ static IPTR WBSet__GM_LAYOUT(Class *cl, Object *obj, struct gpLayout *gpl)
     ForeachNode(&my->SetObjects, node) {
         SetAttrs(node->sn_Object, WBIA_ListView, (IPTR)listView, TAG_END);
         DoSuperMethod(cl, obj, OM_REMMEMBER, node->sn_Object);
+
+        // Re-cache node information.
+        wbSetUpdateNode(cl, obj, node);
     }
 
     // Sort.
@@ -685,6 +709,7 @@ static IPTR WBSet_dispatcher(Class *cl, Object *obj, Msg msg)
     METHOD_CASE(WBSet, GM_GOINACTIVE);
     METHOD_CASE(WBSet, WBSM_Select);
     METHOD_CASE(WBSet, WBSM_Clean_Up);
+    METHOD_CASE(WBSet, WBSM_Arrange);
     METHOD_CASE(WBSet, WBxM_DragDropped);
     default:            rc = DoSuperMethodA(cl, obj, msg); break;
     }
