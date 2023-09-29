@@ -2,7 +2,7 @@
 
 Copy to SYS:System/Workbook
 
-- Unreleases
+- v1.12
   - Add icon move via drag/drop.
   - Fix issue introduced in v1.11 where windows could only be resized to be smaller.
 - v1.11
