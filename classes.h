@@ -252,6 +252,8 @@ Class *WBIcon_MakeClass(struct WorkbookBase *wb);
 /* Attributes */
 #define WBDA_Dummy              (TAG_USER | 0x40450000)
 #define WBDA_Screen             (WBDM_Dummy + 0)    // (struct Screen *) [OM_NEW]
+#define WBDA_OriginX            (WBDM_Dummy + 1)    // (UWORD) [OM_GET] Screen's MouseX at start of drag/drop
+#define WBDA_OriginY            (WBDM_Dummy + 2)    // (UWORD) [OM_GET] Screen's MouseY at start of drag/drop
 
 /* Methods */
 //

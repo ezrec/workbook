@@ -105,6 +105,31 @@ static IPTR WBDragDrop__OM_DISPOSE(Class *cl, Object *obj, Msg msg)
     return DoSuperMethodA(cl, obj, msg);
 }
 
+static IPTR WBDragDrop__OM_GET(Class *cl, Object *obj, struct opGet *opg)
+{
+    struct wbDragDrop *my = INST_DATA(cl, obj);
+
+    IPTR ok = TRUE;
+
+    switch (opg->opg_AttrID) {
+    case WBDA_OriginX:
+        *(opg->opg_Storage) = (IPTR)my->OriginX;
+        break;
+    case WBDA_OriginY:
+        *(opg->opg_Storage) = (IPTR)my->OriginY;
+        break;
+    default:
+        ok = FALSE;
+        break;
+    }
+
+    if (!ok) {
+        ok = DoSuperMethodA(cl, obj, (Msg)opg);
+    }
+
+    return ok;
+}
+
 static inline WORD ABS(WORD n) { return n < 0 ? -n : n; }
 
 static IPTR WBDragDrop__WBDM_Update(Class *cl, Object *obj, Msg msg)
@@ -217,6 +242,7 @@ static IPTR WBDragDrop_dispatcher(Class *cl, Object *obj, Msg msg)
     switch (msg->MethodID) {
     METHOD_CASE(WBDragDrop, OM_NEW);
     METHOD_CASE(WBDragDrop, OM_DISPOSE);
+    METHOD_CASE(WBDragDrop, OM_GET);
     METHOD_CASE(WBDragDrop, WBDM_Begin);
     METHOD_CASE(WBDragDrop, WBDM_Update);
     METHOD_CASE(WBDragDrop, WBDM_End);
