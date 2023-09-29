@@ -1213,7 +1213,8 @@ static IPTR WBWindow__WBWM_ForSelected(Class *cl, Object *obj, struct wbwm_ForSe
     struct wbWindow *my = INST_DATA(cl, obj);
     struct wbWindow_Icon *wbwi;
     IPTR count = 0;
-    BOOL rescan = FALSE;
+    BOOL update = FALSE;
+    BOOL refresh= FALSE;
 
     BOOL modifier = (wbwmf->wbwmf_Msg->MethodID == WBIM_Rename ||
                      wbwmf->wbwmf_Msg->MethodID == WBIM_Copy   ||
@@ -1232,8 +1233,9 @@ static IPTR WBWindow__WBWM_ForSelected(Class *cl, Object *obj, struct wbwm_ForSe
             } else {
                 rc = DoMethodA(wbwi->wbwiObject, wbwmf->wbwmf_Msg);
             }
-            if (modifier && (rc & WBIF_REFRESH)) {
-                rescan |= TRUE;
+            if (modifier) {
+                update |= (rc & WBIF_UPDATE) == WBIF_UPDATE;
+                refresh|= (rc & WBIF_REFRESH) == WBIF_REFRESH;
             }
             GetAttr(GA_Selected, wbwi->wbwiObject, &selected);
             if (!selected) {
@@ -1247,10 +1249,16 @@ static IPTR WBWindow__WBWM_ForSelected(Class *cl, Object *obj, struct wbwm_ForSe
         SetWindowPointer(my->Window, WA_BusyPointer, FALSE, TAG_END);
     }
 
-    if (rescan) {
+    if (update) {
         if (my->Notify.Request.nr_stuff.nr_Msg.nr_Port==NULL) {
             CoerceMethod(cl, obj, WBWM_InvalidateContents, (IPTR)BNULL);
             CoerceMethod(cl, obj, WBWM_CacheContents);
+        }
+    } else {
+        if (refresh) {
+            DoMethod(my->Set, WBSM_Arrange);
+            // Refresh the view of the set.
+            wbWindowRefreshView(cl, obj);
         }
     }
 

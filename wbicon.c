@@ -976,7 +976,7 @@ static IPTR WBIcon__WBIM_Rename(Class *cl, Object *obj, Msg msg)
         ok = wbPopupAction(wb, "Rename", "Enter a new file name.", "New Name:", my->File, 0, ":/", rename_action, my);
     }
 
-    return ok ? WBIF_REFRESH : 0;
+    return ok ? WBIF_UPDATE : 0;
 }
 
 // WBIM_Info
@@ -1119,7 +1119,7 @@ static IPTR WBIcon__WBIM_Delete(Class *cl, Object *obj, Msg msg)
         wbPopupIoErr(wb, "Delete", err, my->File);
     }
 
-    return ok ? WBIF_REFRESH : 0;
+    return ok ? WBIF_UPDATE : 0;
 }
 
 // WBwbwiAppendIM_Format
