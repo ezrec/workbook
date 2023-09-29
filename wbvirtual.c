@@ -309,6 +309,8 @@ static IPTR WBVirtual__WBxM_DragDropped(Class *cl, Object *obj, struct wbxm_Drag
     m = *wbxmd;
     m.wbxmd_MouseX += my->Virt.Left;
     m.wbxmd_MouseY += my->Virt.Top;
+    m.wbxmd_OriginX += my->Virt.Left;
+    m.wbxmd_OriginY += my->Virt.Top;
 
     return DoMethodA(my->Gadget, (Msg)&m);
 }

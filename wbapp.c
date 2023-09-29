@@ -617,9 +617,24 @@ static void wbAppIntuiTick(Class *cl, Object *obj, struct Window *win)
             Object *wbwin = wbLookupWindow(cl, obj, win);
 
             if (wbwin) {
-                ULONG windowX = my->Screen->MouseX - win->LeftEdge;
-                ULONG windowY = my->Screen->MouseY - win->TopEdge;
-                ok = DoMethod(wbwin, WBxM_DragDropped, NULL, windowX, windowY);
+                LONG windowX = my->Screen->MouseX - win->LeftEdge;
+                LONG windowY = my->Screen->MouseY - win->TopEdge;
+
+                // Pass in the origin also.
+                IPTR tmp;
+                GetAttr(WBDA_OriginX, my->DragDrop, &tmp);
+                LONG originX = (LONG)tmp - win->LeftEdge;
+                GetAttr(WBDA_OriginY, my->DragDrop, &tmp);
+                LONG originY = (LONG)tmp - win->TopEdge;
+
+                ok = DoMethod(wbwin, WBxM_DragDropped, NULL, windowX, windowY, originX, originY);
+                if (!ok) {
+                    // This is a delta-move
+                    LONG deltaX = (LONG)windowX - (LONG)originX;
+                    LONG deltaY = (LONG)windowY - (LONG)originY;
+                    D(bug("%s: DELTA MOVE: %ld,%ld\n", __func__, deltaX, deltaY));
+                    wbAppForSelected(cl, obj, WBIM_MoveBy, NULL, deltaX, deltaY);
+                }
             }
         }
         if (ok) {

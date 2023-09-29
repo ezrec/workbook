@@ -287,6 +287,8 @@ struct wbxm_DragDropped {
     STACKED struct GadgetInfo *wbxmd_GInfo;
     STACKED LONG              wbxmd_MouseX;
     STACKED LONG              wbxmd_MouseY;
+    STACKED LONG              wbxmd_OriginX;
+    STACKED LONG              wbxmd_OriginY;
 };
 
 /* WBBackdrop Class
