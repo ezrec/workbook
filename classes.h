@@ -151,6 +151,7 @@ Class *WBVirtual_MakeClass(struct WorkbookBase *wb);
 #define WBSM_Dummy               (TAG_USER | 0x40430100)
 #define WBSM_Select              (WBSM_Dummy + 0)
 #define WBSM_Clean_Up            (WBSM_Dummy + 1)
+#define WBSM_Arrange             (WBSM_Dummy + 2)
 
 struct wbsm_Select {
     STACKED ULONG MethodID;
